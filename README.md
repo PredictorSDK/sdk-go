@@ -1,4 +1,4 @@
-# PredictorSDK Go Client
+# sdk-go
 
 The official Go client for the [PredictorSDK](https://predictorsdk.com) matching markets API.
 
@@ -8,6 +8,32 @@ The official Go client for the [PredictorSDK](https://predictorsdk.com) matching
 go get github.com/PredictorSDK/sdk-go
 ```
 
+## Usage
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+
+	predictorsdk "github.com/PredictorSDK/sdk-go"
+	"github.com/PredictorSDK/sdk-go/option"
+)
+
+func main() {
+	client := predictorsdk.NewClient(option.WithToken("your-api-key"))
+
+	response, err := client.GetSportsMatchingMarkets(context.TODO(), &predictorsdk.GetSportsMatchingMarketsRequest{
+		KalshiEventTicker: predictorsdk.String("KXMLB-25-NYM-COL-2025-04-03"),
+	})
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(response)
+}
+```
+
 ## Documentation
 
 - [Docs](https://docs.predictorsdk.com)
@@ -15,4 +41,4 @@ go get github.com/PredictorSDK/sdk-go
 
 ## License
 
-[MIT](LICENSE)
+[MIT](https://github.com/PredictorSDK/sdk-go/blob/main/LICENSE)
