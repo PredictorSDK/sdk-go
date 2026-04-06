@@ -1,4 +1,4 @@
-package api
+package predictorsdk
 
 import (
 	"io"

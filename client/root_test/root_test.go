@@ -10,7 +10,7 @@ import (
 	os "os"
 	testing "testing"
 
-	sdkgo "github.com/PredictorSDK/sdk-go"
+	predictorsdk "github.com/PredictorSDK/sdk-go"
 	client "github.com/PredictorSDK/sdk-go/client"
 	option "github.com/PredictorSDK/sdk-go/option"
 	require "github.com/stretchr/testify/require"
@@ -70,10 +70,10 @@ func TestGetSportsMatchingMarketsWithWireMock(
 	if WireMockBaseURL == "" {
 		WireMockBaseURL = "http://localhost:8080"
 	}
-	client := client.NewClient(
+	client := client.New(
 		option.WithBaseURL(WireMockBaseURL),
 	)
-	request := &sdkgo.GetSportsMatchingMarketsRequest{}
+	request := &predictorsdk.GetSportsMatchingMarketsRequest{}
 	_, invocationErr := client.GetSportsMatchingMarkets(
 		context.TODO(),
 		request,

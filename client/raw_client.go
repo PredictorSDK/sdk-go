@@ -6,7 +6,7 @@ import (
 	context "context"
 	http "net/http"
 
-	sdkgo "github.com/PredictorSDK/sdk-go"
+	predictorsdk "github.com/PredictorSDK/sdk-go"
 	core "github.com/PredictorSDK/sdk-go/core"
 	internal "github.com/PredictorSDK/sdk-go/internal"
 	option "github.com/PredictorSDK/sdk-go/option"
@@ -33,9 +33,9 @@ func NewRawClient(options *core.RequestOptions) *RawClient {
 
 func (r *RawClient) GetSportsMatchingMarkets(
 	ctx context.Context,
-	request *sdkgo.GetSportsMatchingMarketsRequest,
+	request *predictorsdk.GetSportsMatchingMarketsRequest,
 	opts ...option.RequestOption,
-) (*core.Response[*sdkgo.SportsMatchingResponse], error) {
+) (*core.Response[*predictorsdk.SportsMatchingResponse], error) {
 	options := core.NewRequestOptions(opts...)
 	baseURL := internal.ResolveBaseURL(
 		options.BaseURL,
@@ -54,7 +54,7 @@ func (r *RawClient) GetSportsMatchingMarkets(
 		r.options.ToHeader(),
 		options.ToHeader(),
 	)
-	var response *sdkgo.SportsMatchingResponse
+	var response *predictorsdk.SportsMatchingResponse
 	raw, err := r.caller.Call(
 		ctx,
 		&internal.CallParams{
@@ -66,13 +66,13 @@ func (r *RawClient) GetSportsMatchingMarkets(
 			QueryParameters: options.QueryParameters,
 			Client:          options.HTTPClient,
 			Response:        &response,
-			ErrorDecoder:    internal.NewErrorDecoder(sdkgo.ErrorCodes),
+			ErrorDecoder:    internal.NewErrorDecoder(predictorsdk.ErrorCodes),
 		},
 	)
 	if err != nil {
 		return nil, err
 	}
-	return &core.Response[*sdkgo.SportsMatchingResponse]{
+	return &core.Response[*predictorsdk.SportsMatchingResponse]{
 		StatusCode: raw.StatusCode,
 		Header:     raw.Header,
 		Body:       response,

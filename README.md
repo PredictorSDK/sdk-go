@@ -18,19 +18,20 @@ import (
 	"fmt"
 
 	predictorsdk "github.com/PredictorSDK/sdk-go"
+	predictorclient "github.com/PredictorSDK/sdk-go/client"
 	"github.com/PredictorSDK/sdk-go/option"
 )
 
 func main() {
-	client := predictorsdk.NewClient(option.WithToken("your-api-key"))
+	client := predictorclient.New(option.WithToken("your-api-key"))
 
 	response, err := client.GetSportsMatchingMarkets(context.TODO(), &predictorsdk.GetSportsMatchingMarketsRequest{
-		KalshiEventTicker: predictorsdk.String("KXMLB-25-NYM-COL-2025-04-03"),
+		KalshiEventTicker: []*string{predictorsdk.String("KXMLB-25-NYM-COL-2025-04-03")},
 	})
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(response)
+	fmt.Println(response.Markets)
 }
 ```
 

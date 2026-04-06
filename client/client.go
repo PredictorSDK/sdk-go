@@ -5,7 +5,7 @@ package client
 import (
 	context "context"
 
-	sdkgo "github.com/PredictorSDK/sdk-go"
+	predictorsdk "github.com/PredictorSDK/sdk-go"
 	core "github.com/PredictorSDK/sdk-go/core"
 	internal "github.com/PredictorSDK/sdk-go/internal"
 	option "github.com/PredictorSDK/sdk-go/option"
@@ -19,7 +19,7 @@ type Client struct {
 	caller  *internal.Caller
 }
 
-func NewClient(opts ...option.RequestOption) *Client {
+func New(opts ...option.RequestOption) *Client {
 	options := core.NewRequestOptions(opts...)
 	return &Client{
 		WithRawResponse: NewRawClient(options),
@@ -37,9 +37,9 @@ func NewClient(opts ...option.RequestOption) *Client {
 // Find cross-platform market matches for sports events. Provide a Kalshi event ticker or Polymarket market slug to look up the equivalent market on other platforms. When called without parameters, returns all currently matched sports markets.
 func (c *Client) GetSportsMatchingMarkets(
 	ctx context.Context,
-	request *sdkgo.GetSportsMatchingMarketsRequest,
+	request *predictorsdk.GetSportsMatchingMarketsRequest,
 	opts ...option.RequestOption,
-) (*sdkgo.SportsMatchingResponse, error) {
+) (*predictorsdk.SportsMatchingResponse, error) {
 	response, err := c.WithRawResponse.GetSportsMatchingMarkets(
 		ctx,
 		request,
