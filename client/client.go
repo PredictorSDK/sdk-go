@@ -50,3 +50,20 @@ func (c *Client) GetSportsMatchingMarkets(
 	}
 	return response.Body, nil
 }
+
+// Returns per-second price data for a Binance trading pair. When called without a time range, returns the latest price. With `start_time` and `end_time`, returns historical per-second prices in newest-first order. Supports cursor-based pagination for large result sets. Unknown or invalid symbols return `200` with `{"prices":[]}` and omit `total`.
+func (c *Client) GetBinanceCryptoPrices(
+	ctx context.Context,
+	request *predictorsdk.GetBinanceCryptoPricesRequest,
+	opts ...option.RequestOption,
+) (*predictorsdk.CryptoPricesResponse, error) {
+	response, err := c.WithRawResponse.GetBinanceCryptoPrices(
+		ctx,
+		request,
+		opts...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return response.Body, nil
+}

@@ -26,9 +26,41 @@
         }
       },
       "postServeActions": []
+    },
+    {
+      "id": "6083101e-0114-486a-a099-ce027f51d4ab",
+      "name": "Get Binance crypto prices - default",
+      "request": {
+        "urlPathTemplate": "/v1/crypto-prices/binance",
+        "method": "GET",
+        "queryParameters": {
+          "currency": {
+            "equalTo": "btcusdt"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": "{\n  \"prices\": [\n    {\n      \"symbol\": \"btcusdt\",\n      \"value\": 71392.81,\n      \"timestamp\": 1775680556000\n    },\n    {\n      \"symbol\": \"btcusdt\",\n      \"value\": 71392.82,\n      \"timestamp\": 1775680555000\n    },\n    {\n      \"symbol\": \"btcusdt\",\n      \"value\": 71388.51,\n      \"timestamp\": 1775680554000\n    }\n  ],\n  \"pagination_key\": \"eyJpZCI6IlBSSUNFI2J0Y3VzZHQiLCJ0aW1lc3RhbXAiOjE3NzU2ODA1NTQwMDB9\",\n  \"total\": 3\n}",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "uuid": "6083101e-0114-486a-a099-ce027f51d4ab",
+      "persistent": true,
+      "priority": 3,
+      "metadata": {
+        "mocklab": {
+          "created": {
+            "at": "2020-01-01T00:00:00.000Z",
+            "via": "SYSTEM"
+          }
+        }
+      },
+      "postServeActions": []
     }
   ],
   "meta": {
-    "total": 1
+    "total": 2
   }
 }

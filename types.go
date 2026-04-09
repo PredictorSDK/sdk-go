@@ -10,6 +10,72 @@ import (
 )
 
 var (
+	getBinanceCryptoPricesRequestFieldCurrency      = big.NewInt(1 << 0)
+	getBinanceCryptoPricesRequestFieldStartTime     = big.NewInt(1 << 1)
+	getBinanceCryptoPricesRequestFieldEndTime       = big.NewInt(1 << 2)
+	getBinanceCryptoPricesRequestFieldLimit         = big.NewInt(1 << 3)
+	getBinanceCryptoPricesRequestFieldPaginationKey = big.NewInt(1 << 4)
+)
+
+type GetBinanceCryptoPricesRequest struct {
+	// Binance trading pair (e.g. `btcusdt`, `ethusdt`, `solusdt`). Must contain only alphanumeric characters (no hyphens, underscores, or other separators). Uppercase is accepted and automatically lowercased (e.g. `BTCUSDT` → `btcusdt`). Must be a valid Binance symbol; unknown symbols return `200` with an empty `prices` array.
+	Currency string `json:"-" url:"currency"`
+	// Start of the time range as a Unix timestamp in milliseconds (inclusive). Negative values are clamped to 0.
+	StartTime *int64 `json:"-" url:"start_time,omitempty"`
+	// End of the time range as a Unix timestamp in milliseconds (inclusive). Negative values are clamped to 0.
+	EndTime *int64 `json:"-" url:"end_time,omitempty"`
+	// Maximum number of prices to return. Defaults to 100 when a time range is present. Values above 100 are silently clamped to 100. Without a time range, this parameter is ignored — the endpoint always returns the single latest price.
+	Limit *int `json:"-" url:"limit,omitempty"`
+	// Base64-encoded cursor from a previous response to fetch the next page of results.
+	PaginationKey *string `json:"-" url:"pagination_key,omitempty"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+}
+
+func (g *GetBinanceCryptoPricesRequest) require(field *big.Int) {
+	if g.explicitFields == nil {
+		g.explicitFields = big.NewInt(0)
+	}
+	g.explicitFields.Or(g.explicitFields, field)
+}
+
+// SetCurrency sets the Currency field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (g *GetBinanceCryptoPricesRequest) SetCurrency(currency string) {
+	g.Currency = currency
+	g.require(getBinanceCryptoPricesRequestFieldCurrency)
+}
+
+// SetStartTime sets the StartTime field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (g *GetBinanceCryptoPricesRequest) SetStartTime(startTime *int64) {
+	g.StartTime = startTime
+	g.require(getBinanceCryptoPricesRequestFieldStartTime)
+}
+
+// SetEndTime sets the EndTime field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (g *GetBinanceCryptoPricesRequest) SetEndTime(endTime *int64) {
+	g.EndTime = endTime
+	g.require(getBinanceCryptoPricesRequestFieldEndTime)
+}
+
+// SetLimit sets the Limit field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (g *GetBinanceCryptoPricesRequest) SetLimit(limit *int) {
+	g.Limit = limit
+	g.require(getBinanceCryptoPricesRequestFieldLimit)
+}
+
+// SetPaginationKey sets the PaginationKey field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (g *GetBinanceCryptoPricesRequest) SetPaginationKey(paginationKey *string) {
+	g.PaginationKey = paginationKey
+	g.require(getBinanceCryptoPricesRequestFieldPaginationKey)
+}
+
+var (
 	getSportsMatchingMarketsRequestFieldKalshiEventTicker    = big.NewInt(1 << 0)
 	getSportsMatchingMarketsRequestFieldPolymarketMarketSlug = big.NewInt(1 << 1)
 	getSportsMatchingMarketsRequestFieldPredictMarketID      = big.NewInt(1 << 2)
@@ -66,13 +132,253 @@ func (g *GetSportsMatchingMarketsRequest) SetSxbetMarketID(sxbetMarketID []*stri
 }
 
 var (
+	cryptoPriceItemFieldSymbol    = big.NewInt(1 << 0)
+	cryptoPriceItemFieldValue     = big.NewInt(1 << 1)
+	cryptoPriceItemFieldTimestamp = big.NewInt(1 << 2)
+)
+
+type CryptoPriceItem struct {
+	// Trading pair in lowercase (e.g. `btcusdt`).
+	Symbol string `json:"symbol" url:"symbol"`
+	// Close price for the 1-second interval.
+	Value float64 `json:"value" url:"value"`
+	// Unix timestamp in milliseconds for the start of the 1-second interval.
+	Timestamp int64 `json:"timestamp" url:"timestamp"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (c *CryptoPriceItem) GetSymbol() string {
+	if c == nil {
+		return ""
+	}
+	return c.Symbol
+}
+
+func (c *CryptoPriceItem) GetValue() float64 {
+	if c == nil {
+		return 0
+	}
+	return c.Value
+}
+
+func (c *CryptoPriceItem) GetTimestamp() int64 {
+	if c == nil {
+		return 0
+	}
+	return c.Timestamp
+}
+
+func (c *CryptoPriceItem) GetExtraProperties() map[string]interface{} {
+	if c == nil {
+		return nil
+	}
+	return c.extraProperties
+}
+
+func (c *CryptoPriceItem) require(field *big.Int) {
+	if c.explicitFields == nil {
+		c.explicitFields = big.NewInt(0)
+	}
+	c.explicitFields.Or(c.explicitFields, field)
+}
+
+// SetSymbol sets the Symbol field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CryptoPriceItem) SetSymbol(symbol string) {
+	c.Symbol = symbol
+	c.require(cryptoPriceItemFieldSymbol)
+}
+
+// SetValue sets the Value field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CryptoPriceItem) SetValue(value float64) {
+	c.Value = value
+	c.require(cryptoPriceItemFieldValue)
+}
+
+// SetTimestamp sets the Timestamp field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CryptoPriceItem) SetTimestamp(timestamp int64) {
+	c.Timestamp = timestamp
+	c.require(cryptoPriceItemFieldTimestamp)
+}
+
+func (c *CryptoPriceItem) UnmarshalJSON(data []byte) error {
+	type unmarshaler CryptoPriceItem
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*c = CryptoPriceItem(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *c)
+	if err != nil {
+		return err
+	}
+	c.extraProperties = extraProperties
+	c.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (c *CryptoPriceItem) MarshalJSON() ([]byte, error) {
+	type embed CryptoPriceItem
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*c),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, c.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (c *CryptoPriceItem) String() string {
+	if c == nil {
+		return "<nil>"
+	}
+	if len(c.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(c.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(c); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", c)
+}
+
+var (
+	cryptoPricesResponseFieldPrices        = big.NewInt(1 << 0)
+	cryptoPricesResponseFieldPaginationKey = big.NewInt(1 << 1)
+	cryptoPricesResponseFieldTotal         = big.NewInt(1 << 2)
+)
+
+type CryptoPricesResponse struct {
+	Prices []*CryptoPriceItem `json:"prices" url:"prices"`
+	// Base64-encoded cursor for fetching the next page. Absent when there are no more results.
+	PaginationKey *string `json:"pagination_key,omitempty" url:"pagination_key,omitempty"`
+	// Number of prices in this response page. Omitted on empty responses for unknown symbols.
+	Total *int `json:"total,omitempty" url:"total,omitempty"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (c *CryptoPricesResponse) GetPrices() []*CryptoPriceItem {
+	if c == nil {
+		return nil
+	}
+	return c.Prices
+}
+
+func (c *CryptoPricesResponse) GetPaginationKey() *string {
+	if c == nil {
+		return nil
+	}
+	return c.PaginationKey
+}
+
+func (c *CryptoPricesResponse) GetTotal() *int {
+	if c == nil {
+		return nil
+	}
+	return c.Total
+}
+
+func (c *CryptoPricesResponse) GetExtraProperties() map[string]interface{} {
+	if c == nil {
+		return nil
+	}
+	return c.extraProperties
+}
+
+func (c *CryptoPricesResponse) require(field *big.Int) {
+	if c.explicitFields == nil {
+		c.explicitFields = big.NewInt(0)
+	}
+	c.explicitFields.Or(c.explicitFields, field)
+}
+
+// SetPrices sets the Prices field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CryptoPricesResponse) SetPrices(prices []*CryptoPriceItem) {
+	c.Prices = prices
+	c.require(cryptoPricesResponseFieldPrices)
+}
+
+// SetPaginationKey sets the PaginationKey field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CryptoPricesResponse) SetPaginationKey(paginationKey *string) {
+	c.PaginationKey = paginationKey
+	c.require(cryptoPricesResponseFieldPaginationKey)
+}
+
+// SetTotal sets the Total field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CryptoPricesResponse) SetTotal(total *int) {
+	c.Total = total
+	c.require(cryptoPricesResponseFieldTotal)
+}
+
+func (c *CryptoPricesResponse) UnmarshalJSON(data []byte) error {
+	type unmarshaler CryptoPricesResponse
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*c = CryptoPricesResponse(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *c)
+	if err != nil {
+		return err
+	}
+	c.extraProperties = extraProperties
+	c.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (c *CryptoPricesResponse) MarshalJSON() ([]byte, error) {
+	type embed CryptoPricesResponse
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*c),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, c.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (c *CryptoPricesResponse) String() string {
+	if c == nil {
+		return "<nil>"
+	}
+	if len(c.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(c.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(c); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", c)
+}
+
+var (
 	errorResponseFieldError      = big.NewInt(1 << 0)
-	errorResponseFieldStatusCode = big.NewInt(1 << 1)
+	errorResponseFieldMessage    = big.NewInt(1 << 1)
+	errorResponseFieldStatusCode = big.NewInt(1 << 2)
 )
 
 type ErrorResponse struct {
-	Error      string `json:"error" url:"error"`
-	StatusCode int    `json:"status_code" url:"status_code"`
+	Error string `json:"error" url:"error"`
+	// Additional detail about the error. May be present, including on some validation errors.
+	Message    *string `json:"message,omitempty" url:"message,omitempty"`
+	StatusCode int     `json:"status_code" url:"status_code"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
 	explicitFields *big.Int `json:"-" url:"-"`
@@ -86,6 +392,13 @@ func (e *ErrorResponse) GetError() string {
 		return ""
 	}
 	return e.Error
+}
+
+func (e *ErrorResponse) GetMessage() *string {
+	if e == nil {
+		return nil
+	}
+	return e.Message
 }
 
 func (e *ErrorResponse) GetStatusCode() int {
@@ -114,6 +427,13 @@ func (e *ErrorResponse) require(field *big.Int) {
 func (e *ErrorResponse) SetError(error_ string) {
 	e.Error = error_
 	e.require(errorResponseFieldError)
+}
+
+// SetMessage sets the Message field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (e *ErrorResponse) SetMessage(message *string) {
+	e.Message = message
+	e.require(errorResponseFieldMessage)
 }
 
 // SetStatusCode sets the StatusCode field and marks it as non-optional;

@@ -7,6 +7,30 @@ import (
 	core "github.com/PredictorSDK/sdk-go/core"
 )
 
+// Bad gateway
+type BadGatewayError struct {
+	*core.APIError
+	Body *ErrorResponse
+}
+
+func (b *BadGatewayError) UnmarshalJSON(data []byte) error {
+	var body *ErrorResponse
+	if err := json.Unmarshal(data, &body); err != nil {
+		return err
+	}
+	b.StatusCode = 502
+	b.Body = body
+	return nil
+}
+
+func (b *BadGatewayError) MarshalJSON() ([]byte, error) {
+	return json.Marshal(b.Body)
+}
+
+func (b *BadGatewayError) Unwrap() error {
+	return b.APIError
+}
+
 // Invalid query parameters (e.g. combining multiple filter types)
 type BadRequestError struct {
 	*core.APIError
