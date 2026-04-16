@@ -79,6 +79,30 @@ func (f *ForbiddenError) Unwrap() error {
 	return f.APIError
 }
 
+// Internal server error
+type InternalServerError struct {
+	*core.APIError
+	Body *ErrorResponse
+}
+
+func (i *InternalServerError) UnmarshalJSON(data []byte) error {
+	var body *ErrorResponse
+	if err := json.Unmarshal(data, &body); err != nil {
+		return err
+	}
+	i.StatusCode = 500
+	i.Body = body
+	return nil
+}
+
+func (i *InternalServerError) MarshalJSON() ([]byte, error) {
+	return json.Marshal(i.Body)
+}
+
+func (i *InternalServerError) Unwrap() error {
+	return i.APIError
+}
+
 // Matching markets reader unavailable
 type ServiceUnavailableError struct {
 	*core.APIError

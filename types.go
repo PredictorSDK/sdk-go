@@ -76,20 +76,65 @@ func (g *GetBinanceCryptoPricesRequest) SetPaginationKey(paginationKey *string) 
 }
 
 var (
-	getSportsMatchingMarketsRequestFieldKalshiEventTicker    = big.NewInt(1 << 0)
-	getSportsMatchingMarketsRequestFieldPolymarketMarketSlug = big.NewInt(1 << 1)
-	getSportsMatchingMarketsRequestFieldPredictMarketID      = big.NewInt(1 << 2)
-	getSportsMatchingMarketsRequestFieldSxbetMarketID        = big.NewInt(1 << 3)
+	getMarketsRequestFieldLimit  = big.NewInt(1 << 0)
+	getMarketsRequestFieldCursor = big.NewInt(1 << 1)
+)
+
+type GetMarketsRequest struct {
+	// Maximum number of markets to return per page. Range 1–100, default 25.
+	Limit *int `json:"-" url:"limit,omitempty"`
+	// Opaque cursor from a previous response's `pagination.nextCursor` in the SDKs (raw JSON: `pagination.next_cursor`).
+	Cursor *string `json:"-" url:"cursor,omitempty"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+}
+
+func (g *GetMarketsRequest) require(field *big.Int) {
+	if g.explicitFields == nil {
+		g.explicitFields = big.NewInt(0)
+	}
+	g.explicitFields.Or(g.explicitFields, field)
+}
+
+// SetLimit sets the Limit field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (g *GetMarketsRequest) SetLimit(limit *int) {
+	g.Limit = limit
+	g.require(getMarketsRequestFieldLimit)
+}
+
+// SetCursor sets the Cursor field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (g *GetMarketsRequest) SetCursor(cursor *string) {
+	g.Cursor = cursor
+	g.require(getMarketsRequestFieldCursor)
+}
+
+var (
+	getSportsMatchingMarketsRequestFieldLimit                = big.NewInt(1 << 0)
+	getSportsMatchingMarketsRequestFieldCursor               = big.NewInt(1 << 1)
+	getSportsMatchingMarketsRequestFieldIncludeSettled       = big.NewInt(1 << 2)
+	getSportsMatchingMarketsRequestFieldKalshiEventTicker    = big.NewInt(1 << 3)
+	getSportsMatchingMarketsRequestFieldPolymarketMarketSlug = big.NewInt(1 << 4)
+	getSportsMatchingMarketsRequestFieldPredictMarketID      = big.NewInt(1 << 5)
+	getSportsMatchingMarketsRequestFieldSxbetMarketID        = big.NewInt(1 << 6)
 )
 
 type GetSportsMatchingMarketsRequest struct {
-	// Kalshi event ticker(s) to find matching markets for (e.g. `KXNFLGAME-25AUG16ARIDEN`). Provide the parameter multiple times for multiple tickers. Only one filter type may be used per request.
+	// Maximum number of matched events to return per page. Range 1–100, default 25. Ignored when a platform-ID filter is supplied.
+	Limit *int `json:"-" url:"limit,omitempty"`
+	// Opaque cursor from a previous response's `pagination.nextCursor` in the SDKs (raw JSON: `pagination.next_cursor`). Must be used with the same filter set — a cursor from `include_settled=true` cannot be replayed against `include_settled=false` and will return `400`.
+	Cursor *string `json:"-" url:"cursor,omitempty"`
+	// When `true`, include settled/archived events alongside currently live matches. Defaults to `false`.
+	IncludeSettled *bool `json:"-" url:"include_settled,omitempty"`
+	// Kalshi event ticker(s) to find matching markets for (e.g. `KXNFLGAME-25AUG16ARIDEN`). Provide the parameter multiple times for multiple tickers. Only one filter type may be used per request. Lookup mode — pagination parameters are ignored.
 	KalshiEventTicker []*string `json:"-" url:"kalshi_event_ticker,omitempty"`
-	// Polymarket market slug(s) to find matching markets for (e.g. `nfl-ari-den-2025-08-16`). Provide the parameter multiple times for multiple slugs. Only one filter type may be used per request.
+	// Polymarket market slug(s) to find matching markets for (e.g. `nfl-ari-den-2025-08-16`). Provide the parameter multiple times for multiple slugs. Only one filter type may be used per request. Lookup mode — pagination parameters are ignored.
 	PolymarketMarketSlug []*string `json:"-" url:"polymarket_market_slug,omitempty"`
-	// Predict market ID(s) to find matching markets for (e.g. `110629`). Provide the parameter multiple times for multiple IDs. Only one filter type may be used per request.
+	// Predict market ID(s) to find matching markets for (e.g. `110629`). Provide the parameter multiple times for multiple IDs. Only one filter type may be used per request. Lookup mode — pagination parameters are ignored.
 	PredictMarketID []*string `json:"-" url:"predict_market_id,omitempty"`
-	// SX Bet market ID(s) to find matching markets for (e.g. `0x4c000abdbf197ef32ecdf15561b1d636f1e5b02629f466678757fd83e2ec3599`). Provide the parameter multiple times for multiple IDs. Only one filter type may be used per request.
+	// SX Bet market ID(s) to find matching markets for (e.g. `0x4c000abdbf197ef32ecdf15561b1d636f1e5b02629f466678757fd83e2ec3599`). Provide the parameter multiple times for multiple IDs. Only one filter type may be used per request. Lookup mode — pagination parameters are ignored.
 	SxbetMarketID []*string `json:"-" url:"sxbet_market_id,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
@@ -101,6 +146,27 @@ func (g *GetSportsMatchingMarketsRequest) require(field *big.Int) {
 		g.explicitFields = big.NewInt(0)
 	}
 	g.explicitFields.Or(g.explicitFields, field)
+}
+
+// SetLimit sets the Limit field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (g *GetSportsMatchingMarketsRequest) SetLimit(limit *int) {
+	g.Limit = limit
+	g.require(getSportsMatchingMarketsRequestFieldLimit)
+}
+
+// SetCursor sets the Cursor field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (g *GetSportsMatchingMarketsRequest) SetCursor(cursor *string) {
+	g.Cursor = cursor
+	g.require(getSportsMatchingMarketsRequestFieldCursor)
+}
+
+// SetIncludeSettled sets the IncludeSettled field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (g *GetSportsMatchingMarketsRequest) SetIncludeSettled(includeSettled *bool) {
+	g.IncludeSettled = includeSettled
+	g.require(getSportsMatchingMarketsRequestFieldIncludeSettled)
 }
 
 // SetKalshiEventTicker sets the KalshiEventTicker field and marks it as non-optional;
@@ -486,6 +552,244 @@ func (e *ErrorResponse) String() string {
 }
 
 var (
+	marketsListResponseFieldData       = big.NewInt(1 << 0)
+	marketsListResponseFieldPagination = big.NewInt(1 << 1)
+)
+
+type MarketsListResponse struct {
+	// Array of markets for the current page.
+	Data []*UnifiedMarket `json:"data" url:"data"`
+	// Pagination metadata for the current page.
+	Pagination *PaginationBlock `json:"pagination" url:"pagination"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (m *MarketsListResponse) GetData() []*UnifiedMarket {
+	if m == nil {
+		return nil
+	}
+	return m.Data
+}
+
+func (m *MarketsListResponse) GetPagination() *PaginationBlock {
+	if m == nil {
+		return nil
+	}
+	return m.Pagination
+}
+
+func (m *MarketsListResponse) GetExtraProperties() map[string]interface{} {
+	if m == nil {
+		return nil
+	}
+	return m.extraProperties
+}
+
+func (m *MarketsListResponse) require(field *big.Int) {
+	if m.explicitFields == nil {
+		m.explicitFields = big.NewInt(0)
+	}
+	m.explicitFields.Or(m.explicitFields, field)
+}
+
+// SetData sets the Data field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketsListResponse) SetData(data []*UnifiedMarket) {
+	m.Data = data
+	m.require(marketsListResponseFieldData)
+}
+
+// SetPagination sets the Pagination field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketsListResponse) SetPagination(pagination *PaginationBlock) {
+	m.Pagination = pagination
+	m.require(marketsListResponseFieldPagination)
+}
+
+func (m *MarketsListResponse) UnmarshalJSON(data []byte) error {
+	type unmarshaler MarketsListResponse
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*m = MarketsListResponse(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *m)
+	if err != nil {
+		return err
+	}
+	m.extraProperties = extraProperties
+	m.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (m *MarketsListResponse) MarshalJSON() ([]byte, error) {
+	type embed MarketsListResponse
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*m),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, m.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (m *MarketsListResponse) String() string {
+	if m == nil {
+		return "<nil>"
+	}
+	if len(m.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(m.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(m); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", m)
+}
+
+var (
+	paginationBlockFieldLimit      = big.NewInt(1 << 0)
+	paginationBlockFieldTotal      = big.NewInt(1 << 1)
+	paginationBlockFieldHasMore    = big.NewInt(1 << 2)
+	paginationBlockFieldNextCursor = big.NewInt(1 << 3)
+)
+
+type PaginationBlock struct {
+	// Number of items requested per page (echoes the `limit` query param).
+	Limit int `json:"limit" url:"limit"`
+	// Total matching items across all pages.
+	Total int `json:"total" url:"total"`
+	// Whether additional pages exist beyond this one.
+	HasMore bool `json:"has_more" url:"has_more"`
+	// Opaque cursor for fetching the next page. Pass back via the `cursor` query parameter. Omitted when `has_more` is `false`. Clients must preserve the same filter set when re-using a cursor — mismatches return `400`.
+	NextCursor *string `json:"next_cursor,omitempty" url:"next_cursor,omitempty"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (p *PaginationBlock) GetLimit() int {
+	if p == nil {
+		return 0
+	}
+	return p.Limit
+}
+
+func (p *PaginationBlock) GetTotal() int {
+	if p == nil {
+		return 0
+	}
+	return p.Total
+}
+
+func (p *PaginationBlock) GetHasMore() bool {
+	if p == nil {
+		return false
+	}
+	return p.HasMore
+}
+
+func (p *PaginationBlock) GetNextCursor() *string {
+	if p == nil {
+		return nil
+	}
+	return p.NextCursor
+}
+
+func (p *PaginationBlock) GetExtraProperties() map[string]interface{} {
+	if p == nil {
+		return nil
+	}
+	return p.extraProperties
+}
+
+func (p *PaginationBlock) require(field *big.Int) {
+	if p.explicitFields == nil {
+		p.explicitFields = big.NewInt(0)
+	}
+	p.explicitFields.Or(p.explicitFields, field)
+}
+
+// SetLimit sets the Limit field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *PaginationBlock) SetLimit(limit int) {
+	p.Limit = limit
+	p.require(paginationBlockFieldLimit)
+}
+
+// SetTotal sets the Total field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *PaginationBlock) SetTotal(total int) {
+	p.Total = total
+	p.require(paginationBlockFieldTotal)
+}
+
+// SetHasMore sets the HasMore field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *PaginationBlock) SetHasMore(hasMore bool) {
+	p.HasMore = hasMore
+	p.require(paginationBlockFieldHasMore)
+}
+
+// SetNextCursor sets the NextCursor field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *PaginationBlock) SetNextCursor(nextCursor *string) {
+	p.NextCursor = nextCursor
+	p.require(paginationBlockFieldNextCursor)
+}
+
+func (p *PaginationBlock) UnmarshalJSON(data []byte) error {
+	type unmarshaler PaginationBlock
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*p = PaginationBlock(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *p)
+	if err != nil {
+		return err
+	}
+	p.extraProperties = extraProperties
+	p.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (p *PaginationBlock) MarshalJSON() ([]byte, error) {
+	type embed PaginationBlock
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*p),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, p.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (p *PaginationBlock) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	if len(p.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(p.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(p); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", p)
+}
+
+var (
 	platformMarketFieldPlatform      = big.NewInt(1 << 0)
 	platformMarketFieldEventTicker   = big.NewInt(1 << 1)
 	platformMarketFieldMarketTickers = big.NewInt(1 << 2)
@@ -700,12 +1004,15 @@ func (p PlatformMarketPlatform) Ptr() *PlatformMarketPlatform {
 }
 
 var (
-	sportsMatchingResponseFieldMarkets = big.NewInt(1 << 0)
+	sportsMatchingResponseFieldMarkets    = big.NewInt(1 << 0)
+	sportsMatchingResponseFieldPagination = big.NewInt(1 << 1)
 )
 
 type SportsMatchingResponse struct {
 	// Key-value pairs where each key is the queried identifier (Kalshi event ticker, Polymarket slug, or canonical event ID when no filter is provided) and each value is an array of platform market objects.
 	Markets map[string][]*PlatformMarket `json:"markets" url:"markets"`
+	// Pagination metadata for the current page. Present in list mode (no platform-ID filter). Absent in lookup mode since the response is bounded by the filter.
+	Pagination *PaginationBlock `json:"pagination,omitempty" url:"pagination,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
 	explicitFields *big.Int `json:"-" url:"-"`
@@ -719,6 +1026,13 @@ func (s *SportsMatchingResponse) GetMarkets() map[string][]*PlatformMarket {
 		return nil
 	}
 	return s.Markets
+}
+
+func (s *SportsMatchingResponse) GetPagination() *PaginationBlock {
+	if s == nil {
+		return nil
+	}
+	return s.Pagination
 }
 
 func (s *SportsMatchingResponse) GetExtraProperties() map[string]interface{} {
@@ -740,6 +1054,13 @@ func (s *SportsMatchingResponse) require(field *big.Int) {
 func (s *SportsMatchingResponse) SetMarkets(markets map[string][]*PlatformMarket) {
 	s.Markets = markets
 	s.require(sportsMatchingResponseFieldMarkets)
+}
+
+// SetPagination sets the Pagination field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (s *SportsMatchingResponse) SetPagination(pagination *PaginationBlock) {
+	s.Pagination = pagination
+	s.require(sportsMatchingResponseFieldPagination)
 }
 
 func (s *SportsMatchingResponse) UnmarshalJSON(data []byte) error {
@@ -782,4 +1103,152 @@ func (s *SportsMatchingResponse) String() string {
 		return value
 	}
 	return fmt.Sprintf("%#v", s)
+}
+
+var (
+	unifiedMarketFieldID       = big.NewInt(1 << 0)
+	unifiedMarketFieldProvider = big.NewInt(1 << 1)
+	unifiedMarketFieldTitle    = big.NewInt(1 << 2)
+)
+
+type UnifiedMarket struct {
+	// Composite market identifier in the format `{provider}:{provider_id}` (e.g. `kalshi:KXNBAGAME-26MAR06INDLAL-LAL`).
+	ID string `json:"id" url:"id"`
+	// Prediction market provider.
+	Provider UnifiedMarketProvider `json:"provider" url:"provider"`
+	// Human-readable market title/question.
+	Title string `json:"title" url:"title"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (u *UnifiedMarket) GetID() string {
+	if u == nil {
+		return ""
+	}
+	return u.ID
+}
+
+func (u *UnifiedMarket) GetProvider() UnifiedMarketProvider {
+	if u == nil {
+		return ""
+	}
+	return u.Provider
+}
+
+func (u *UnifiedMarket) GetTitle() string {
+	if u == nil {
+		return ""
+	}
+	return u.Title
+}
+
+func (u *UnifiedMarket) GetExtraProperties() map[string]interface{} {
+	if u == nil {
+		return nil
+	}
+	return u.extraProperties
+}
+
+func (u *UnifiedMarket) require(field *big.Int) {
+	if u.explicitFields == nil {
+		u.explicitFields = big.NewInt(0)
+	}
+	u.explicitFields.Or(u.explicitFields, field)
+}
+
+// SetID sets the ID field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (u *UnifiedMarket) SetID(id string) {
+	u.ID = id
+	u.require(unifiedMarketFieldID)
+}
+
+// SetProvider sets the Provider field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (u *UnifiedMarket) SetProvider(provider UnifiedMarketProvider) {
+	u.Provider = provider
+	u.require(unifiedMarketFieldProvider)
+}
+
+// SetTitle sets the Title field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (u *UnifiedMarket) SetTitle(title string) {
+	u.Title = title
+	u.require(unifiedMarketFieldTitle)
+}
+
+func (u *UnifiedMarket) UnmarshalJSON(data []byte) error {
+	type unmarshaler UnifiedMarket
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*u = UnifiedMarket(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *u)
+	if err != nil {
+		return err
+	}
+	u.extraProperties = extraProperties
+	u.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (u *UnifiedMarket) MarshalJSON() ([]byte, error) {
+	type embed UnifiedMarket
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*u),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, u.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (u *UnifiedMarket) String() string {
+	if u == nil {
+		return "<nil>"
+	}
+	if len(u.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(u.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(u); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", u)
+}
+
+// Prediction market provider.
+type UnifiedMarketProvider string
+
+const (
+	UnifiedMarketProviderKalshi     UnifiedMarketProvider = "kalshi"
+	UnifiedMarketProviderPolymarket UnifiedMarketProvider = "polymarket"
+	UnifiedMarketProviderPredict    UnifiedMarketProvider = "predict"
+	UnifiedMarketProviderSxbet      UnifiedMarketProvider = "sxbet"
+)
+
+func NewUnifiedMarketProviderFromString(s string) (UnifiedMarketProvider, error) {
+	switch s {
+	case "kalshi":
+		return UnifiedMarketProviderKalshi, nil
+	case "polymarket":
+		return UnifiedMarketProviderPolymarket, nil
+	case "predict":
+		return UnifiedMarketProviderPredict, nil
+	case "sxbet":
+		return UnifiedMarketProviderSxbet, nil
+	}
+	var t UnifiedMarketProvider
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (u UnifiedMarketProvider) Ptr() *UnifiedMarketProvider {
+	return &u
 }

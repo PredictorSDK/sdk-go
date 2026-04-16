@@ -34,13 +34,30 @@ func New(opts ...option.RequestOption) *Client {
 	}
 }
 
-// Find cross-platform market matches for sports events. Provide a Kalshi event ticker or Polymarket market slug to look up the equivalent market on other platforms. When called without parameters, returns all currently matched sports markets.
+// Find cross-platform market matches for sports events. When called without parameters, returns all currently matched sports markets with cursor-based pagination (default `limit=25`, max `100`). Provide a Kalshi event ticker, Polymarket slug, Predict market ID, or SX Bet market ID to look up a specific event — lookups return the full match immediately and skip pagination.
 func (c *Client) GetSportsMatchingMarkets(
 	ctx context.Context,
 	request *predictorsdk.GetSportsMatchingMarketsRequest,
 	opts ...option.RequestOption,
 ) (*predictorsdk.SportsMatchingResponse, error) {
 	response, err := c.WithRawResponse.GetSportsMatchingMarkets(
+		ctx,
+		request,
+		opts...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return response.Body, nil
+}
+
+// Returns a paginated list of unified markets from all supported prediction market providers. Uses cursor-based pagination with default `limit=25`, max `100`.
+func (c *Client) GetMarkets(
+	ctx context.Context,
+	request *predictorsdk.GetMarketsRequest,
+	opts ...option.RequestOption,
+) (*predictorsdk.MarketsListResponse, error) {
+	response, err := c.WithRawResponse.GetMarkets(
 		ctx,
 		request,
 		opts...,

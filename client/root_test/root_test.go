@@ -86,6 +86,29 @@ func TestGetSportsMatchingMarketsWithWireMock(
 	VerifyRequestCount(t, "TestGetSportsMatchingMarketsWithWireMock", "GET", "/v1/matching-markets/sports", nil, 1)
 }
 
+func TestGetMarketsWithWireMock(
+	t *testing.T,
+) {
+	WireMockBaseURL := os.Getenv("WIREMOCK_URL")
+	if WireMockBaseURL == "" {
+		WireMockBaseURL = "http://localhost:8080"
+	}
+	client := client.New(
+		option.WithBaseURL(WireMockBaseURL),
+	)
+	request := &predictorsdk.GetMarketsRequest{}
+	_, invocationErr := client.GetMarkets(
+		context.TODO(),
+		request,
+		option.WithHTTPHeader(
+			http.Header{"X-Test-Id": []string{"TestGetMarketsWithWireMock"}},
+		),
+	)
+
+	require.NoError(t, invocationErr, "Client method call should succeed")
+	VerifyRequestCount(t, "TestGetMarketsWithWireMock", "GET", "/v1/markets", nil, 1)
+}
+
 func TestGetBinanceCryptoPricesWithWireMock(
 	t *testing.T,
 ) {

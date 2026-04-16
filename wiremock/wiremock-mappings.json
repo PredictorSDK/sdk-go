@@ -9,12 +9,39 @@
       },
       "response": {
         "status": 200,
-        "body": "{\n  \"markets\": {\n    \"nba-atl-bkn-2026-04-03\": [\n      {\n        \"platform\": \"KALSHI\",\n        \"event_ticker\": \"KXNBAGAME-26APR03ATLBKN\",\n        \"market_tickers\": [\n          \"KXNBAGAME-26APR03ATLBKN-ATL\",\n          \"KXNBAGAME-26APR03ATLBKN-BKN\"\n        ]\n      },\n      {\n        \"platform\": \"POLYMARKET\",\n        \"market_slug\": \"nba-atl-bkn-2026-04-03\",\n        \"token_ids\": [\n          \"32002537305796713412992497217271542315830782956408162834235179971626345442266\",\n          \"54906302261335904012140217655706684894109890699610510556259321095251693008566\"\n        ]\n      },\n      {\n        \"platform\": \"PREDICT\",\n        \"market_id\": \"117842\",\n        \"outcome_ids\": [\n          \"42450068601397923663194476725113946791163307597268325867603562155912565101383\",\n          \"43102322251933821304724821407446253780566834213232881297354551077124098601237\"\n        ]\n      },\n      {\n        \"platform\": \"SXBET\",\n        \"market_id\": \"0x3f9912a701a4451294e2f19731dc7e3a5e1bf8d0a12e36009f6f0b9e26995a77\",\n        \"outcome_ids\": [\n          \"0x3f9912a701a4451294e2f19731dc7e3a5e1bf8d0a12e36009f6f0b9e26995a77:1\",\n          \"0x3f9912a701a4451294e2f19731dc7e3a5e1bf8d0a12e36009f6f0b9e26995a77:2\"\n        ]\n      }\n    ],\n    \"nba-bos-mil-2026-04-03\": [\n      {\n        \"platform\": \"KALSHI\",\n        \"event_ticker\": \"KXNBAGAME-26APR03BOSMIL\",\n        \"market_tickers\": [\n          \"KXNBAGAME-26APR03BOSMIL-BOS\",\n          \"KXNBAGAME-26APR03BOSMIL-MIL\"\n        ]\n      },\n      {\n        \"platform\": \"POLYMARKET\",\n        \"market_slug\": \"nba-bos-mil-2026-04-03\",\n        \"token_ids\": [\n          \"49199244396445171530475075286068451873553860192941400530757555179878544737686\",\n          \"81253098687158329416121610334652503237499398178205861633996997670891953141961\"\n        ]\n      },\n      {\n        \"platform\": \"PREDICT\",\n        \"market_id\": \"117835\",\n        \"outcome_ids\": [\n          \"57118720877390954428360380424274936147100791376055257807333281050699018229344\",\n          \"75163046550784480329631088691877638693793132655426851735832718463639926238644\"\n        ]\n      },\n      {\n        \"platform\": \"SXBET\",\n        \"market_id\": \"0x181da70a7db706ee9a4b1840d9fffb60967dc64a16e865a738a3fb1b52a731fe\",\n        \"outcome_ids\": [\n          \"0x181da70a7db706ee9a4b1840d9fffb60967dc64a16e865a738a3fb1b52a731fe:1\",\n          \"0x181da70a7db706ee9a4b1840d9fffb60967dc64a16e865a738a3fb1b52a731fe:2\"\n        ]\n      }\n    ]\n  }\n}",
+        "body": "{\n  \"markets\": {\n    \"nba-atl-bkn-2026-04-03\": [\n      {\n        \"platform\": \"KALSHI\",\n        \"event_ticker\": \"KXNBAGAME-26APR03ATLBKN\",\n        \"market_tickers\": [\n          \"KXNBAGAME-26APR03ATLBKN-ATL\",\n          \"KXNBAGAME-26APR03ATLBKN-BKN\"\n        ]\n      },\n      {\n        \"platform\": \"POLYMARKET\",\n        \"market_slug\": \"nba-atl-bkn-2026-04-03\",\n        \"token_ids\": [\n          \"32002537305796713412992497217271542315830782956408162834235179971626345442266\",\n          \"54906302261335904012140217655706684894109890699610510556259321095251693008566\"\n        ]\n      }\n    ],\n    \"nba-bos-mil-2026-04-03\": [\n      {\n        \"platform\": \"KALSHI\",\n        \"event_ticker\": \"KXNBAGAME-26APR03BOSMIL\",\n        \"market_tickers\": [\n          \"KXNBAGAME-26APR03BOSMIL-BOS\",\n          \"KXNBAGAME-26APR03BOSMIL-MIL\"\n        ]\n      },\n      {\n        \"platform\": \"POLYMARKET\",\n        \"market_slug\": \"nba-bos-mil-2026-04-03\",\n        \"token_ids\": [\n          \"49199244396445171530475075286068451873553860192941400530757555179878544737686\",\n          \"81253098687158329416121610334652503237499398178205861633996997670891953141961\"\n        ]\n      }\n    ]\n  },\n  \"pagination\": {\n    \"limit\": 25,\n    \"total\": 143,\n    \"has_more\": true,\n    \"next_cursor\": \"eyJzIjoiYWJjMTIzZWYiLCJ0IjoiMjAyNi0wNC0wM1QyMzowMDowMFoiLCJpIjoibmJhLWJvcy1taWwtMjAyNi0wNC0wMyJ9\"\n  }\n}",
         "headers": {
           "Content-Type": "application/json"
         }
       },
       "uuid": "f5a0d9f3-06e2-454a-87ae-9b5eb124ac24",
+      "persistent": true,
+      "priority": 3,
+      "metadata": {
+        "mocklab": {
+          "created": {
+            "at": "2020-01-01T00:00:00.000Z",
+            "via": "SYSTEM"
+          }
+        }
+      },
+      "postServeActions": []
+    },
+    {
+      "id": "75abd808-7c17-4a37-99e7-749ee2f6b5a3",
+      "name": "List markets - default",
+      "request": {
+        "urlPathTemplate": "/v1/markets",
+        "method": "GET"
+      },
+      "response": {
+        "status": 200,
+        "body": "{\n  \"data\": [\n    {\n      \"id\": \"kalshi:KXNBAGAME-26MAR06INDLAL-LAL\",\n      \"provider\": \"kalshi\",\n      \"title\": \"Indiana at Los Angeles L Winner?\"\n    },\n    {\n      \"id\": \"polymarket:0xe9e80abc123\",\n      \"provider\": \"polymarket\",\n      \"title\": \"Will the Lakers win?\"\n    }\n  ],\n  \"pagination\": {\n    \"limit\": 25,\n    \"total\": 412,\n    \"has_more\": true,\n    \"next_cursor\": \"eyJzIjoiYWJjMTIzZWYiLCJ0IjoiMjAyNi0wNC0wM1QyMzowMDowMFoiLCJpIjoia2Fsc2hpOktYTkJBR0FNRS0yNk1BUjA2SU5ETEFMLUxBTCJ9\"\n  }\n}",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "uuid": "75abd808-7c17-4a37-99e7-749ee2f6b5a3",
       "persistent": true,
       "priority": 3,
       "metadata": {
@@ -61,6 +88,6 @@
     }
   ],
   "meta": {
-    "total": 2
+    "total": 3
   }
 }
