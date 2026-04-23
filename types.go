@@ -789,6 +789,232 @@ func (p *PaginationBlock) String() string {
 	return fmt.Sprintf("%#v", p)
 }
 
+// Recommended client action for this 402.
+type PaymentRequiredErrorAction string
+
+const (
+	PaymentRequiredErrorActionUpgradePlan    PaymentRequiredErrorAction = "upgrade_plan"
+	PaymentRequiredErrorActionResolvePayment PaymentRequiredErrorAction = "resolve_payment"
+)
+
+func NewPaymentRequiredErrorActionFromString(s string) (PaymentRequiredErrorAction, error) {
+	switch s {
+	case "upgrade_plan":
+		return PaymentRequiredErrorActionUpgradePlan, nil
+	case "resolve_payment":
+		return PaymentRequiredErrorActionResolvePayment, nil
+	}
+	var t PaymentRequiredErrorAction
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (p PaymentRequiredErrorAction) Ptr() *PaymentRequiredErrorAction {
+	return &p
+}
+
+// Error body returned with HTTP 402. The `action` discriminator lets clients route to the correct recovery flow: `upgrade_plan` means the caller is on a lower tier than the endpoint requires, or the Free monthly allowance is exhausted; `resolve_payment` means the caller had a paid subscription that entered a payment-recovery state (past_due/unpaid/paused/incomplete) and the backend has already downgraded them to Free — the fix is in the billing portal, not a new purchase. `required_tier` / `current_tier` are always populated; `included_requests_per_month` and `current_period_requests` are only set when a Free caller hits the monthly allowance.
+var (
+	paymentRequiredErrorBodyFieldError                    = big.NewInt(1 << 0)
+	paymentRequiredErrorBodyFieldMessage                  = big.NewInt(1 << 1)
+	paymentRequiredErrorBodyFieldStatusCode               = big.NewInt(1 << 2)
+	paymentRequiredErrorBodyFieldAction                   = big.NewInt(1 << 3)
+	paymentRequiredErrorBodyFieldRequiredTier             = big.NewInt(1 << 4)
+	paymentRequiredErrorBodyFieldCurrentTier              = big.NewInt(1 << 5)
+	paymentRequiredErrorBodyFieldIncludedRequestsPerMonth = big.NewInt(1 << 6)
+	paymentRequiredErrorBodyFieldCurrentPeriodRequests    = big.NewInt(1 << 7)
+)
+
+type PaymentRequiredErrorBody struct {
+	Error string `json:"error" url:"error"`
+	// Additional detail about the error.
+	Message    *string `json:"message,omitempty" url:"message,omitempty"`
+	StatusCode int     `json:"status_code" url:"status_code"`
+	// Recommended client action for this 402.
+	Action PaymentRequiredErrorAction `json:"action" url:"action"`
+	// Billing tier that would satisfy the gate (e.g. `starter`, `pro`, `business`, `enterprise`).
+	RequiredTier string `json:"required_tier" url:"required_tier"`
+	// Billing tier currently associated with the caller.
+	CurrentTier string `json:"current_tier" url:"current_tier"`
+	// Monthly Free-tier allowance. Present only when the 402 is caused by the Free cap.
+	IncludedRequestsPerMonth *int64 `json:"included_requests_per_month,omitempty" url:"included_requests_per_month,omitempty"`
+	// Requests the Free caller has made in the current calendar month. Present only when the 402 is caused by the Free cap.
+	CurrentPeriodRequests *int64 `json:"current_period_requests,omitempty" url:"current_period_requests,omitempty"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (p *PaymentRequiredErrorBody) GetError() string {
+	if p == nil {
+		return ""
+	}
+	return p.Error
+}
+
+func (p *PaymentRequiredErrorBody) GetMessage() *string {
+	if p == nil {
+		return nil
+	}
+	return p.Message
+}
+
+func (p *PaymentRequiredErrorBody) GetStatusCode() int {
+	if p == nil {
+		return 0
+	}
+	return p.StatusCode
+}
+
+func (p *PaymentRequiredErrorBody) GetAction() PaymentRequiredErrorAction {
+	if p == nil {
+		return ""
+	}
+	return p.Action
+}
+
+func (p *PaymentRequiredErrorBody) GetRequiredTier() string {
+	if p == nil {
+		return ""
+	}
+	return p.RequiredTier
+}
+
+func (p *PaymentRequiredErrorBody) GetCurrentTier() string {
+	if p == nil {
+		return ""
+	}
+	return p.CurrentTier
+}
+
+func (p *PaymentRequiredErrorBody) GetIncludedRequestsPerMonth() *int64 {
+	if p == nil {
+		return nil
+	}
+	return p.IncludedRequestsPerMonth
+}
+
+func (p *PaymentRequiredErrorBody) GetCurrentPeriodRequests() *int64 {
+	if p == nil {
+		return nil
+	}
+	return p.CurrentPeriodRequests
+}
+
+func (p *PaymentRequiredErrorBody) GetExtraProperties() map[string]interface{} {
+	if p == nil {
+		return nil
+	}
+	return p.extraProperties
+}
+
+func (p *PaymentRequiredErrorBody) require(field *big.Int) {
+	if p.explicitFields == nil {
+		p.explicitFields = big.NewInt(0)
+	}
+	p.explicitFields.Or(p.explicitFields, field)
+}
+
+// SetError sets the Error field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *PaymentRequiredErrorBody) SetError(error_ string) {
+	p.Error = error_
+	p.require(paymentRequiredErrorBodyFieldError)
+}
+
+// SetMessage sets the Message field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *PaymentRequiredErrorBody) SetMessage(message *string) {
+	p.Message = message
+	p.require(paymentRequiredErrorBodyFieldMessage)
+}
+
+// SetStatusCode sets the StatusCode field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *PaymentRequiredErrorBody) SetStatusCode(statusCode int) {
+	p.StatusCode = statusCode
+	p.require(paymentRequiredErrorBodyFieldStatusCode)
+}
+
+// SetAction sets the Action field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *PaymentRequiredErrorBody) SetAction(action PaymentRequiredErrorAction) {
+	p.Action = action
+	p.require(paymentRequiredErrorBodyFieldAction)
+}
+
+// SetRequiredTier sets the RequiredTier field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *PaymentRequiredErrorBody) SetRequiredTier(requiredTier string) {
+	p.RequiredTier = requiredTier
+	p.require(paymentRequiredErrorBodyFieldRequiredTier)
+}
+
+// SetCurrentTier sets the CurrentTier field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *PaymentRequiredErrorBody) SetCurrentTier(currentTier string) {
+	p.CurrentTier = currentTier
+	p.require(paymentRequiredErrorBodyFieldCurrentTier)
+}
+
+// SetIncludedRequestsPerMonth sets the IncludedRequestsPerMonth field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *PaymentRequiredErrorBody) SetIncludedRequestsPerMonth(includedRequestsPerMonth *int64) {
+	p.IncludedRequestsPerMonth = includedRequestsPerMonth
+	p.require(paymentRequiredErrorBodyFieldIncludedRequestsPerMonth)
+}
+
+// SetCurrentPeriodRequests sets the CurrentPeriodRequests field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *PaymentRequiredErrorBody) SetCurrentPeriodRequests(currentPeriodRequests *int64) {
+	p.CurrentPeriodRequests = currentPeriodRequests
+	p.require(paymentRequiredErrorBodyFieldCurrentPeriodRequests)
+}
+
+func (p *PaymentRequiredErrorBody) UnmarshalJSON(data []byte) error {
+	type unmarshaler PaymentRequiredErrorBody
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*p = PaymentRequiredErrorBody(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *p)
+	if err != nil {
+		return err
+	}
+	p.extraProperties = extraProperties
+	p.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (p *PaymentRequiredErrorBody) MarshalJSON() ([]byte, error) {
+	type embed PaymentRequiredErrorBody
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*p),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, p.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (p *PaymentRequiredErrorBody) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	if len(p.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(p.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(p); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", p)
+}
+
 var (
 	platformMarketFieldPlatform      = big.NewInt(1 << 0)
 	platformMarketFieldEventTicker   = big.NewInt(1 << 1)

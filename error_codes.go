@@ -18,6 +18,11 @@ var ErrorCodes internal.ErrorCodes = internal.ErrorCodes{
 			APIError: apiError,
 		}
 	},
+	402: func(apiError *core.APIError) error {
+		return &PaymentRequiredError{
+			APIError: apiError,
+		}
+	},
 	403: func(apiError *core.APIError) error {
 		return &ForbiddenError{
 			APIError: apiError,
@@ -30,11 +35,6 @@ var ErrorCodes internal.ErrorCodes = internal.ErrorCodes{
 	},
 	503: func(apiError *core.APIError) error {
 		return &ServiceUnavailableError{
-			APIError: apiError,
-		}
-	},
-	500: func(apiError *core.APIError) error {
-		return &InternalServerError{
 			APIError: apiError,
 		}
 	},

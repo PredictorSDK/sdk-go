@@ -79,28 +79,28 @@ func (f *ForbiddenError) Unwrap() error {
 	return f.APIError
 }
 
-// Internal server error
-type InternalServerError struct {
+// Endpoint requires a higher plan, the caller's paid subscription is in a payment-recovery state, or (for the Free tier) the monthly request allowance is exhausted.
+type PaymentRequiredError struct {
 	*core.APIError
-	Body *ErrorResponse
+	Body *PaymentRequiredErrorBody
 }
 
-func (i *InternalServerError) UnmarshalJSON(data []byte) error {
-	var body *ErrorResponse
+func (p *PaymentRequiredError) UnmarshalJSON(data []byte) error {
+	var body *PaymentRequiredErrorBody
 	if err := json.Unmarshal(data, &body); err != nil {
 		return err
 	}
-	i.StatusCode = 500
-	i.Body = body
+	p.StatusCode = 402
+	p.Body = body
 	return nil
 }
 
-func (i *InternalServerError) MarshalJSON() ([]byte, error) {
-	return json.Marshal(i.Body)
+func (p *PaymentRequiredError) MarshalJSON() ([]byte, error) {
+	return json.Marshal(p.Body)
 }
 
-func (i *InternalServerError) Unwrap() error {
-	return i.APIError
+func (p *PaymentRequiredError) Unwrap() error {
+	return p.APIError
 }
 
 // Matching markets reader unavailable
@@ -127,7 +127,7 @@ func (s *ServiceUnavailableError) Unwrap() error {
 	return s.APIError
 }
 
-// API key exceeded its rate limit or credits
+// API key exceeded its rate limit
 type TooManyRequestsError struct {
 	*core.APIError
 	Body *ErrorResponse
