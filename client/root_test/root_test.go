@@ -21,7 +21,7 @@ func VerifyRequestCount(
 	testId string,
 	method string,
 	urlPath string,
-	queryParams map[string]string,
+	queryParams map[string]any,
 	expected int,
 ) {
 	wiremockURL := os.Getenv("WIREMOCK_URL")
@@ -46,9 +46,23 @@ func VerifyRequestCount(
 			}
 			reqBody.WriteString(`"`)
 			reqBody.WriteString(key)
-			reqBody.WriteString(`":{"equalTo":"`)
-			reqBody.WriteString(value)
-			reqBody.WriteString(`"}`)
+			switch v := value.(type) {
+			case string:
+				reqBody.WriteString(`":{"equalTo":"`)
+				reqBody.WriteString(v)
+				reqBody.WriteString(`"}`)
+			case []string:
+				reqBody.WriteString(`":{"hasExactly":[`)
+				for i, item := range v {
+					if i > 0 {
+						reqBody.WriteString(",")
+					}
+					reqBody.WriteString(`{"equalTo":"`)
+					reqBody.WriteString(item)
+					reqBody.WriteString(`"}`)
+				}
+				reqBody.WriteString(`]}`)
+			}
 			first = false
 		}
 		reqBody.WriteString("}")
@@ -72,6 +86,7 @@ func TestGetSportsMatchingMarketsWithWireMock(
 	}
 	client := client.New(
 		option.WithBaseURL(WireMockBaseURL),
+		option.WithToken("test-token"),
 	)
 	request := &predictorsdk.GetSportsMatchingMarketsRequest{}
 	_, invocationErr := client.GetSportsMatchingMarkets(
@@ -95,6 +110,7 @@ func TestGetMarketsWithWireMock(
 	}
 	client := client.New(
 		option.WithBaseURL(WireMockBaseURL),
+		option.WithToken("test-token"),
 	)
 	request := &predictorsdk.GetMarketsRequest{}
 	_, invocationErr := client.GetMarkets(
@@ -118,6 +134,7 @@ func TestGetBinanceCryptoPricesWithWireMock(
 	}
 	client := client.New(
 		option.WithBaseURL(WireMockBaseURL),
+		option.WithToken("test-token"),
 	)
 	request := &predictorsdk.GetBinanceCryptoPricesRequest{
 		Currency: "btcusdt",
@@ -131,5 +148,5 @@ func TestGetBinanceCryptoPricesWithWireMock(
 	)
 
 	require.NoError(t, invocationErr, "Client method call should succeed")
-	VerifyRequestCount(t, "TestGetBinanceCryptoPricesWithWireMock", "GET", "/v1/crypto-prices/binance", map[string]string{"currency": "btcusdt"}, 1)
+	VerifyRequestCount(t, "TestGetBinanceCryptoPricesWithWireMock", "GET", "/v1/crypto-prices/binance", map[string]interface{}{"currency": "btcusdt"}, 1)
 }

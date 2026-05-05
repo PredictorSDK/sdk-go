@@ -79,7 +79,7 @@ func (f *ForbiddenError) Unwrap() error {
 	return f.APIError
 }
 
-// Endpoint requires a higher plan, the caller's paid subscription is in a payment-recovery state, or (for the Free tier) the monthly request allowance is exhausted.
+// Free tier monthly request allowance is exhausted, or the caller's paid subscription is in a payment-recovery state. This endpoint is available on every plan, so 402 never indicates a tier mismatch here.
 type PaymentRequiredError struct {
 	*core.APIError
 	Body *PaymentRequiredErrorBody

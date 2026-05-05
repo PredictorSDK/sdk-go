@@ -1,11 +1,16 @@
 {
   "mappings": [
     {
-      "id": "f5a0d9f3-06e2-454a-87ae-9b5eb124ac24",
-      "name": "Get sports matching markets - default",
+      "id": "cdb08fbd-1ea1-45ec-ab40-24060619797f",
+      "name": "Get sports matching markets - List mode with pagination",
       "request": {
         "urlPathTemplate": "/v1/matching-markets/sports",
-        "method": "GET"
+        "method": "GET",
+        "headers": {
+          "Authorization": {
+            "matches": "Bearer .+"
+          }
+        }
       },
       "response": {
         "status": 200,
@@ -14,7 +19,7 @@
           "Content-Type": "application/json"
         }
       },
-      "uuid": "f5a0d9f3-06e2-454a-87ae-9b5eb124ac24",
+      "uuid": "cdb08fbd-1ea1-45ec-ab40-24060619797f",
       "persistent": true,
       "priority": 3,
       "metadata": {
@@ -28,11 +33,16 @@
       "postServeActions": []
     },
     {
-      "id": "75abd808-7c17-4a37-99e7-749ee2f6b5a3",
-      "name": "List markets - default",
+      "id": "a841c38a-05d2-461b-a010-ca8b5631f469",
+      "name": "List markets - First page of markets",
       "request": {
         "urlPathTemplate": "/v1/markets",
-        "method": "GET"
+        "method": "GET",
+        "headers": {
+          "Authorization": {
+            "matches": "Bearer .+"
+          }
+        }
       },
       "response": {
         "status": 200,
@@ -41,7 +51,7 @@
           "Content-Type": "application/json"
         }
       },
-      "uuid": "75abd808-7c17-4a37-99e7-749ee2f6b5a3",
+      "uuid": "a841c38a-05d2-461b-a010-ca8b5631f469",
       "persistent": true,
       "priority": 3,
       "metadata": {
@@ -60,6 +70,11 @@
       "request": {
         "urlPathTemplate": "/v1/crypto-prices/binance",
         "method": "GET",
+        "headers": {
+          "Authorization": {
+            "matches": "Bearer .+"
+          }
+        },
         "queryParameters": {
           "currency": {
             "equalTo": "btcusdt"
