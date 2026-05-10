@@ -100,9 +100,46 @@
         }
       },
       "postServeActions": []
+    },
+    {
+      "id": "f5c46110-cf3b-4a3b-988d-4ce7cc4236c4",
+      "name": "Get Polymarket wallet profile - proxy_input",
+      "request": {
+        "urlPathTemplate": "/v1/polymarket/wallet",
+        "method": "GET",
+        "headers": {
+          "Authorization": {
+            "matches": "Bearer .+"
+          }
+        },
+        "queryParameters": {
+          "address": {
+            "equalTo": "0x7c3db723f1d4d8cb9c550095203b686cb11e5c6b"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": "{\n  \"address\": \"0x7c3db723f1d4d8cb9c550095203b686cb11e5c6b\",\n  \"signer\": null,\n  \"profile_image\": \"https://polymarket-upload.s3.us-east-2.amazonaws.com/profile-image-501613.png\",\n  \"display_name\": \"Car\"\n}",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "uuid": "f5c46110-cf3b-4a3b-988d-4ce7cc4236c4",
+      "persistent": true,
+      "priority": 3,
+      "metadata": {
+        "mocklab": {
+          "created": {
+            "at": "2020-01-01T00:00:00.000Z",
+            "via": "SYSTEM"
+          }
+        }
+      },
+      "postServeActions": []
     }
   ],
   "meta": {
-    "total": 3
+    "total": 4
   }
 }

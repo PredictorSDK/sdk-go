@@ -84,3 +84,24 @@ func (c *Client) GetBinanceCryptoPrices(
 	}
 	return response.Body, nil
 }
+
+// Returns the public profile (image and display name) for a Polymarket wallet. Accepts either a wallet `address` (proxy or signer EOA) or a Polymarket `username`. Exactly one of the two must be supplied — passing both returns `400`.
+//
+// When `address` is the underlying signer EOA, the endpoint resolves it to the deterministic proxy address and returns the proxy's profile, with `signer` echoing the input.
+//
+// When `username` is supplied, the endpoint resolves it to the wallet via Polymarket's profile search. Match is case-insensitive and exact: a query of `Theo` resolves the user literally named `theo` but does not resolve `theo46` or `Theo47`. A leading `@` is accepted (and stripped) as a convenience for callers used to Twitter-style handles. `signer` is always `null` on the username path. Profiles that don't exist (or only match fuzzily) return `404`.
+func (c *Client) GetPolymarketWallet(
+	ctx context.Context,
+	request *predictorsdk.GetPolymarketWalletRequest,
+	opts ...option.RequestOption,
+) (*predictorsdk.PolymarketWalletResponse, error) {
+	response, err := c.WithRawResponse.GetPolymarketWallet(
+		ctx,
+		request,
+		opts...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return response.Body, nil
+}

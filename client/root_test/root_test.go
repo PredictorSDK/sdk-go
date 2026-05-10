@@ -150,3 +150,31 @@ func TestGetBinanceCryptoPricesWithWireMock(
 	require.NoError(t, invocationErr, "Client method call should succeed")
 	VerifyRequestCount(t, "TestGetBinanceCryptoPricesWithWireMock", "GET", "/v1/crypto-prices/binance", map[string]interface{}{"currency": "btcusdt"}, 1)
 }
+
+func TestGetPolymarketWalletWithWireMock(
+	t *testing.T,
+) {
+	WireMockBaseURL := os.Getenv("WIREMOCK_URL")
+	if WireMockBaseURL == "" {
+		WireMockBaseURL = "http://localhost:8080"
+	}
+	client := client.New(
+		option.WithBaseURL(WireMockBaseURL),
+		option.WithToken("test-token"),
+	)
+	request := &predictorsdk.GetPolymarketWalletRequest{
+		Address: predictorsdk.String(
+			"0x7c3db723f1d4d8cb9c550095203b686cb11e5c6b",
+		),
+	}
+	_, invocationErr := client.GetPolymarketWallet(
+		context.TODO(),
+		request,
+		option.WithHTTPHeader(
+			http.Header{"X-Test-Id": []string{"TestGetPolymarketWalletWithWireMock"}},
+		),
+	)
+
+	require.NoError(t, invocationErr, "Client method call should succeed")
+	VerifyRequestCount(t, "TestGetPolymarketWalletWithWireMock", "GET", "/v1/polymarket/wallet", map[string]interface{}{"address": "0x7c3db723f1d4d8cb9c550095203b686cb11e5c6b"}, 1)
+}

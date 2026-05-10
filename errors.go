@@ -79,6 +79,30 @@ func (f *ForbiddenError) Unwrap() error {
 	return f.APIError
 }
 
+// Resource not found.
+type NotFoundError struct {
+	*core.APIError
+	Body *ErrorResponse
+}
+
+func (n *NotFoundError) UnmarshalJSON(data []byte) error {
+	var body *ErrorResponse
+	if err := json.Unmarshal(data, &body); err != nil {
+		return err
+	}
+	n.StatusCode = 404
+	n.Body = body
+	return nil
+}
+
+func (n *NotFoundError) MarshalJSON() ([]byte, error) {
+	return json.Marshal(n.Body)
+}
+
+func (n *NotFoundError) Unwrap() error {
+	return n.APIError
+}
+
 // Free tier monthly request allowance is exhausted, or the caller's paid subscription is in a payment-recovery state. This endpoint is available on every plan, so 402 never indicates a tier mismatch here.
 type PaymentRequiredError struct {
 	*core.APIError

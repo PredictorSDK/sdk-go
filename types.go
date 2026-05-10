@@ -112,6 +112,42 @@ func (g *GetMarketsRequest) SetCursor(cursor *string) {
 }
 
 var (
+	getPolymarketWalletRequestFieldAddress  = big.NewInt(1 << 0)
+	getPolymarketWalletRequestFieldUsername = big.NewInt(1 << 1)
+)
+
+type GetPolymarketWalletRequest struct {
+	// Wallet address to look up. May be a Polymarket proxy address or the underlying signer EOA — the endpoint resolves either form. Must match `^0x[a-fA-F0-9]{40}$`. Mixed-case input is accepted and lowercased in the response. Mutually exclusive with `username`; exactly one of the two is required.
+	Address *string `json:"-" url:"address,omitempty"`
+	// Polymarket display name to look up. Match is case-insensitive and exact against the user's stored `name` (so `Car`, `car`, and `CAR` all resolve, but `Theo` does not match `Theo47`). A leading `@` is accepted and stripped before the lookup. Mutually exclusive with `address`; exactly one of the two is required. Example: `Car`.
+	Username *string `json:"-" url:"username,omitempty"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+}
+
+func (g *GetPolymarketWalletRequest) require(field *big.Int) {
+	if g.explicitFields == nil {
+		g.explicitFields = big.NewInt(0)
+	}
+	g.explicitFields.Or(g.explicitFields, field)
+}
+
+// SetAddress sets the Address field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (g *GetPolymarketWalletRequest) SetAddress(address *string) {
+	g.Address = address
+	g.require(getPolymarketWalletRequestFieldAddress)
+}
+
+// SetUsername sets the Username field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (g *GetPolymarketWalletRequest) SetUsername(username *string) {
+	g.Username = username
+	g.require(getPolymarketWalletRequestFieldUsername)
+}
+
+var (
 	getSportsMatchingMarketsRequestFieldLimit                = big.NewInt(1 << 0)
 	getSportsMatchingMarketsRequestFieldCursor               = big.NewInt(1 << 1)
 	getSportsMatchingMarketsRequestFieldIncludeSettled       = big.NewInt(1 << 2)
@@ -1227,6 +1263,142 @@ func NewPlatformMarketPlatformFromString(s string) (PlatformMarketPlatform, erro
 
 func (p PlatformMarketPlatform) Ptr() *PlatformMarketPlatform {
 	return &p
+}
+
+var (
+	polymarketWalletResponseFieldAddress      = big.NewInt(1 << 0)
+	polymarketWalletResponseFieldSigner       = big.NewInt(1 << 1)
+	polymarketWalletResponseFieldProfileImage = big.NewInt(1 << 2)
+	polymarketWalletResponseFieldDisplayName  = big.NewInt(1 << 3)
+)
+
+type PolymarketWalletResponse struct {
+	// Polymarket proxy address (lowercased) the profile is keyed on. When the input was a signer EOA, this is the resolved proxy.
+	Address string `json:"address" url:"address"`
+	// Original signer EOA from the request, when the input was an EOA that resolved to a different proxy. `null` when the input was already a proxy address (no resolution needed) or when no populated profile could be found for the resolved proxy.
+	Signer *string `json:"signer,omitempty" url:"signer,omitempty"`
+	// URL of the wallet's profile image, or `null` if unset.
+	ProfileImage *string `json:"profile_image,omitempty" url:"profile_image,omitempty"`
+	// User-chosen display name when set; otherwise the auto-generated pseudonym Polymarket assigns. `null` only when both are missing.
+	DisplayName *string `json:"display_name,omitempty" url:"display_name,omitempty"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (p *PolymarketWalletResponse) GetAddress() string {
+	if p == nil {
+		return ""
+	}
+	return p.Address
+}
+
+func (p *PolymarketWalletResponse) GetSigner() *string {
+	if p == nil {
+		return nil
+	}
+	return p.Signer
+}
+
+func (p *PolymarketWalletResponse) GetProfileImage() *string {
+	if p == nil {
+		return nil
+	}
+	return p.ProfileImage
+}
+
+func (p *PolymarketWalletResponse) GetDisplayName() *string {
+	if p == nil {
+		return nil
+	}
+	return p.DisplayName
+}
+
+func (p *PolymarketWalletResponse) GetExtraProperties() map[string]interface{} {
+	if p == nil {
+		return nil
+	}
+	return p.extraProperties
+}
+
+func (p *PolymarketWalletResponse) require(field *big.Int) {
+	if p.explicitFields == nil {
+		p.explicitFields = big.NewInt(0)
+	}
+	p.explicitFields.Or(p.explicitFields, field)
+}
+
+// SetAddress sets the Address field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *PolymarketWalletResponse) SetAddress(address string) {
+	p.Address = address
+	p.require(polymarketWalletResponseFieldAddress)
+}
+
+// SetSigner sets the Signer field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *PolymarketWalletResponse) SetSigner(signer *string) {
+	p.Signer = signer
+	p.require(polymarketWalletResponseFieldSigner)
+}
+
+// SetProfileImage sets the ProfileImage field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *PolymarketWalletResponse) SetProfileImage(profileImage *string) {
+	p.ProfileImage = profileImage
+	p.require(polymarketWalletResponseFieldProfileImage)
+}
+
+// SetDisplayName sets the DisplayName field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *PolymarketWalletResponse) SetDisplayName(displayName *string) {
+	p.DisplayName = displayName
+	p.require(polymarketWalletResponseFieldDisplayName)
+}
+
+func (p *PolymarketWalletResponse) UnmarshalJSON(data []byte) error {
+	type unmarshaler PolymarketWalletResponse
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*p = PolymarketWalletResponse(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *p)
+	if err != nil {
+		return err
+	}
+	p.extraProperties = extraProperties
+	p.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (p *PolymarketWalletResponse) MarshalJSON() ([]byte, error) {
+	type embed PolymarketWalletResponse
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*p),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, p.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (p *PolymarketWalletResponse) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	if len(p.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(p.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(p); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", p)
 }
 
 var (
