@@ -178,3 +178,57 @@ func TestGetPolymarketWalletWithWireMock(
 	require.NoError(t, invocationErr, "Client method call should succeed")
 	VerifyRequestCount(t, "TestGetPolymarketWalletWithWireMock", "GET", "/v1/polymarket/wallet", map[string]interface{}{"address": "0x7c3db723f1d4d8cb9c550095203b686cb11e5c6b"}, 1)
 }
+
+func TestListPolymarketWalletPositionsWithWireMock(
+	t *testing.T,
+) {
+	WireMockBaseURL := os.Getenv("WIREMOCK_URL")
+	if WireMockBaseURL == "" {
+		WireMockBaseURL = "http://localhost:8080"
+	}
+	client := client.New(
+		option.WithBaseURL(WireMockBaseURL),
+		option.WithToken("test-token"),
+	)
+	request := &predictorsdk.ListPolymarketWalletPositionsRequest{
+		Address: predictorsdk.String(
+			"0x7c3db723f1d4d8cb9c550095203b686cb11e5c6b",
+		),
+	}
+	_, invocationErr := client.ListPolymarketWalletPositions(
+		context.TODO(),
+		request,
+		option.WithHTTPHeader(
+			http.Header{"X-Test-Id": []string{"TestListPolymarketWalletPositionsWithWireMock"}},
+		),
+	)
+
+	require.NoError(t, invocationErr, "Client method call should succeed")
+	VerifyRequestCount(t, "TestListPolymarketWalletPositionsWithWireMock", "GET", "/v1/polymarket/wallet/positions", map[string]interface{}{"address": "0x7c3db723f1d4d8cb9c550095203b686cb11e5c6b"}, 1)
+}
+
+func TestGetEventWithWireMock(
+	t *testing.T,
+) {
+	WireMockBaseURL := os.Getenv("WIREMOCK_URL")
+	if WireMockBaseURL == "" {
+		WireMockBaseURL = "http://localhost:8080"
+	}
+	client := client.New(
+		option.WithBaseURL(WireMockBaseURL),
+		option.WithToken("test-token"),
+	)
+	request := &predictorsdk.GetEventRequest{
+		EventID: "KXMLBGAME-26MAY221840CLEPHI",
+	}
+	_, invocationErr := client.GetEvent(
+		context.TODO(),
+		request,
+		option.WithHTTPHeader(
+			http.Header{"X-Test-Id": []string{"TestGetEventWithWireMock"}},
+		),
+	)
+
+	require.NoError(t, invocationErr, "Client method call should succeed")
+	VerifyRequestCount(t, "TestGetEventWithWireMock", "GET", "/v1/events/KXMLBGAME-26MAY221840CLEPHI", nil, 1)
+}

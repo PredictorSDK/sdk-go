@@ -76,6 +76,42 @@ func (g *GetBinanceCryptoPricesRequest) SetPaginationKey(paginationKey *string) 
 }
 
 var (
+	getEventRequestFieldEventID  = big.NewInt(1 << 0)
+	getEventRequestFieldPlatform = big.NewInt(1 << 1)
+)
+
+type GetEventRequest struct {
+	// Platform-native event identifier. Examples per platform: Kalshi event ticker (`KXMLBGAME-26MAY221840CLEPHI`), Polymarket event slug (`mlb-cle-phi-2026-05-22`), SX Bet event id (`L10073358`), Predict market id (`110629`).
+	EventID string `json:"-" url:"-"`
+	// Optional platform override. When omitted, inferred from the `event_id` format: `KX…` → Kalshi, `L\d+` → SX Bet. Numeric IDs and kebab-case slugs are ambiguous between Polymarket and Predict; supplying `platform` is required in that case or the response is `400`.
+	Platform *GetEventRequestPlatform `json:"-" url:"platform,omitempty"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+}
+
+func (g *GetEventRequest) require(field *big.Int) {
+	if g.explicitFields == nil {
+		g.explicitFields = big.NewInt(0)
+	}
+	g.explicitFields.Or(g.explicitFields, field)
+}
+
+// SetEventID sets the EventID field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (g *GetEventRequest) SetEventID(eventID string) {
+	g.EventID = eventID
+	g.require(getEventRequestFieldEventID)
+}
+
+// SetPlatform sets the Platform field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (g *GetEventRequest) SetPlatform(platform *GetEventRequestPlatform) {
+	g.Platform = platform
+	g.require(getEventRequestFieldPlatform)
+}
+
+var (
 	getMarketsRequestFieldLimit  = big.NewInt(1 << 0)
 	getMarketsRequestFieldCursor = big.NewInt(1 << 1)
 )
@@ -231,6 +267,62 @@ func (g *GetSportsMatchingMarketsRequest) SetPredictMarketID(predictMarketID []*
 func (g *GetSportsMatchingMarketsRequest) SetSxbetMarketID(sxbetMarketID []*string) {
 	g.SxbetMarketID = sxbetMarketID
 	g.require(getSportsMatchingMarketsRequestFieldSxbetMarketID)
+}
+
+var (
+	listPolymarketWalletPositionsRequestFieldAddress  = big.NewInt(1 << 0)
+	listPolymarketWalletPositionsRequestFieldUsername = big.NewInt(1 << 1)
+	listPolymarketWalletPositionsRequestFieldLimit    = big.NewInt(1 << 2)
+	listPolymarketWalletPositionsRequestFieldCursor   = big.NewInt(1 << 3)
+)
+
+type ListPolymarketWalletPositionsRequest struct {
+	// Polymarket proxy wallet address. Must match `^0x[a-fA-F0-9]{40}$`. Mixed-case input is accepted and lowercased in the response. Mutually exclusive with `username`; exactly one of the two is required.
+	Address *string `json:"-" url:"address,omitempty"`
+	// Polymarket display name to resolve to a proxy wallet. Match is case-insensitive and exact against the user's stored `name`. A leading `@` is accepted and stripped. Mutually exclusive with `address`.
+	Username *string `json:"-" url:"username,omitempty"`
+	// Number of items per page. Defaults to 50.
+	Limit *int `json:"-" url:"limit,omitempty"`
+	// Opaque cursor from a previous response's `pagination.next_cursor`. Bound to the resolved wallet address — replaying a cursor against a different identifier returns `400`.
+	Cursor *string `json:"-" url:"cursor,omitempty"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+}
+
+func (l *ListPolymarketWalletPositionsRequest) require(field *big.Int) {
+	if l.explicitFields == nil {
+		l.explicitFields = big.NewInt(0)
+	}
+	l.explicitFields.Or(l.explicitFields, field)
+}
+
+// SetAddress sets the Address field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (l *ListPolymarketWalletPositionsRequest) SetAddress(address *string) {
+	l.Address = address
+	l.require(listPolymarketWalletPositionsRequestFieldAddress)
+}
+
+// SetUsername sets the Username field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (l *ListPolymarketWalletPositionsRequest) SetUsername(username *string) {
+	l.Username = username
+	l.require(listPolymarketWalletPositionsRequestFieldUsername)
+}
+
+// SetLimit sets the Limit field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (l *ListPolymarketWalletPositionsRequest) SetLimit(limit *int) {
+	l.Limit = limit
+	l.require(listPolymarketWalletPositionsRequestFieldLimit)
+}
+
+// SetCursor sets the Cursor field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (l *ListPolymarketWalletPositionsRequest) SetCursor(cursor *string) {
+	l.Cursor = cursor
+	l.require(listPolymarketWalletPositionsRequestFieldCursor)
 }
 
 var (
@@ -588,6 +680,437 @@ func (e *ErrorResponse) String() string {
 }
 
 var (
+	eventFanoutFieldSiblingsAttempted = big.NewInt(1 << 0)
+	eventFanoutFieldSiblingsReturned  = big.NewInt(1 << 1)
+	eventFanoutFieldSiblingsMissing   = big.NewInt(1 << 2)
+)
+
+type EventFanout struct {
+	// Sibling event tickers the server attempted to fetch alongside the primary event. Determined by the Kalshi sibling registry for the primary event's series.
+	SiblingsAttempted []string `json:"siblings_attempted" url:"siblings_attempted"`
+	// Sibling event tickers that returned successfully and contributed markets to the merged response.
+	SiblingsReturned []string `json:"siblings_returned" url:"siblings_returned"`
+	// Sibling event tickers that did not exist upstream (404) or errored. The primary event still returned 200 — these are reported for observability, not as request failures.
+	SiblingsMissing []string `json:"siblings_missing" url:"siblings_missing"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (e *EventFanout) GetSiblingsAttempted() []string {
+	if e == nil {
+		return nil
+	}
+	return e.SiblingsAttempted
+}
+
+func (e *EventFanout) GetSiblingsReturned() []string {
+	if e == nil {
+		return nil
+	}
+	return e.SiblingsReturned
+}
+
+func (e *EventFanout) GetSiblingsMissing() []string {
+	if e == nil {
+		return nil
+	}
+	return e.SiblingsMissing
+}
+
+func (e *EventFanout) GetExtraProperties() map[string]interface{} {
+	if e == nil {
+		return nil
+	}
+	return e.extraProperties
+}
+
+func (e *EventFanout) require(field *big.Int) {
+	if e.explicitFields == nil {
+		e.explicitFields = big.NewInt(0)
+	}
+	e.explicitFields.Or(e.explicitFields, field)
+}
+
+// SetSiblingsAttempted sets the SiblingsAttempted field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (e *EventFanout) SetSiblingsAttempted(siblingsAttempted []string) {
+	e.SiblingsAttempted = siblingsAttempted
+	e.require(eventFanoutFieldSiblingsAttempted)
+}
+
+// SetSiblingsReturned sets the SiblingsReturned field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (e *EventFanout) SetSiblingsReturned(siblingsReturned []string) {
+	e.SiblingsReturned = siblingsReturned
+	e.require(eventFanoutFieldSiblingsReturned)
+}
+
+// SetSiblingsMissing sets the SiblingsMissing field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (e *EventFanout) SetSiblingsMissing(siblingsMissing []string) {
+	e.SiblingsMissing = siblingsMissing
+	e.require(eventFanoutFieldSiblingsMissing)
+}
+
+func (e *EventFanout) UnmarshalJSON(data []byte) error {
+	type unmarshaler EventFanout
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*e = EventFanout(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *e)
+	if err != nil {
+		return err
+	}
+	e.extraProperties = extraProperties
+	e.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (e *EventFanout) MarshalJSON() ([]byte, error) {
+	type embed EventFanout
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*e),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, e.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (e *EventFanout) String() string {
+	if e == nil {
+		return "<nil>"
+	}
+	if len(e.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(e.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(e); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", e)
+}
+
+var (
+	eventMarketFieldMarketID = big.NewInt(1 << 0)
+	eventMarketFieldTitle    = big.NewInt(1 << 1)
+)
+
+type EventMarket struct {
+	// Platform-native market identifier. Kalshi ticker (`KXMLBGAME-26MAY221840CLEPHI-CLE`), Polymarket numeric market id, SX Bet `marketHash`, or Predict market id.
+	MarketID string `json:"market_id" url:"market_id"`
+	// Human-readable market title/question.
+	Title string `json:"title" url:"title"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (e *EventMarket) GetMarketID() string {
+	if e == nil {
+		return ""
+	}
+	return e.MarketID
+}
+
+func (e *EventMarket) GetTitle() string {
+	if e == nil {
+		return ""
+	}
+	return e.Title
+}
+
+func (e *EventMarket) GetExtraProperties() map[string]interface{} {
+	if e == nil {
+		return nil
+	}
+	return e.extraProperties
+}
+
+func (e *EventMarket) require(field *big.Int) {
+	if e.explicitFields == nil {
+		e.explicitFields = big.NewInt(0)
+	}
+	e.explicitFields.Or(e.explicitFields, field)
+}
+
+// SetMarketID sets the MarketID field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (e *EventMarket) SetMarketID(marketID string) {
+	e.MarketID = marketID
+	e.require(eventMarketFieldMarketID)
+}
+
+// SetTitle sets the Title field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (e *EventMarket) SetTitle(title string) {
+	e.Title = title
+	e.require(eventMarketFieldTitle)
+}
+
+func (e *EventMarket) UnmarshalJSON(data []byte) error {
+	type unmarshaler EventMarket
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*e = EventMarket(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *e)
+	if err != nil {
+		return err
+	}
+	e.extraProperties = extraProperties
+	e.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (e *EventMarket) MarshalJSON() ([]byte, error) {
+	type embed EventMarket
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*e),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, e.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (e *EventMarket) String() string {
+	if e == nil {
+		return "<nil>"
+	}
+	if len(e.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(e.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(e); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", e)
+}
+
+var (
+	eventResponseFieldEventID  = big.NewInt(1 << 0)
+	eventResponseFieldPlatform = big.NewInt(1 << 1)
+	eventResponseFieldTitle    = big.NewInt(1 << 2)
+	eventResponseFieldMarkets  = big.NewInt(1 << 3)
+	eventResponseFieldFanout   = big.NewInt(1 << 4)
+)
+
+type EventResponse struct {
+	// Echo of the platform-native event identifier supplied in the request path.
+	EventID string `json:"event_id" url:"event_id"`
+	// The platform the event_id was resolved against, either inferred from the ID format or supplied via `?platform=`.
+	Platform EventResponsePlatform `json:"platform" url:"platform"`
+	// Human-readable event title from the platform.
+	Title string `json:"title" url:"title"`
+	// Markets nested under this event. Order is platform-native for the primary event, followed by markets from fanout siblings (Kalshi sports) in registry order.
+	Markets []*EventMarket `json:"markets" url:"markets"`
+	// Present when the response was assembled from multiple upstream events (Kalshi sports sibling fanout). Lists which sibling event tickers were attempted, which contributed markets, and which failed or didn't exist. Absent for non-Kalshi platforms and for Kalshi events whose series is not in the sibling registry.
+	Fanout *EventFanout `json:"fanout,omitempty" url:"fanout,omitempty"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (e *EventResponse) GetEventID() string {
+	if e == nil {
+		return ""
+	}
+	return e.EventID
+}
+
+func (e *EventResponse) GetPlatform() EventResponsePlatform {
+	if e == nil {
+		return ""
+	}
+	return e.Platform
+}
+
+func (e *EventResponse) GetTitle() string {
+	if e == nil {
+		return ""
+	}
+	return e.Title
+}
+
+func (e *EventResponse) GetMarkets() []*EventMarket {
+	if e == nil {
+		return nil
+	}
+	return e.Markets
+}
+
+func (e *EventResponse) GetFanout() *EventFanout {
+	if e == nil {
+		return nil
+	}
+	return e.Fanout
+}
+
+func (e *EventResponse) GetExtraProperties() map[string]interface{} {
+	if e == nil {
+		return nil
+	}
+	return e.extraProperties
+}
+
+func (e *EventResponse) require(field *big.Int) {
+	if e.explicitFields == nil {
+		e.explicitFields = big.NewInt(0)
+	}
+	e.explicitFields.Or(e.explicitFields, field)
+}
+
+// SetEventID sets the EventID field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (e *EventResponse) SetEventID(eventID string) {
+	e.EventID = eventID
+	e.require(eventResponseFieldEventID)
+}
+
+// SetPlatform sets the Platform field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (e *EventResponse) SetPlatform(platform EventResponsePlatform) {
+	e.Platform = platform
+	e.require(eventResponseFieldPlatform)
+}
+
+// SetTitle sets the Title field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (e *EventResponse) SetTitle(title string) {
+	e.Title = title
+	e.require(eventResponseFieldTitle)
+}
+
+// SetMarkets sets the Markets field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (e *EventResponse) SetMarkets(markets []*EventMarket) {
+	e.Markets = markets
+	e.require(eventResponseFieldMarkets)
+}
+
+// SetFanout sets the Fanout field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (e *EventResponse) SetFanout(fanout *EventFanout) {
+	e.Fanout = fanout
+	e.require(eventResponseFieldFanout)
+}
+
+func (e *EventResponse) UnmarshalJSON(data []byte) error {
+	type unmarshaler EventResponse
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*e = EventResponse(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *e)
+	if err != nil {
+		return err
+	}
+	e.extraProperties = extraProperties
+	e.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (e *EventResponse) MarshalJSON() ([]byte, error) {
+	type embed EventResponse
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*e),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, e.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (e *EventResponse) String() string {
+	if e == nil {
+		return "<nil>"
+	}
+	if len(e.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(e.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(e); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", e)
+}
+
+// The platform the event_id was resolved against, either inferred from the ID format or supplied via `?platform=`.
+type EventResponsePlatform string
+
+const (
+	EventResponsePlatformKalshi     EventResponsePlatform = "kalshi"
+	EventResponsePlatformPolymarket EventResponsePlatform = "polymarket"
+	EventResponsePlatformPredict    EventResponsePlatform = "predict"
+	EventResponsePlatformSxbet      EventResponsePlatform = "sxbet"
+)
+
+func NewEventResponsePlatformFromString(s string) (EventResponsePlatform, error) {
+	switch s {
+	case "kalshi":
+		return EventResponsePlatformKalshi, nil
+	case "polymarket":
+		return EventResponsePlatformPolymarket, nil
+	case "predict":
+		return EventResponsePlatformPredict, nil
+	case "sxbet":
+		return EventResponsePlatformSxbet, nil
+	}
+	var t EventResponsePlatform
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (e EventResponsePlatform) Ptr() *EventResponsePlatform {
+	return &e
+}
+
+type GetEventRequestPlatform string
+
+const (
+	GetEventRequestPlatformKalshi     GetEventRequestPlatform = "kalshi"
+	GetEventRequestPlatformPolymarket GetEventRequestPlatform = "polymarket"
+	GetEventRequestPlatformPredict    GetEventRequestPlatform = "predict"
+	GetEventRequestPlatformSxbet      GetEventRequestPlatform = "sxbet"
+)
+
+func NewGetEventRequestPlatformFromString(s string) (GetEventRequestPlatform, error) {
+	switch s {
+	case "kalshi":
+		return GetEventRequestPlatformKalshi, nil
+	case "polymarket":
+		return GetEventRequestPlatformPolymarket, nil
+	case "predict":
+		return GetEventRequestPlatformPredict, nil
+	case "sxbet":
+		return GetEventRequestPlatformSxbet, nil
+	}
+	var t GetEventRequestPlatform
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (g GetEventRequestPlatform) Ptr() *GetEventRequestPlatform {
+	return &g
+}
+
+var (
 	marketsListResponseFieldData       = big.NewInt(1 << 0)
 	marketsListResponseFieldPagination = big.NewInt(1 << 1)
 )
@@ -699,7 +1222,7 @@ var (
 type PaginationBlock struct {
 	// Number of items requested per page (echoes the `limit` query param).
 	Limit int `json:"limit" url:"limit"`
-	// Total matching items across all pages.
+	// Total matching items across all pages, when known. Set to `0` for endpoints whose upstream does not expose a total count — clients should rely on `has_more` and `next_cursor` to paginate in that case.
 	Total int `json:"total" url:"total"`
 	// Whether additional pages exist beyond this one.
 	HasMore bool `json:"has_more" url:"has_more"`
@@ -1263,6 +1786,242 @@ func NewPlatformMarketPlatformFromString(s string) (PlatformMarketPlatform, erro
 
 func (p PlatformMarketPlatform) Ptr() *PlatformMarketPlatform {
 	return &p
+}
+
+var (
+	polymarketPositionFieldConditionID = big.NewInt(1 << 0)
+	polymarketPositionFieldOutcome     = big.NewInt(1 << 1)
+	polymarketPositionFieldShares      = big.NewInt(1 << 2)
+)
+
+type PolymarketPosition struct {
+	// Polymarket condition ID (`0x`-prefixed hex).
+	ConditionID string `json:"condition_id" url:"condition_id"`
+	// Outcome label held in this position (`Yes`/`No` for binary markets).
+	Outcome string `json:"outcome" url:"outcome"`
+	// Number of outcome shares held.
+	Shares float64 `json:"shares" url:"shares"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (p *PolymarketPosition) GetConditionID() string {
+	if p == nil {
+		return ""
+	}
+	return p.ConditionID
+}
+
+func (p *PolymarketPosition) GetOutcome() string {
+	if p == nil {
+		return ""
+	}
+	return p.Outcome
+}
+
+func (p *PolymarketPosition) GetShares() float64 {
+	if p == nil {
+		return 0
+	}
+	return p.Shares
+}
+
+func (p *PolymarketPosition) GetExtraProperties() map[string]interface{} {
+	if p == nil {
+		return nil
+	}
+	return p.extraProperties
+}
+
+func (p *PolymarketPosition) require(field *big.Int) {
+	if p.explicitFields == nil {
+		p.explicitFields = big.NewInt(0)
+	}
+	p.explicitFields.Or(p.explicitFields, field)
+}
+
+// SetConditionID sets the ConditionID field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *PolymarketPosition) SetConditionID(conditionID string) {
+	p.ConditionID = conditionID
+	p.require(polymarketPositionFieldConditionID)
+}
+
+// SetOutcome sets the Outcome field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *PolymarketPosition) SetOutcome(outcome string) {
+	p.Outcome = outcome
+	p.require(polymarketPositionFieldOutcome)
+}
+
+// SetShares sets the Shares field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *PolymarketPosition) SetShares(shares float64) {
+	p.Shares = shares
+	p.require(polymarketPositionFieldShares)
+}
+
+func (p *PolymarketPosition) UnmarshalJSON(data []byte) error {
+	type unmarshaler PolymarketPosition
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*p = PolymarketPosition(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *p)
+	if err != nil {
+		return err
+	}
+	p.extraProperties = extraProperties
+	p.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (p *PolymarketPosition) MarshalJSON() ([]byte, error) {
+	type embed PolymarketPosition
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*p),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, p.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (p *PolymarketPosition) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	if len(p.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(p.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(p); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", p)
+}
+
+var (
+	polymarketPositionsResponseFieldAddress    = big.NewInt(1 << 0)
+	polymarketPositionsResponseFieldData       = big.NewInt(1 << 1)
+	polymarketPositionsResponseFieldPagination = big.NewInt(1 << 2)
+)
+
+type PolymarketPositionsResponse struct {
+	// Resolved Polymarket proxy wallet (lowercased).
+	Address    string                `json:"address" url:"address"`
+	Data       []*PolymarketPosition `json:"data" url:"data"`
+	Pagination *PaginationBlock      `json:"pagination" url:"pagination"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (p *PolymarketPositionsResponse) GetAddress() string {
+	if p == nil {
+		return ""
+	}
+	return p.Address
+}
+
+func (p *PolymarketPositionsResponse) GetData() []*PolymarketPosition {
+	if p == nil {
+		return nil
+	}
+	return p.Data
+}
+
+func (p *PolymarketPositionsResponse) GetPagination() *PaginationBlock {
+	if p == nil {
+		return nil
+	}
+	return p.Pagination
+}
+
+func (p *PolymarketPositionsResponse) GetExtraProperties() map[string]interface{} {
+	if p == nil {
+		return nil
+	}
+	return p.extraProperties
+}
+
+func (p *PolymarketPositionsResponse) require(field *big.Int) {
+	if p.explicitFields == nil {
+		p.explicitFields = big.NewInt(0)
+	}
+	p.explicitFields.Or(p.explicitFields, field)
+}
+
+// SetAddress sets the Address field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *PolymarketPositionsResponse) SetAddress(address string) {
+	p.Address = address
+	p.require(polymarketPositionsResponseFieldAddress)
+}
+
+// SetData sets the Data field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *PolymarketPositionsResponse) SetData(data []*PolymarketPosition) {
+	p.Data = data
+	p.require(polymarketPositionsResponseFieldData)
+}
+
+// SetPagination sets the Pagination field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *PolymarketPositionsResponse) SetPagination(pagination *PaginationBlock) {
+	p.Pagination = pagination
+	p.require(polymarketPositionsResponseFieldPagination)
+}
+
+func (p *PolymarketPositionsResponse) UnmarshalJSON(data []byte) error {
+	type unmarshaler PolymarketPositionsResponse
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*p = PolymarketPositionsResponse(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *p)
+	if err != nil {
+		return err
+	}
+	p.extraProperties = extraProperties
+	p.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (p *PolymarketPositionsResponse) MarshalJSON() ([]byte, error) {
+	type embed PolymarketPositionsResponse
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*p),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, p.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (p *PolymarketPositionsResponse) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	if len(p.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(p.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(p); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", p)
 }
 
 var (

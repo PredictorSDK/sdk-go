@@ -137,9 +137,82 @@
         }
       },
       "postServeActions": []
+    },
+    {
+      "id": "4887b190-ebb7-45ce-82d6-785d61766f32",
+      "name": "List Polymarket wallet positions - with_positions",
+      "request": {
+        "urlPathTemplate": "/v1/polymarket/wallet/positions",
+        "method": "GET",
+        "headers": {
+          "Authorization": {
+            "matches": "Bearer .+"
+          }
+        },
+        "queryParameters": {
+          "address": {
+            "equalTo": "0x7c3db723f1d4d8cb9c550095203b686cb11e5c6b"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": "{\n  \"address\": \"0x7c3db723f1d4d8cb9c550095203b686cb11e5c6b\",\n  \"data\": [\n    {\n      \"condition_id\": \"0x7ad403c3508f8e3912940fd1a913f227591145ca0614074208e0b962d5fcc422\",\n      \"outcome\": \"Yes\",\n      \"shares\": 300000\n    },\n    {\n      \"condition_id\": \"0x7ad403c3508f8e3912940fd1a913f227591145ca0614074208e0b962d5fcc422\",\n      \"outcome\": \"No\",\n      \"shares\": 300000\n    }\n  ],\n  \"pagination\": {\n    \"limit\": 2,\n    \"total\": 0,\n    \"has_more\": true,\n    \"next_cursor\": \"eyJzIjoiYTNmMWIyYzgiLCJvIjoyfQ\"\n  }\n}",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "uuid": "4887b190-ebb7-45ce-82d6-785d61766f32",
+      "persistent": true,
+      "priority": 3,
+      "metadata": {
+        "mocklab": {
+          "created": {
+            "at": "2020-01-01T00:00:00.000Z",
+            "via": "SYSTEM"
+          }
+        }
+      },
+      "postServeActions": []
+    },
+    {
+      "id": "94403d36-f5ed-401b-aea7-18b9a28c30d4",
+      "name": "Get event with nested markets - Kalshi MLB game with sibling fanout",
+      "request": {
+        "urlPathTemplate": "/v1/events/{event_id}",
+        "method": "GET",
+        "headers": {
+          "Authorization": {
+            "matches": "Bearer .+"
+          }
+        },
+        "pathParameters": {
+          "event_id": {
+            "equalTo": "KXMLBGAME-26MAY221840CLEPHI"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": "{\n  \"event_id\": \"KXMLBGAME-26MAY221840CLEPHI\",\n  \"platform\": \"kalshi\",\n  \"title\": \"Cleveland vs Philadelphia\",\n  \"markets\": [\n    {\n      \"market_id\": \"KXMLBGAME-26MAY221840CLEPHI-CLE\",\n      \"title\": \"Cleveland vs Philadelphia Winner?\"\n    },\n    {\n      \"market_id\": \"KXMLBGAME-26MAY221840CLEPHI-PHI\",\n      \"title\": \"Cleveland vs Philadelphia Winner?\"\n    },\n    {\n      \"market_id\": \"KXMLBF5TOTAL-26MAY221840CLEPHI-1\",\n      \"title\": \"Cleveland vs Philadelphia: First 5 Innings Total\"\n    },\n    {\n      \"market_id\": \"KXMLBRFI-26MAY221840CLEPHI\",\n      \"title\": \"Cleveland vs Philadelphia: First Inning Run\"\n    }\n  ],\n  \"fanout\": {\n    \"siblings_attempted\": [\n      \"KXMLBF5-26MAY221840CLEPHI\",\n      \"KXMLBF5SPREAD-26MAY221840CLEPHI\",\n      \"KXMLBF5TOTAL-26MAY221840CLEPHI\",\n      \"KXMLBRFI-26MAY221840CLEPHI\"\n    ],\n    \"siblings_returned\": [\n      \"KXMLBF5SPREAD-26MAY221840CLEPHI\",\n      \"KXMLBF5TOTAL-26MAY221840CLEPHI\",\n      \"KXMLBRFI-26MAY221840CLEPHI\"\n    ],\n    \"siblings_missing\": [\n      \"KXMLBF5-26MAY221840CLEPHI\"\n    ]\n  }\n}",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "uuid": "94403d36-f5ed-401b-aea7-18b9a28c30d4",
+      "persistent": true,
+      "priority": 3,
+      "metadata": {
+        "mocklab": {
+          "created": {
+            "at": "2020-01-01T00:00:00.000Z",
+            "via": "SYSTEM"
+          }
+        }
+      }
     }
   ],
   "meta": {
-    "total": 4
+    "total": 6
   }
 }

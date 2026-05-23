@@ -105,3 +105,49 @@ func (c *Client) GetPolymarketWallet(
 	}
 	return response.Body, nil
 }
+
+// Returns the current Polymarket positions for a wallet. Accepts either a wallet `address` (proxy address only — see note below) or a Polymarket `username`. Exactly one of the two must be supplied — passing both returns `400`.
+//
+// v1 surfaces a minimal field set so the endpoint scaffolding can be verified end-to-end: `condition_id` (which market), `outcome` (which side), and `shares` (how much). Title/slug, avg/current price, PnL (`cash_pnl`, `realized_pnl`), `redeemable`/`mergeable` flags, and event metadata will be added in follow-ups.
+//
+// `total` in the pagination block is always `0` because the upstream Data API does not return a total count; rely on `has_more` + `next_cursor` to paginate.
+//
+// **EOA inputs are not auto-resolved on this endpoint.** Unlike `/v1/polymarket/wallet`, this endpoint does not perform the EOA→proxy CREATE2 resolution. Callers with a signer EOA should call `/v1/polymarket/wallet` first to resolve the proxy, then pass the returned `address`. Passing an EOA directly will return an empty `data` array.
+func (c *Client) ListPolymarketWalletPositions(
+	ctx context.Context,
+	request *predictorsdk.ListPolymarketWalletPositionsRequest,
+	opts ...option.RequestOption,
+) (*predictorsdk.PolymarketPositionsResponse, error) {
+	response, err := c.WithRawResponse.ListPolymarketWalletPositions(
+		ctx,
+		request,
+		opts...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return response.Body, nil
+}
+
+// Returns a single event and the markets nested under it on the identified platform. The `event_id` is the platform's native identifier — a Kalshi `event_ticker`, a Polymarket event slug, an SX Bet `eventId`, or a Predict market identifier. The `platform` is inferred from the ID format when unambiguous; callers must pass `?platform=` for numeric IDs or kebab-case slugs that could belong to either Polymarket or Predict.
+//
+// Response is minimal in v0: each market is returned with its platform-native `market_id` and a human-readable `title`. Pricing, volume, status, and timestamps are intentionally deferred — they'll be added as additive fields to `EventMarket` in a later release. The endpoint mirrors the `/v1/markets` rollout pattern (titles first, fields later).
+//
+// **Kalshi sibling fanout.** A single Kalshi sports game lives across multiple event tickers that share a game suffix — e.g. `KXMLBGAME-26MAY221840CLEPHI` holds the moneyline, `KXMLBF5TOTAL-26MAY221840CLEPHI` holds the totals, and so on. When the supplied event_ticker belongs to a sport in the sibling registry (MLB, NBA, NFL, NHL, WNBA today), this endpoint fans out across known sibling series in parallel and merges their markets into one response. Siblings that don't exist for a particular game silently drop. Siblings that error are reported under `fanout.siblings_missing`; the primary event still returns 200 in that case. Only the primary fetch failing produces a 4xx/5xx — partial fanouts never fail the request.
+//
+// **Polymarket** events already nest the moneyline plus all spread/totals/game-level prop markets under a single event slug, so no fanout is performed. **SX Bet** fixtures similarly bundle game lines per `eventId`. **Predict** currently treats `event_id` as a market identifier and wraps the single market as a 1-element event response, since the upstream `event` concept on Predict is closer to a category than to a multi-market container.
+func (c *Client) GetEvent(
+	ctx context.Context,
+	request *predictorsdk.GetEventRequest,
+	opts ...option.RequestOption,
+) (*predictorsdk.EventResponse, error) {
+	response, err := c.WithRawResponse.GetEvent(
+		ctx,
+		request,
+		opts...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return response.Body, nil
+}
