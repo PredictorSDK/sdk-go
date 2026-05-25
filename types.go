@@ -83,7 +83,7 @@ var (
 type GetEventRequest struct {
 	// Platform-native event identifier. Examples per platform: Kalshi event ticker (`KXMLBGAME-26MAY221840CLEPHI`), Polymarket event slug (`mlb-cle-phi-2026-05-22`), SX Bet event id (`L10073358`), Predict market id (`110629`).
 	EventID string `json:"-" url:"-"`
-	// Optional platform override. When omitted, inferred from the `event_id` format: `KX…` → Kalshi, `L\d+` → SX Bet. Numeric IDs and kebab-case slugs are ambiguous between Polymarket and Predict; supplying `platform` is required in that case or the response is `400`.
+	// Optional platform override. When omitted, inferred from the `event_id` format: `KX…` → Kalshi, `L\d+` → SX Bet. Numeric IDs and kebab-case slugs are shared shape between Polymarket and Predict; in that case the service probes Polymarket first and falls back to Predict on 404. Pass `platform` explicitly to skip the probe.
 	Platform *GetEventRequestPlatform `json:"-" url:"platform,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
@@ -109,6 +109,42 @@ func (g *GetEventRequest) SetEventID(eventID string) {
 func (g *GetEventRequest) SetPlatform(platform *GetEventRequestPlatform) {
 	g.Platform = platform
 	g.require(getEventRequestFieldPlatform)
+}
+
+var (
+	getMarketRequestFieldMarketID = big.NewInt(1 << 0)
+	getMarketRequestFieldPlatform = big.NewInt(1 << 1)
+)
+
+type GetMarketRequest struct {
+	// Composite (`{provider}:{native_id}`) or platform-native market identifier. Examples per platform: Kalshi market ticker (`KXMLBGAME-26MAY262005HOUTEX-TEX`), Polymarket numeric id or slug (`540817` or `new-rhianna-album-before-gta-vi-926`), Predict market id (`356635`), SX Bet `marketHash` (`0x…64hex`).
+	MarketID string `json:"-" url:"-"`
+	// Optional platform override. When omitted, inferred from the composite prefix or from the native ID format (`KX…` → Kalshi, `0x…64hex` → SX Bet). Numeric IDs and kebab-case slugs are shared shape between Polymarket and Predict; in that case the service probes Polymarket first and falls back to Predict on 404. Pass `platform` explicitly to skip the probe. When the override contradicts a composite prefix (e.g. `kalshi:X` with `?platform=polymarket`), the request returns 400.
+	Platform *GetMarketRequestPlatform `json:"-" url:"platform,omitempty"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+}
+
+func (g *GetMarketRequest) require(field *big.Int) {
+	if g.explicitFields == nil {
+		g.explicitFields = big.NewInt(0)
+	}
+	g.explicitFields.Or(g.explicitFields, field)
+}
+
+// SetMarketID sets the MarketID field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (g *GetMarketRequest) SetMarketID(marketID string) {
+	g.MarketID = marketID
+	g.require(getMarketRequestFieldMarketID)
+}
+
+// SetPlatform sets the Platform field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (g *GetMarketRequest) SetPlatform(platform *GetMarketRequestPlatform) {
+	g.Platform = platform
+	g.require(getMarketRequestFieldPlatform)
 }
 
 var (
@@ -1108,6 +1144,345 @@ func NewGetEventRequestPlatformFromString(s string) (GetEventRequestPlatform, er
 
 func (g GetEventRequestPlatform) Ptr() *GetEventRequestPlatform {
 	return &g
+}
+
+type GetMarketRequestPlatform string
+
+const (
+	GetMarketRequestPlatformKalshi     GetMarketRequestPlatform = "kalshi"
+	GetMarketRequestPlatformPolymarket GetMarketRequestPlatform = "polymarket"
+	GetMarketRequestPlatformPredict    GetMarketRequestPlatform = "predict"
+	GetMarketRequestPlatformSxbet      GetMarketRequestPlatform = "sxbet"
+)
+
+func NewGetMarketRequestPlatformFromString(s string) (GetMarketRequestPlatform, error) {
+	switch s {
+	case "kalshi":
+		return GetMarketRequestPlatformKalshi, nil
+	case "polymarket":
+		return GetMarketRequestPlatformPolymarket, nil
+	case "predict":
+		return GetMarketRequestPlatformPredict, nil
+	case "sxbet":
+		return GetMarketRequestPlatformSxbet, nil
+	}
+	var t GetMarketRequestPlatform
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (g GetMarketRequestPlatform) Ptr() *GetMarketRequestPlatform {
+	return &g
+}
+
+var (
+	marketDetailOutcomeFieldName = big.NewInt(1 << 0)
+)
+
+type MarketDetailOutcome struct {
+	// Outcome label as the platform reports it. Kalshi binary markets normalize to `Yes`/`No`; Polymarket parses the stringified outcomes array (also typically `Yes`/`No`); Predict reports per-outcome names; SX Bet uses outcome-one/outcome-two names (e.g. team labels with spreads applied).
+	Name string `json:"name" url:"name"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (m *MarketDetailOutcome) GetName() string {
+	if m == nil {
+		return ""
+	}
+	return m.Name
+}
+
+func (m *MarketDetailOutcome) GetExtraProperties() map[string]interface{} {
+	if m == nil {
+		return nil
+	}
+	return m.extraProperties
+}
+
+func (m *MarketDetailOutcome) require(field *big.Int) {
+	if m.explicitFields == nil {
+		m.explicitFields = big.NewInt(0)
+	}
+	m.explicitFields.Or(m.explicitFields, field)
+}
+
+// SetName sets the Name field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailOutcome) SetName(name string) {
+	m.Name = name
+	m.require(marketDetailOutcomeFieldName)
+}
+
+func (m *MarketDetailOutcome) UnmarshalJSON(data []byte) error {
+	type unmarshaler MarketDetailOutcome
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*m = MarketDetailOutcome(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *m)
+	if err != nil {
+		return err
+	}
+	m.extraProperties = extraProperties
+	m.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (m *MarketDetailOutcome) MarshalJSON() ([]byte, error) {
+	type embed MarketDetailOutcome
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*m),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, m.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (m *MarketDetailOutcome) String() string {
+	if m == nil {
+		return "<nil>"
+	}
+	if len(m.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(m.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(m); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", m)
+}
+
+// Single-market detail across all four supported platforms. Strict-universal v0 shape — only fields every platform exposes natively without a second fetch. Pricing/volume/closes_at/ event_id are deliberately omitted, see the endpoint description for the rationale.
+var (
+	marketDetailResponseFieldID         = big.NewInt(1 << 0)
+	marketDetailResponseFieldProvider   = big.NewInt(1 << 1)
+	marketDetailResponseFieldProviderID = big.NewInt(1 << 2)
+	marketDetailResponseFieldTitle      = big.NewInt(1 << 3)
+	marketDetailResponseFieldStatus     = big.NewInt(1 << 4)
+	marketDetailResponseFieldOutcomes   = big.NewInt(1 << 5)
+)
+
+type MarketDetailResponse struct {
+	// Composite market identifier in the format `{provider}:{provider_id}`. Matches the `id` field returned by `GET /v1/markets` so list output flows into detail lookups without preprocessing.
+	ID string `json:"id" url:"id"`
+	// Prediction market provider the market_id resolved against.
+	Provider MarketDetailResponseProvider `json:"provider" url:"provider"`
+	// Platform-native market identifier. Kalshi ticker, Polymarket numeric id, Predict numeric id, or SX Bet `marketHash`. For Polymarket markets resolved by slug, this is normalized to the numeric id.
+	ProviderID string `json:"provider_id" url:"provider_id"`
+	// Human-readable market title. Each platform exposes a slightly different field — Kalshi `title`, Polymarket `question`, Predict `title`, SX Bet composed from team names with outcome-name fallback for outright markets.
+	Title string `json:"title" url:"title"`
+	// Normalized lifecycle status. Mapping per platform: Kalshi `active` → open · `closed`/`determined` → closed · `settled`/`finalized` → settled. Polymarket `archived` → settled · `closed && !archived` → closed · otherwise → open. Predict `tradingStatus=OPEN` → open · `CLOSED && !RESOLVED` → closed · `status=RESOLVED` → settled. SX Bet `ACTIVE` → open · otherwise closed. Unknown upstream values default to closed.
+	Status MarketDetailResponseStatus `json:"status" url:"status"`
+	// Outcome labels for the market. Every supported platform models per-market outcomes as a 2-element list in practice (multi-outcome events are modeled as multiple binary markets nested under one event/category). Prices and sizes are deliberately omitted from v0 — see the endpoint description.
+	Outcomes []*MarketDetailOutcome `json:"outcomes" url:"outcomes"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (m *MarketDetailResponse) GetID() string {
+	if m == nil {
+		return ""
+	}
+	return m.ID
+}
+
+func (m *MarketDetailResponse) GetProvider() MarketDetailResponseProvider {
+	if m == nil {
+		return ""
+	}
+	return m.Provider
+}
+
+func (m *MarketDetailResponse) GetProviderID() string {
+	if m == nil {
+		return ""
+	}
+	return m.ProviderID
+}
+
+func (m *MarketDetailResponse) GetTitle() string {
+	if m == nil {
+		return ""
+	}
+	return m.Title
+}
+
+func (m *MarketDetailResponse) GetStatus() MarketDetailResponseStatus {
+	if m == nil {
+		return ""
+	}
+	return m.Status
+}
+
+func (m *MarketDetailResponse) GetOutcomes() []*MarketDetailOutcome {
+	if m == nil {
+		return nil
+	}
+	return m.Outcomes
+}
+
+func (m *MarketDetailResponse) GetExtraProperties() map[string]interface{} {
+	if m == nil {
+		return nil
+	}
+	return m.extraProperties
+}
+
+func (m *MarketDetailResponse) require(field *big.Int) {
+	if m.explicitFields == nil {
+		m.explicitFields = big.NewInt(0)
+	}
+	m.explicitFields.Or(m.explicitFields, field)
+}
+
+// SetID sets the ID field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailResponse) SetID(id string) {
+	m.ID = id
+	m.require(marketDetailResponseFieldID)
+}
+
+// SetProvider sets the Provider field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailResponse) SetProvider(provider MarketDetailResponseProvider) {
+	m.Provider = provider
+	m.require(marketDetailResponseFieldProvider)
+}
+
+// SetProviderID sets the ProviderID field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailResponse) SetProviderID(providerID string) {
+	m.ProviderID = providerID
+	m.require(marketDetailResponseFieldProviderID)
+}
+
+// SetTitle sets the Title field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailResponse) SetTitle(title string) {
+	m.Title = title
+	m.require(marketDetailResponseFieldTitle)
+}
+
+// SetStatus sets the Status field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailResponse) SetStatus(status MarketDetailResponseStatus) {
+	m.Status = status
+	m.require(marketDetailResponseFieldStatus)
+}
+
+// SetOutcomes sets the Outcomes field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailResponse) SetOutcomes(outcomes []*MarketDetailOutcome) {
+	m.Outcomes = outcomes
+	m.require(marketDetailResponseFieldOutcomes)
+}
+
+func (m *MarketDetailResponse) UnmarshalJSON(data []byte) error {
+	type unmarshaler MarketDetailResponse
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*m = MarketDetailResponse(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *m)
+	if err != nil {
+		return err
+	}
+	m.extraProperties = extraProperties
+	m.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (m *MarketDetailResponse) MarshalJSON() ([]byte, error) {
+	type embed MarketDetailResponse
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*m),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, m.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (m *MarketDetailResponse) String() string {
+	if m == nil {
+		return "<nil>"
+	}
+	if len(m.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(m.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(m); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", m)
+}
+
+// Prediction market provider the market_id resolved against.
+type MarketDetailResponseProvider string
+
+const (
+	MarketDetailResponseProviderKalshi     MarketDetailResponseProvider = "kalshi"
+	MarketDetailResponseProviderPolymarket MarketDetailResponseProvider = "polymarket"
+	MarketDetailResponseProviderPredict    MarketDetailResponseProvider = "predict"
+	MarketDetailResponseProviderSxbet      MarketDetailResponseProvider = "sxbet"
+)
+
+func NewMarketDetailResponseProviderFromString(s string) (MarketDetailResponseProvider, error) {
+	switch s {
+	case "kalshi":
+		return MarketDetailResponseProviderKalshi, nil
+	case "polymarket":
+		return MarketDetailResponseProviderPolymarket, nil
+	case "predict":
+		return MarketDetailResponseProviderPredict, nil
+	case "sxbet":
+		return MarketDetailResponseProviderSxbet, nil
+	}
+	var t MarketDetailResponseProvider
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (m MarketDetailResponseProvider) Ptr() *MarketDetailResponseProvider {
+	return &m
+}
+
+// Normalized lifecycle status. Mapping per platform: Kalshi `active` → open · `closed`/`determined` → closed · `settled`/`finalized` → settled. Polymarket `archived` → settled · `closed && !archived` → closed · otherwise → open. Predict `tradingStatus=OPEN` → open · `CLOSED && !RESOLVED` → closed · `status=RESOLVED` → settled. SX Bet `ACTIVE` → open · otherwise closed. Unknown upstream values default to closed.
+type MarketDetailResponseStatus string
+
+const (
+	MarketDetailResponseStatusOpen    MarketDetailResponseStatus = "open"
+	MarketDetailResponseStatusClosed  MarketDetailResponseStatus = "closed"
+	MarketDetailResponseStatusSettled MarketDetailResponseStatus = "settled"
+)
+
+func NewMarketDetailResponseStatusFromString(s string) (MarketDetailResponseStatus, error) {
+	switch s {
+	case "open":
+		return MarketDetailResponseStatusOpen, nil
+	case "closed":
+		return MarketDetailResponseStatusClosed, nil
+	case "settled":
+		return MarketDetailResponseStatusSettled, nil
+	}
+	var t MarketDetailResponseStatus
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (m MarketDetailResponseStatus) Ptr() *MarketDetailResponseStatus {
+	return &m
 }
 
 var (

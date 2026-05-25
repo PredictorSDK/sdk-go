@@ -38,13 +38,13 @@ var ErrorCodes internal.ErrorCodes = internal.ErrorCodes{
 			APIError: apiError,
 		}
 	},
-	502: func(apiError *core.APIError) error {
-		return &BadGatewayError{
+	404: func(apiError *core.APIError) error {
+		return &NotFoundError{
 			APIError: apiError,
 		}
 	},
-	404: func(apiError *core.APIError) error {
-		return &NotFoundError{
+	502: func(apiError *core.APIError) error {
+		return &BadGatewayError{
 			APIError: apiError,
 		}
 	},

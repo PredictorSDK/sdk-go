@@ -127,6 +127,57 @@ func (r *RawClient) GetMarkets(
 	}, nil
 }
 
+func (r *RawClient) GetMarket(
+	ctx context.Context,
+	request *predictorsdk.GetMarketRequest,
+	opts ...option.RequestOption,
+) (*core.Response[*predictorsdk.MarketDetailResponse], error) {
+	options := core.NewRequestOptions(opts...)
+	baseURL := internal.ResolveBaseURL(
+		options.BaseURL,
+		r.baseURL,
+		"https://api.predictorsdk.com",
+	)
+	endpointURL := internal.EncodeURL(
+		baseURL+"/v1/markets/%v",
+		request.MarketID,
+	)
+	queryParams, err := internal.QueryValues(request)
+	if err != nil {
+		return nil, err
+	}
+	if len(queryParams) > 0 {
+		endpointURL += "?" + queryParams.Encode()
+	}
+	headers := internal.MergeHeaders(
+		r.options.ToHeader(),
+		options.ToHeader(),
+	)
+	var response *predictorsdk.MarketDetailResponse
+	raw, err := r.caller.Call(
+		ctx,
+		&internal.CallParams{
+			URL:             endpointURL,
+			Method:          http.MethodGet,
+			Headers:         headers,
+			MaxAttempts:     options.MaxAttempts,
+			BodyProperties:  options.BodyProperties,
+			QueryParameters: options.QueryParameters,
+			Client:          options.HTTPClient,
+			Response:        &response,
+			ErrorDecoder:    internal.NewErrorDecoder(predictorsdk.ErrorCodes),
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &core.Response[*predictorsdk.MarketDetailResponse]{
+		StatusCode: raw.StatusCode,
+		Header:     raw.Header,
+		Body:       response,
+	}, nil
+}
+
 func (r *RawClient) GetBinanceCryptoPrices(
 	ctx context.Context,
 	request *predictorsdk.GetBinanceCryptoPricesRequest,

@@ -68,6 +68,25 @@ func (c *Client) GetMarkets(
 	return response.Body, nil
 }
 
+// Returns a single market across the four supported platforms. The `market_id` is either the composite form returned by `GET /v1/markets` (`{provider}:{native_id}`, e.g. `kalshi:KXMLBGAME-26MAY262005HOUTEX-TEX`) or the platform-native identifier. Composite IDs dispatch unambiguously by prefix. Native IDs are routed by format inference: Kalshi tickers match the all-caps-with-hyphens shape (`KX…-…`); SX Bet hashes match `0x` + 64 hex characters; numeric ids and kebab-case slugs are shared shape between Polymarket and Predict and probe Polymarket first, falling back to Predict on 404. Pass `?platform=` explicitly to skip the probe.
+//
+// Response shape is intentionally strict-universal: only fields every platform's single-market endpoint exposes natively without a second fetch. Pricing lives in SX Bet's order book, Predict's market record has no close timestamp (that lives on the parent category), and SX Bet/Predict don't expose volume or liquidity on the market record in any reliable form — those fields are deliberately omitted from v0 to avoid asymmetric nullable shapes. Additions are additive when the underlying coverage improves.
+func (c *Client) GetMarket(
+	ctx context.Context,
+	request *predictorsdk.GetMarketRequest,
+	opts ...option.RequestOption,
+) (*predictorsdk.MarketDetailResponse, error) {
+	response, err := c.WithRawResponse.GetMarket(
+		ctx,
+		request,
+		opts...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return response.Body, nil
+}
+
 // Returns per-second price data for a Binance trading pair. When called without a time range, returns the latest price. With `start_time` and `end_time`, returns historical per-second prices in newest-first order. Supports cursor-based pagination for large result sets. Unknown or invalid symbols return `200` with `{"prices":[]}` and omit `total`.
 func (c *Client) GetBinanceCryptoPrices(
 	ctx context.Context,
@@ -129,7 +148,7 @@ func (c *Client) ListPolymarketWalletPositions(
 	return response.Body, nil
 }
 
-// Returns a single event and the markets nested under it on the identified platform. The `event_id` is the platform's native identifier — a Kalshi `event_ticker`, a Polymarket event slug, an SX Bet `eventId`, or a Predict market identifier. The `platform` is inferred from the ID format when unambiguous; callers must pass `?platform=` for numeric IDs or kebab-case slugs that could belong to either Polymarket or Predict.
+// Returns a single event and the markets nested under it on the identified platform. The `event_id` is the platform's native identifier — a Kalshi `event_ticker`, a Polymarket event slug, an SX Bet `eventId`, or a Predict market identifier. The `platform` is inferred from the ID format when unambiguous (`KX…` → Kalshi, `L\d+` → SX Bet). Numeric IDs and kebab-case slugs are shared shape between Polymarket and Predict; if `?platform=` is omitted in that case, the service probes Polymarket first and falls back to Predict when Polymarket returns 404. Pass `?platform=` explicitly to skip the probe.
 //
 // Response is minimal in v0: each market is returned with its platform-native `market_id` and a human-readable `title`. Pricing, volume, status, and timestamps are intentionally deferred — they'll be added as additive fields to `EventMarket` in a later release. The endpoint mirrors the `/v1/markets` rollout pattern (titles first, fields later).
 //

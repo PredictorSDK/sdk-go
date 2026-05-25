@@ -125,6 +125,32 @@ func TestGetMarketsWithWireMock(
 	VerifyRequestCount(t, "TestGetMarketsWithWireMock", "GET", "/v1/markets", nil, 1)
 }
 
+func TestGetMarketWithWireMock(
+	t *testing.T,
+) {
+	WireMockBaseURL := os.Getenv("WIREMOCK_URL")
+	if WireMockBaseURL == "" {
+		WireMockBaseURL = "http://localhost:8080"
+	}
+	client := client.New(
+		option.WithBaseURL(WireMockBaseURL),
+		option.WithToken("test-token"),
+	)
+	request := &predictorsdk.GetMarketRequest{
+		MarketID: "kalshi:KXMLBGAME-26MAY262005HOUTEX-TEX",
+	}
+	_, invocationErr := client.GetMarket(
+		context.TODO(),
+		request,
+		option.WithHTTPHeader(
+			http.Header{"X-Test-Id": []string{"TestGetMarketWithWireMock"}},
+		),
+	)
+
+	require.NoError(t, invocationErr, "Client method call should succeed")
+	VerifyRequestCount(t, "TestGetMarketWithWireMock", "GET", "/v1/markets/kalshi:KXMLBGAME-26MAY262005HOUTEX-TEX", nil, 1)
+}
+
 func TestGetBinanceCryptoPricesWithWireMock(
 	t *testing.T,
 ) {

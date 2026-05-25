@@ -65,6 +65,42 @@
       "postServeActions": []
     },
     {
+      "id": "6477caa1-2c64-4382-bd00-3d59b5e59a76",
+      "name": "Get market detail - Kalshi MLB moneyline market",
+      "request": {
+        "urlPathTemplate": "/v1/markets/{market_id}",
+        "method": "GET",
+        "headers": {
+          "Authorization": {
+            "matches": "Bearer .+"
+          }
+        },
+        "pathParameters": {
+          "market_id": {
+            "equalTo": "kalshi:KXMLBGAME-26MAY262005HOUTEX-TEX"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": "{\n  \"id\": \"kalshi:KXMLBGAME-26MAY262005HOUTEX-TEX\",\n  \"provider\": \"kalshi\",\n  \"provider_id\": \"KXMLBGAME-26MAY262005HOUTEX-TEX\",\n  \"title\": \"Houston vs Texas Winner?\",\n  \"status\": \"open\",\n  \"outcomes\": [\n    {\n      \"name\": \"Yes\"\n    },\n    {\n      \"name\": \"No\"\n    }\n  ]\n}",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "uuid": "6477caa1-2c64-4382-bd00-3d59b5e59a76",
+      "persistent": true,
+      "priority": 3,
+      "metadata": {
+        "mocklab": {
+          "created": {
+            "at": "2020-01-01T00:00:00.000Z",
+            "via": "SYSTEM"
+          }
+        }
+      }
+    },
+    {
       "id": "6083101e-0114-486a-a099-ce027f51d4ab",
       "name": "Get Binance crypto prices - default",
       "request": {
@@ -213,6 +249,6 @@
     }
   ],
   "meta": {
-    "total": 6
+    "total": 7
   }
 }
