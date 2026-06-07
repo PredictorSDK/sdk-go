@@ -65,8 +65,8 @@
       "postServeActions": []
     },
     {
-      "id": "6477caa1-2c64-4382-bd00-3d59b5e59a76",
-      "name": "Get market detail - Kalshi MLB moneyline market",
+      "id": "8b349261-e943-43b5-9350-935cc94e8778",
+      "name": "Get market detail - Kalshi NBA futures market (quotes from the market record)",
       "request": {
         "urlPathTemplate": "/v1/markets/{market_id}",
         "method": "GET",
@@ -77,18 +77,18 @@
         },
         "pathParameters": {
           "market_id": {
-            "equalTo": "kalshi:KXMLBGAME-26MAY262005HOUTEX-TEX"
+            "equalTo": "kalshi:KXNBA-26-SAS"
           }
         }
       },
       "response": {
         "status": 200,
-        "body": "{\n  \"id\": \"kalshi:KXMLBGAME-26MAY262005HOUTEX-TEX\",\n  \"provider\": \"kalshi\",\n  \"provider_id\": \"KXMLBGAME-26MAY262005HOUTEX-TEX\",\n  \"title\": \"Houston vs Texas Winner?\",\n  \"status\": \"open\",\n  \"outcomes\": [\n    {\n      \"name\": \"Yes\"\n    },\n    {\n      \"name\": \"No\"\n    }\n  ]\n}",
+        "body": "{\n  \"id\": \"kalshi:KXNBA-26-SAS\",\n  \"provider\": \"kalshi\",\n  \"provider_id\": \"KXNBA-26-SAS\",\n  \"title\": \"Will the San Antonio win the 2026 Pro Basketball Finals?\",\n  \"status\": \"open\",\n  \"outcomes\": [\n    {\n      \"name\": \"Yes\",\n      \"outcome_id\": \"yes\",\n      \"price\": 0.195,\n      \"bid\": 0.19,\n      \"ask\": 0.2,\n      \"last\": 0.2,\n      \"bid_size\": 715466.16,\n      \"ask_size\": 9256.49\n    },\n    {\n      \"name\": \"No\",\n      \"outcome_id\": \"no\",\n      \"price\": 0.805,\n      \"bid\": 0.8,\n      \"ask\": 0.81,\n      \"last\": 0.8,\n      \"bid_size\": 715466.16,\n      \"ask_size\": 9256.49\n    }\n  ],\n  \"pricing\": {\n    \"availability\": \"live\",\n    \"scale\": \"probability_0_1\",\n    \"source\": \"market_record\",\n    \"as_of\": \"2026-05-31T16:23:22Z\",\n    \"neg_risk\": true\n  },\n  \"liquidity_usd\": null,\n  \"volume_24h_usd\": null,\n  \"volume_total_usd\": null,\n  \"volume_24h_contracts\": 5258039.8,\n  \"volume_total_contracts\": 55595118.18,\n  \"open_interest\": 24585005.01\n}",
         "headers": {
           "Content-Type": "application/json"
         }
       },
-      "uuid": "6477caa1-2c64-4382-bd00-3d59b5e59a76",
+      "uuid": "8b349261-e943-43b5-9350-935cc94e8778",
       "persistent": true,
       "priority": 3,
       "metadata": {

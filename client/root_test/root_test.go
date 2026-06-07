@@ -137,7 +137,7 @@ func TestGetMarketWithWireMock(
 		option.WithToken("test-token"),
 	)
 	request := &predictorsdk.GetMarketRequest{
-		MarketID: "kalshi:KXMLBGAME-26MAY262005HOUTEX-TEX",
+		MarketID: "kalshi:KXNBA-26-SAS",
 	}
 	_, invocationErr := client.GetMarket(
 		context.TODO(),
@@ -148,7 +148,7 @@ func TestGetMarketWithWireMock(
 	)
 
 	require.NoError(t, invocationErr, "Client method call should succeed")
-	VerifyRequestCount(t, "TestGetMarketWithWireMock", "GET", "/v1/markets/kalshi:KXMLBGAME-26MAY262005HOUTEX-TEX", nil, 1)
+	VerifyRequestCount(t, "TestGetMarketWithWireMock", "GET", "/v1/markets/kalshi:KXNBA-26-SAS", nil, 1)
 }
 
 func TestGetBinanceCryptoPricesWithWireMock(

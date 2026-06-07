@@ -7,6 +7,7 @@ import (
 	fmt "fmt"
 	internal "github.com/PredictorSDK/sdk-go/internal"
 	big "math/big"
+	time "time"
 )
 
 var (
@@ -117,7 +118,7 @@ var (
 )
 
 type GetMarketRequest struct {
-	// Composite (`{provider}:{native_id}`) or platform-native market identifier. Examples per platform: Kalshi market ticker (`KXMLBGAME-26MAY262005HOUTEX-TEX`), Polymarket numeric id or slug (`540817` or `new-rhianna-album-before-gta-vi-926`), Predict market id (`356635`), SX Bet `marketHash` (`0x…64hex`).
+	// Composite (`{provider}:{native_id}`) or platform-native market identifier. Examples per platform: Kalshi market ticker (`KXNBA-26-SAS`), Polymarket numeric id or slug (`540817` or `new-rhianna-album-before-gta-vi-926`), Predict market id (`356635`), SX Bet `marketHash` (`0x…64hex`).
 	MarketID string `json:"-" url:"-"`
 	// Optional platform override. When omitted, inferred from the composite prefix or from the native ID format (`KX…` → Kalshi, `0x…64hex` → SX Bet). Numeric IDs and kebab-case slugs are shared shape between Polymarket and Predict; in that case the service probes Polymarket first and falls back to Predict on 404. Pass `platform` explicitly to skip the probe. When the override contradicts a composite prefix (e.g. `kalshi:X` with `?platform=polymarket`), the request returns 400.
 	Platform *GetMarketRequestPlatform `json:"-" url:"platform,omitempty"`
@@ -1175,12 +1176,33 @@ func (g GetMarketRequestPlatform) Ptr() *GetMarketRequestPlatform {
 }
 
 var (
-	marketDetailOutcomeFieldName = big.NewInt(1 << 0)
+	marketDetailOutcomeFieldName      = big.NewInt(1 << 0)
+	marketDetailOutcomeFieldOutcomeID = big.NewInt(1 << 1)
+	marketDetailOutcomeFieldPrice     = big.NewInt(1 << 2)
+	marketDetailOutcomeFieldBid       = big.NewInt(1 << 3)
+	marketDetailOutcomeFieldAsk       = big.NewInt(1 << 4)
+	marketDetailOutcomeFieldLast      = big.NewInt(1 << 5)
+	marketDetailOutcomeFieldBidSize   = big.NewInt(1 << 6)
+	marketDetailOutcomeFieldAskSize   = big.NewInt(1 << 7)
 )
 
 type MarketDetailOutcome struct {
 	// Outcome label as the platform reports it. Kalshi binary markets normalize to `Yes`/`No`; Polymarket parses the stringified outcomes array (also typically `Yes`/`No`); Predict reports per-outcome names; SX Bet uses outcome-one/outcome-two names (e.g. team labels with spreads applied).
 	Name string `json:"name" url:"name"`
+	// Stable per-platform key for this outcome: Kalshi `yes`/`no`, Polymarket CLOB token id, Predict on-chain id, SX Bet `outcomeOne`/`outcomeTwo`. The join key for future per-outcome sub-resources (order-book depth).
+	OutcomeID *string `json:"outcome_id,omitempty" url:"outcome_id,omitempty"`
+	// Current implied probability of this outcome in 0–1 — the headline field, equal to the implied probability on every supported platform. Derivation cascade: mid of bid/ask when two-sided → the single available side → last trade → platform mark (Polymarket `outcomePrices`, which preserves 0/1 resolution marks on settled markets). Because the cascade differs by what each platform exposes, `price` is a DISPLAY number — when comparing across platforms or sizing trades, prefer `bid`/`ask` directly where present. Null when no quote of any kind exists. GUARANTEE: when `pricing.availability` is `live`, `price` is non-null on every outcome. Values are rounded to at most 6 decimal places.
+	Price *float64 `json:"price,omitempty" url:"price,omitempty"`
+	// Best bid for this outcome in 0–1 probability. Null when that book side is empty or the platform doesn't publish per-outcome quotes on the record (Polymarket non-primary outcomes) — never synthesized from `1 − ask`.
+	Bid *float64 `json:"bid,omitempty" url:"bid,omitempty"`
+	// Best ask (price to take this outcome) in 0–1 probability. For SX Bet this is derived from the opposite side's best maker quote (`1 − bid(other)`), which is that book's actual taker price.
+	Ask *float64 `json:"ask,omitempty" url:"ask,omitempty"`
+	// Last traded price for this outcome in 0–1 probability. Null where the platform exposes no last-trade on the record (Predict, SX Bet).
+	Last *float64 `json:"last,omitempty" url:"last,omitempty"`
+	// Resting size at the best bid in native contract/share units (NOT USD). Omitted where the platform publishes no per-side size — Kalshi publishes YES-side sizes only; Polymarket and SX Bet publish none on this path.
+	BidSize *float64 `json:"bid_size,omitempty" url:"bid_size,omitempty"`
+	// Resting size at the best ask in native contract/share units. Same availability as `bid_size`.
+	AskSize *float64 `json:"ask_size,omitempty" url:"ask_size,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
 	explicitFields *big.Int `json:"-" url:"-"`
@@ -1194,6 +1216,55 @@ func (m *MarketDetailOutcome) GetName() string {
 		return ""
 	}
 	return m.Name
+}
+
+func (m *MarketDetailOutcome) GetOutcomeID() *string {
+	if m == nil {
+		return nil
+	}
+	return m.OutcomeID
+}
+
+func (m *MarketDetailOutcome) GetPrice() *float64 {
+	if m == nil {
+		return nil
+	}
+	return m.Price
+}
+
+func (m *MarketDetailOutcome) GetBid() *float64 {
+	if m == nil {
+		return nil
+	}
+	return m.Bid
+}
+
+func (m *MarketDetailOutcome) GetAsk() *float64 {
+	if m == nil {
+		return nil
+	}
+	return m.Ask
+}
+
+func (m *MarketDetailOutcome) GetLast() *float64 {
+	if m == nil {
+		return nil
+	}
+	return m.Last
+}
+
+func (m *MarketDetailOutcome) GetBidSize() *float64 {
+	if m == nil {
+		return nil
+	}
+	return m.BidSize
+}
+
+func (m *MarketDetailOutcome) GetAskSize() *float64 {
+	if m == nil {
+		return nil
+	}
+	return m.AskSize
 }
 
 func (m *MarketDetailOutcome) GetExtraProperties() map[string]interface{} {
@@ -1215,6 +1286,55 @@ func (m *MarketDetailOutcome) require(field *big.Int) {
 func (m *MarketDetailOutcome) SetName(name string) {
 	m.Name = name
 	m.require(marketDetailOutcomeFieldName)
+}
+
+// SetOutcomeID sets the OutcomeID field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailOutcome) SetOutcomeID(outcomeID *string) {
+	m.OutcomeID = outcomeID
+	m.require(marketDetailOutcomeFieldOutcomeID)
+}
+
+// SetPrice sets the Price field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailOutcome) SetPrice(price *float64) {
+	m.Price = price
+	m.require(marketDetailOutcomeFieldPrice)
+}
+
+// SetBid sets the Bid field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailOutcome) SetBid(bid *float64) {
+	m.Bid = bid
+	m.require(marketDetailOutcomeFieldBid)
+}
+
+// SetAsk sets the Ask field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailOutcome) SetAsk(ask *float64) {
+	m.Ask = ask
+	m.require(marketDetailOutcomeFieldAsk)
+}
+
+// SetLast sets the Last field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailOutcome) SetLast(last *float64) {
+	m.Last = last
+	m.require(marketDetailOutcomeFieldLast)
+}
+
+// SetBidSize sets the BidSize field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailOutcome) SetBidSize(bidSize *float64) {
+	m.BidSize = bidSize
+	m.require(marketDetailOutcomeFieldBidSize)
+}
+
+// SetAskSize sets the AskSize field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailOutcome) SetAskSize(askSize *float64) {
+	m.AskSize = askSize
+	m.require(marketDetailOutcomeFieldAskSize)
 }
 
 func (m *MarketDetailOutcome) UnmarshalJSON(data []byte) error {
@@ -1259,14 +1379,255 @@ func (m *MarketDetailOutcome) String() string {
 	return fmt.Sprintf("%#v", m)
 }
 
-// Single-market detail across all four supported platforms. Strict-universal v0 shape — only fields every platform exposes natively without a second fetch. Pricing/volume/closes_at/ event_id are deliberately omitted, see the endpoint description for the rationale.
+// Market-wide quote metadata for the pricing tier. Always present on the response; `availability` tells the truth about what the tier could hydrate instead of leaving consumers to guess from nulls.
 var (
-	marketDetailResponseFieldID         = big.NewInt(1 << 0)
-	marketDetailResponseFieldProvider   = big.NewInt(1 << 1)
-	marketDetailResponseFieldProviderID = big.NewInt(1 << 2)
-	marketDetailResponseFieldTitle      = big.NewInt(1 << 3)
-	marketDetailResponseFieldStatus     = big.NewInt(1 << 4)
-	marketDetailResponseFieldOutcomes   = big.NewInt(1 << 5)
+	marketDetailPricingFieldAvailability = big.NewInt(1 << 0)
+	marketDetailPricingFieldScale        = big.NewInt(1 << 1)
+	marketDetailPricingFieldSource       = big.NewInt(1 << 2)
+	marketDetailPricingFieldAsOf         = big.NewInt(1 << 3)
+	marketDetailPricingFieldNegRisk      = big.NewInt(1 << 4)
+)
+
+type MarketDetailPricing struct {
+	// `live` — every outcome carries a price. `partial` — some but not all outcomes priced. `no_quotes` — the pricing fetch succeeded but the book is empty (SX Bet with no resting orders; Kalshi provisional/multivariate markets whose quotes are empty-book placeholders). `unavailable` — the pricing enrichment fetch failed or timed out (SX Bet); identity fields are still served.
+	Availability MarketDetailPricingAvailability `json:"availability" url:"availability"`
+	// Self-describing unit declaration for all price fields. Single canonical scale today; new values would be added alongside (never replacing) this one.
+	Scale MarketDetailPricingScale `json:"scale" url:"scale"`
+	// Where the quotes came from. `market_record` — embedded in the same single-market record as the identity fetch (Kalshi, Polymarket, Predict). `orderbook` — required one bounded second fetch against the platform's order-book surface (SX Bet `/orders/odds/best`).
+	Source MarketDetailPricingSource `json:"source" url:"source"`
+	// Quote freshness as RFC3339. When the two sides carry independent upstream timestamps (SX Bet), this is the OLDER of them — a conservative floor that never over-claims freshness. Null when the upstream record carries no quote timestamp at all (Predict) — treat freshness as UNKNOWN, not as fresh. Timestamps come from each platform's own clock; for Kalshi/Polymarket the value is the record's last-update time, the closest the platform exposes to a quote timestamp.
+	AsOf *time.Time `json:"as_of,omitempty" url:"as_of,omitempty"`
+	// True when this market belongs to a negative-risk multi-outcome event (Polymarket `negRisk`, Predict `isNegRisk`). On a multi-outcome record, outcome prices intentionally need not sum to 1 — do not "normalize" the book. Note that for the BINARY member markets these platforms serve today the flag signals event-level structure (this market is one leg of a mutually-exclusive set); the binary pair itself still sums to ~1. Omitted when false.
+	NegRisk *bool `json:"neg_risk,omitempty" url:"neg_risk,omitempty"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (m *MarketDetailPricing) GetAvailability() MarketDetailPricingAvailability {
+	if m == nil {
+		return ""
+	}
+	return m.Availability
+}
+
+func (m *MarketDetailPricing) GetScale() MarketDetailPricingScale {
+	if m == nil {
+		return ""
+	}
+	return m.Scale
+}
+
+func (m *MarketDetailPricing) GetSource() MarketDetailPricingSource {
+	if m == nil {
+		return ""
+	}
+	return m.Source
+}
+
+func (m *MarketDetailPricing) GetAsOf() *time.Time {
+	if m == nil {
+		return nil
+	}
+	return m.AsOf
+}
+
+func (m *MarketDetailPricing) GetNegRisk() *bool {
+	if m == nil {
+		return nil
+	}
+	return m.NegRisk
+}
+
+func (m *MarketDetailPricing) GetExtraProperties() map[string]interface{} {
+	if m == nil {
+		return nil
+	}
+	return m.extraProperties
+}
+
+func (m *MarketDetailPricing) require(field *big.Int) {
+	if m.explicitFields == nil {
+		m.explicitFields = big.NewInt(0)
+	}
+	m.explicitFields.Or(m.explicitFields, field)
+}
+
+// SetAvailability sets the Availability field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailPricing) SetAvailability(availability MarketDetailPricingAvailability) {
+	m.Availability = availability
+	m.require(marketDetailPricingFieldAvailability)
+}
+
+// SetScale sets the Scale field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailPricing) SetScale(scale MarketDetailPricingScale) {
+	m.Scale = scale
+	m.require(marketDetailPricingFieldScale)
+}
+
+// SetSource sets the Source field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailPricing) SetSource(source MarketDetailPricingSource) {
+	m.Source = source
+	m.require(marketDetailPricingFieldSource)
+}
+
+// SetAsOf sets the AsOf field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailPricing) SetAsOf(asOf *time.Time) {
+	m.AsOf = asOf
+	m.require(marketDetailPricingFieldAsOf)
+}
+
+// SetNegRisk sets the NegRisk field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailPricing) SetNegRisk(negRisk *bool) {
+	m.NegRisk = negRisk
+	m.require(marketDetailPricingFieldNegRisk)
+}
+
+func (m *MarketDetailPricing) UnmarshalJSON(data []byte) error {
+	type embed MarketDetailPricing
+	var unmarshaler = struct {
+		embed
+		AsOf *internal.DateTime `json:"as_of,omitempty"`
+	}{
+		embed: embed(*m),
+	}
+	if err := json.Unmarshal(data, &unmarshaler); err != nil {
+		return err
+	}
+	*m = MarketDetailPricing(unmarshaler.embed)
+	m.AsOf = unmarshaler.AsOf.TimePtr()
+	extraProperties, err := internal.ExtractExtraProperties(data, *m)
+	if err != nil {
+		return err
+	}
+	m.extraProperties = extraProperties
+	m.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (m *MarketDetailPricing) MarshalJSON() ([]byte, error) {
+	type embed MarketDetailPricing
+	var marshaler = struct {
+		embed
+		AsOf *internal.DateTime `json:"as_of,omitempty"`
+	}{
+		embed: embed(*m),
+		AsOf:  internal.NewOptionalDateTime(m.AsOf),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, m.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (m *MarketDetailPricing) String() string {
+	if m == nil {
+		return "<nil>"
+	}
+	if len(m.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(m.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(m); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", m)
+}
+
+// `live` — every outcome carries a price. `partial` — some but not all outcomes priced. `no_quotes` — the pricing fetch succeeded but the book is empty (SX Bet with no resting orders; Kalshi provisional/multivariate markets whose quotes are empty-book placeholders). `unavailable` — the pricing enrichment fetch failed or timed out (SX Bet); identity fields are still served.
+type MarketDetailPricingAvailability string
+
+const (
+	MarketDetailPricingAvailabilityLive        MarketDetailPricingAvailability = "live"
+	MarketDetailPricingAvailabilityPartial     MarketDetailPricingAvailability = "partial"
+	MarketDetailPricingAvailabilityNoQuotes    MarketDetailPricingAvailability = "no_quotes"
+	MarketDetailPricingAvailabilityUnavailable MarketDetailPricingAvailability = "unavailable"
+)
+
+func NewMarketDetailPricingAvailabilityFromString(s string) (MarketDetailPricingAvailability, error) {
+	switch s {
+	case "live":
+		return MarketDetailPricingAvailabilityLive, nil
+	case "partial":
+		return MarketDetailPricingAvailabilityPartial, nil
+	case "no_quotes":
+		return MarketDetailPricingAvailabilityNoQuotes, nil
+	case "unavailable":
+		return MarketDetailPricingAvailabilityUnavailable, nil
+	}
+	var t MarketDetailPricingAvailability
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (m MarketDetailPricingAvailability) Ptr() *MarketDetailPricingAvailability {
+	return &m
+}
+
+// Self-describing unit declaration for all price fields. Single canonical scale today; new values would be added alongside (never replacing) this one.
+type MarketDetailPricingScale string
+
+const (
+	MarketDetailPricingScaleProbability01 MarketDetailPricingScale = "probability_0_1"
+)
+
+func NewMarketDetailPricingScaleFromString(s string) (MarketDetailPricingScale, error) {
+	switch s {
+	case "probability_0_1":
+		return MarketDetailPricingScaleProbability01, nil
+	}
+	var t MarketDetailPricingScale
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (m MarketDetailPricingScale) Ptr() *MarketDetailPricingScale {
+	return &m
+}
+
+// Where the quotes came from. `market_record` — embedded in the same single-market record as the identity fetch (Kalshi, Polymarket, Predict). `orderbook` — required one bounded second fetch against the platform's order-book surface (SX Bet `/orders/odds/best`).
+type MarketDetailPricingSource string
+
+const (
+	MarketDetailPricingSourceMarketRecord MarketDetailPricingSource = "market_record"
+	MarketDetailPricingSourceOrderbook    MarketDetailPricingSource = "orderbook"
+)
+
+func NewMarketDetailPricingSourceFromString(s string) (MarketDetailPricingSource, error) {
+	switch s {
+	case "market_record":
+		return MarketDetailPricingSourceMarketRecord, nil
+	case "orderbook":
+		return MarketDetailPricingSourceOrderbook, nil
+	}
+	var t MarketDetailPricingSource
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (m MarketDetailPricingSource) Ptr() *MarketDetailPricingSource {
+	return &m
+}
+
+// Single-market detail across all four supported platforms. Identity fields are strict-universal (no second fetch on any platform); the pricing tier carries per-outcome quotes plus market-level aggregates with explicit nulls where a platform doesn't natively expose a figure — values are never fabricated. closes_at/event_id remain deliberately omitted, see the endpoint description for the rationale.
+var (
+	marketDetailResponseFieldID                   = big.NewInt(1 << 0)
+	marketDetailResponseFieldProvider             = big.NewInt(1 << 1)
+	marketDetailResponseFieldProviderID           = big.NewInt(1 << 2)
+	marketDetailResponseFieldTitle                = big.NewInt(1 << 3)
+	marketDetailResponseFieldStatus               = big.NewInt(1 << 4)
+	marketDetailResponseFieldOutcomes             = big.NewInt(1 << 5)
+	marketDetailResponseFieldPricing              = big.NewInt(1 << 6)
+	marketDetailResponseFieldLiquidityUsd         = big.NewInt(1 << 7)
+	marketDetailResponseFieldVolume24HUsd         = big.NewInt(1 << 8)
+	marketDetailResponseFieldVolumeTotalUsd       = big.NewInt(1 << 9)
+	marketDetailResponseFieldVolume24HContracts   = big.NewInt(1 << 10)
+	marketDetailResponseFieldVolumeTotalContracts = big.NewInt(1 << 11)
+	marketDetailResponseFieldOpenInterest         = big.NewInt(1 << 12)
 )
 
 type MarketDetailResponse struct {
@@ -1276,12 +1637,25 @@ type MarketDetailResponse struct {
 	Provider MarketDetailResponseProvider `json:"provider" url:"provider"`
 	// Platform-native market identifier. Kalshi ticker, Polymarket numeric id, Predict numeric id, or SX Bet `marketHash`. For Polymarket markets resolved by slug, this is normalized to the numeric id.
 	ProviderID string `json:"provider_id" url:"provider_id"`
-	// Human-readable market title. Each platform exposes a slightly different field — Kalshi `title`, Polymarket `question`, Predict `title`, SX Bet composed from team names with outcome-name fallback for outright markets.
+	// Human-readable market title. Each platform exposes a slightly different field — Kalshi `title`, Polymarket `question`, Predict `title`, SX Bet composed from outcome labels (team-pair fallback) so a game's moneyline, spread, and total markets stay distinguishable.
 	Title string `json:"title" url:"title"`
 	// Normalized lifecycle status. Mapping per platform: Kalshi `active` → open · `closed`/`determined` → closed · `settled`/`finalized` → settled. Polymarket `archived` → settled · `closed && !archived` → closed · otherwise → open. Predict `tradingStatus=OPEN` → open · `CLOSED && !RESOLVED` → closed · `status=RESOLVED` → settled. SX Bet `ACTIVE` → open · otherwise closed. Unknown upstream values default to closed.
 	Status MarketDetailResponseStatus `json:"status" url:"status"`
-	// Outcome labels for the market. Every supported platform models per-market outcomes as a 2-element list in practice (multi-outcome events are modeled as multiple binary markets nested under one event/category). Prices and sizes are deliberately omitted from v0 — see the endpoint description.
+	// Outcomes with per-outcome quotes. ORDERING GUARANTEE: `outcomes[0]` is the platform's primary/headline outcome — Kalshi `Yes`, Polymarket's first outcome token (its `bestBid`/`bestAsk` side), Predict `indexSet=1`, SX Bet `outcomeOne`. Render `outcomes[0].price` as the headline probability; do NOT search for an outcome named "Yes" (names are free-text on Predict/SX Bet). Every supported platform models per-market outcomes as a 2-element list in practice (multi-outcome events are modeled as multiple binary markets nested under one event/category); the per-outcome quote shape handles binary and any future multi-outcome record identically with no special-casing.
 	Outcomes []*MarketDetailOutcome `json:"outcomes" url:"outcomes"`
+	Pricing  *MarketDetailPricing   `json:"pricing" url:"pricing"`
+	// Resting order-book depth valued in USD — strictly CLOB book depth, never an AMM pool size or a synthetic score. Polymarket exposes it natively (`liquidityNum`); null for Kalshi (its upstream `liquidity_dollars` is deprecated and always zero), Predict (stats is null on the record), and SX Bet (no scalar without summing the raw order book).
+	LiquidityUsd *float64 `json:"liquidity_usd,omitempty" url:"liquidity_usd,omitempty"`
+	// Trailing-24h traded volume in USD notional. Null where the platform doesn't denominate volume in USD — notably Kalshi (contracts; see `volume_24h_contracts`) — or doesn't expose a volume aggregate at all (SX Bet, Predict's record).
+	Volume24HUsd *float64 `json:"volume_24h_usd,omitempty" url:"volume_24h_usd,omitempty"`
+	// Lifetime traded volume in USD notional. Same per-platform availability as `volume_24h_usd`. Never fabricated by converting contract counts through a price.
+	VolumeTotalUsd *float64 `json:"volume_total_usd,omitempty" url:"volume_total_usd,omitempty"`
+	// Trailing-24h traded volume in contracts (Kalshi `volume_24h_fp`; fractional contracts supported). Omitted for platforms that denominate volume in USD.
+	Volume24HContracts *float64 `json:"volume_24h_contracts,omitempty" url:"volume_24h_contracts,omitempty"`
+	// Lifetime traded volume in contracts (Kalshi `volume_fp`). Omitted for platforms that denominate volume in USD.
+	VolumeTotalContracts *float64 `json:"volume_total_contracts,omitempty" url:"volume_total_contracts,omitempty"`
+	// Total outstanding contracts (Kalshi `open_interest_fp`). Contracts, not USD — a positioning gauge kept separate from `liquidity_usd` (depth). Omitted where the platform doesn't expose market-level open interest.
+	OpenInterest *float64 `json:"open_interest,omitempty" url:"open_interest,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
 	explicitFields *big.Int `json:"-" url:"-"`
@@ -1330,6 +1704,55 @@ func (m *MarketDetailResponse) GetOutcomes() []*MarketDetailOutcome {
 		return nil
 	}
 	return m.Outcomes
+}
+
+func (m *MarketDetailResponse) GetPricing() *MarketDetailPricing {
+	if m == nil {
+		return nil
+	}
+	return m.Pricing
+}
+
+func (m *MarketDetailResponse) GetLiquidityUsd() *float64 {
+	if m == nil {
+		return nil
+	}
+	return m.LiquidityUsd
+}
+
+func (m *MarketDetailResponse) GetVolume24HUsd() *float64 {
+	if m == nil {
+		return nil
+	}
+	return m.Volume24HUsd
+}
+
+func (m *MarketDetailResponse) GetVolumeTotalUsd() *float64 {
+	if m == nil {
+		return nil
+	}
+	return m.VolumeTotalUsd
+}
+
+func (m *MarketDetailResponse) GetVolume24HContracts() *float64 {
+	if m == nil {
+		return nil
+	}
+	return m.Volume24HContracts
+}
+
+func (m *MarketDetailResponse) GetVolumeTotalContracts() *float64 {
+	if m == nil {
+		return nil
+	}
+	return m.VolumeTotalContracts
+}
+
+func (m *MarketDetailResponse) GetOpenInterest() *float64 {
+	if m == nil {
+		return nil
+	}
+	return m.OpenInterest
 }
 
 func (m *MarketDetailResponse) GetExtraProperties() map[string]interface{} {
@@ -1386,6 +1809,55 @@ func (m *MarketDetailResponse) SetStatus(status MarketDetailResponseStatus) {
 func (m *MarketDetailResponse) SetOutcomes(outcomes []*MarketDetailOutcome) {
 	m.Outcomes = outcomes
 	m.require(marketDetailResponseFieldOutcomes)
+}
+
+// SetPricing sets the Pricing field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailResponse) SetPricing(pricing *MarketDetailPricing) {
+	m.Pricing = pricing
+	m.require(marketDetailResponseFieldPricing)
+}
+
+// SetLiquidityUsd sets the LiquidityUsd field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailResponse) SetLiquidityUsd(liquidityUsd *float64) {
+	m.LiquidityUsd = liquidityUsd
+	m.require(marketDetailResponseFieldLiquidityUsd)
+}
+
+// SetVolume24HUsd sets the Volume24HUsd field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailResponse) SetVolume24HUsd(volume24HUsd *float64) {
+	m.Volume24HUsd = volume24HUsd
+	m.require(marketDetailResponseFieldVolume24HUsd)
+}
+
+// SetVolumeTotalUsd sets the VolumeTotalUsd field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailResponse) SetVolumeTotalUsd(volumeTotalUsd *float64) {
+	m.VolumeTotalUsd = volumeTotalUsd
+	m.require(marketDetailResponseFieldVolumeTotalUsd)
+}
+
+// SetVolume24HContracts sets the Volume24HContracts field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailResponse) SetVolume24HContracts(volume24HContracts *float64) {
+	m.Volume24HContracts = volume24HContracts
+	m.require(marketDetailResponseFieldVolume24HContracts)
+}
+
+// SetVolumeTotalContracts sets the VolumeTotalContracts field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailResponse) SetVolumeTotalContracts(volumeTotalContracts *float64) {
+	m.VolumeTotalContracts = volumeTotalContracts
+	m.require(marketDetailResponseFieldVolumeTotalContracts)
+}
+
+// SetOpenInterest sets the OpenInterest field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailResponse) SetOpenInterest(openInterest *float64) {
+	m.OpenInterest = openInterest
+	m.require(marketDetailResponseFieldOpenInterest)
 }
 
 func (m *MarketDetailResponse) UnmarshalJSON(data []byte) error {
