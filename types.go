@@ -82,9 +82,9 @@ var (
 )
 
 type GetEventRequest struct {
-	// Platform-native event identifier. Examples per platform: Kalshi event ticker (`KXMLBGAME-26MAY221840CLEPHI`), Polymarket event slug (`mlb-cle-phi-2026-05-22`), SX Bet event id (`L10073358`), Predict market id (`110629`).
+	// Platform-native event identifier. Examples per platform: Kalshi event ticker (`KXMLBGAME-26MAY221840CLEPHI`), Polymarket event slug (`mlb-cle-phi-2026-05-22`), SX Bet event id (`L10073358`), Predict market id (`110629`), Hyperliquid question or outcome integer id (`19` or `172`; requires `?platform=hyperliquid` since integer ids aren't inferred).
 	EventID string `json:"-" url:"-"`
-	// Optional platform override. When omitted, inferred from the `event_id` format: `KX…` → Kalshi, `L\d+` → SX Bet. Numeric IDs and kebab-case slugs are shared shape between Polymarket and Predict; in that case the service probes Polymarket first and falls back to Predict on 404. Pass `platform` explicitly to skip the probe.
+	// Optional platform override. When omitted, inferred from the `event_id` format: `KX…` → Kalshi, `L\d+` → SX Bet. Numeric IDs and kebab-case slugs are shared shape between Polymarket and Predict; in that case the service probes Polymarket first and falls back to Predict on 404. Hyperliquid question/outcome integer ids collide with these numerics and are not inferred — pass `?platform=hyperliquid` (alias `hl`). Pass `platform` explicitly to skip the probe.
 	Platform *GetEventRequestPlatform `json:"-" url:"platform,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
@@ -118,9 +118,9 @@ var (
 )
 
 type GetMarketRequest struct {
-	// Composite (`{provider}:{native_id}`) or platform-native market identifier. Examples per platform: Kalshi market ticker (`KXNBA-26-SAS`), Polymarket numeric id or slug (`540817` or `new-rhianna-album-before-gta-vi-926`), Predict market id (`356635`), SX Bet `marketHash` (`0x…64hex`).
+	// Composite (`{provider}:{native_id}`) or platform-native market identifier. Examples per platform: Kalshi market ticker (`KXNBA-26-SAS`), Polymarket numeric id or slug (`540817` or `new-rhianna-album-before-gta-vi-926`), Predict market id (`356635`), SX Bet `marketHash` (`0x…64hex`), Hyperliquid outcome id (use the composite `hyperliquid:172` or `?platform=hyperliquid` — bare integer ids aren't inferred).
 	MarketID string `json:"-" url:"-"`
-	// Optional platform override. When omitted, inferred from the composite prefix or from the native ID format (`KX…` → Kalshi, `0x…64hex` → SX Bet). Numeric IDs and kebab-case slugs are shared shape between Polymarket and Predict; in that case the service probes Polymarket first and falls back to Predict on 404. Pass `platform` explicitly to skip the probe. When the override contradicts a composite prefix (e.g. `kalshi:X` with `?platform=polymarket`), the request returns 400.
+	// Optional platform override. When omitted, inferred from the composite prefix or from the native ID format (`KX…` → Kalshi, `0x…64hex` → SX Bet). Numeric IDs and kebab-case slugs are shared shape between Polymarket and Predict; in that case the service probes Polymarket first and falls back to Predict on 404. Hyperliquid integer ids collide with these numerics and are not inferred — use the composite `hyperliquid:<id>` or `?platform=hyperliquid` (alias `hl`). Pass `platform` explicitly to skip the probe. When the override contradicts a composite prefix (e.g. `kalshi:X` with `?platform=polymarket`), the request returns 400.
 	Platform *GetMarketRequestPlatform `json:"-" url:"platform,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
@@ -1094,10 +1094,12 @@ func (e *EventResponse) String() string {
 type EventResponsePlatform string
 
 const (
-	EventResponsePlatformKalshi     EventResponsePlatform = "kalshi"
-	EventResponsePlatformPolymarket EventResponsePlatform = "polymarket"
-	EventResponsePlatformPredict    EventResponsePlatform = "predict"
-	EventResponsePlatformSxbet      EventResponsePlatform = "sxbet"
+	EventResponsePlatformKalshi      EventResponsePlatform = "kalshi"
+	EventResponsePlatformPolymarket  EventResponsePlatform = "polymarket"
+	EventResponsePlatformPredict     EventResponsePlatform = "predict"
+	EventResponsePlatformSxbet       EventResponsePlatform = "sxbet"
+	EventResponsePlatformHyperliquid EventResponsePlatform = "hyperliquid"
+	EventResponsePlatformAlphaArcade EventResponsePlatform = "alpha-arcade"
 )
 
 func NewEventResponsePlatformFromString(s string) (EventResponsePlatform, error) {
@@ -1110,6 +1112,10 @@ func NewEventResponsePlatformFromString(s string) (EventResponsePlatform, error)
 		return EventResponsePlatformPredict, nil
 	case "sxbet":
 		return EventResponsePlatformSxbet, nil
+	case "hyperliquid":
+		return EventResponsePlatformHyperliquid, nil
+	case "alpha-arcade":
+		return EventResponsePlatformAlphaArcade, nil
 	}
 	var t EventResponsePlatform
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
@@ -1122,10 +1128,12 @@ func (e EventResponsePlatform) Ptr() *EventResponsePlatform {
 type GetEventRequestPlatform string
 
 const (
-	GetEventRequestPlatformKalshi     GetEventRequestPlatform = "kalshi"
-	GetEventRequestPlatformPolymarket GetEventRequestPlatform = "polymarket"
-	GetEventRequestPlatformPredict    GetEventRequestPlatform = "predict"
-	GetEventRequestPlatformSxbet      GetEventRequestPlatform = "sxbet"
+	GetEventRequestPlatformKalshi      GetEventRequestPlatform = "kalshi"
+	GetEventRequestPlatformPolymarket  GetEventRequestPlatform = "polymarket"
+	GetEventRequestPlatformPredict     GetEventRequestPlatform = "predict"
+	GetEventRequestPlatformSxbet       GetEventRequestPlatform = "sxbet"
+	GetEventRequestPlatformHyperliquid GetEventRequestPlatform = "hyperliquid"
+	GetEventRequestPlatformAlphaArcade GetEventRequestPlatform = "alpha-arcade"
 )
 
 func NewGetEventRequestPlatformFromString(s string) (GetEventRequestPlatform, error) {
@@ -1138,6 +1146,10 @@ func NewGetEventRequestPlatformFromString(s string) (GetEventRequestPlatform, er
 		return GetEventRequestPlatformPredict, nil
 	case "sxbet":
 		return GetEventRequestPlatformSxbet, nil
+	case "hyperliquid":
+		return GetEventRequestPlatformHyperliquid, nil
+	case "alpha-arcade":
+		return GetEventRequestPlatformAlphaArcade, nil
 	}
 	var t GetEventRequestPlatform
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
@@ -1150,10 +1162,12 @@ func (g GetEventRequestPlatform) Ptr() *GetEventRequestPlatform {
 type GetMarketRequestPlatform string
 
 const (
-	GetMarketRequestPlatformKalshi     GetMarketRequestPlatform = "kalshi"
-	GetMarketRequestPlatformPolymarket GetMarketRequestPlatform = "polymarket"
-	GetMarketRequestPlatformPredict    GetMarketRequestPlatform = "predict"
-	GetMarketRequestPlatformSxbet      GetMarketRequestPlatform = "sxbet"
+	GetMarketRequestPlatformKalshi      GetMarketRequestPlatform = "kalshi"
+	GetMarketRequestPlatformPolymarket  GetMarketRequestPlatform = "polymarket"
+	GetMarketRequestPlatformPredict     GetMarketRequestPlatform = "predict"
+	GetMarketRequestPlatformSxbet       GetMarketRequestPlatform = "sxbet"
+	GetMarketRequestPlatformHyperliquid GetMarketRequestPlatform = "hyperliquid"
+	GetMarketRequestPlatformAlphaArcade GetMarketRequestPlatform = "alpha-arcade"
 )
 
 func NewGetMarketRequestPlatformFromString(s string) (GetMarketRequestPlatform, error) {
@@ -1166,6 +1180,10 @@ func NewGetMarketRequestPlatformFromString(s string) (GetMarketRequestPlatform, 
 		return GetMarketRequestPlatformPredict, nil
 	case "sxbet":
 		return GetMarketRequestPlatformSxbet, nil
+	case "hyperliquid":
+		return GetMarketRequestPlatformHyperliquid, nil
+	case "alpha-arcade":
+		return GetMarketRequestPlatformAlphaArcade, nil
 	}
 	var t GetMarketRequestPlatform
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
@@ -1187,19 +1205,19 @@ var (
 )
 
 type MarketDetailOutcome struct {
-	// Outcome label as the platform reports it. Kalshi binary markets normalize to `Yes`/`No`; Polymarket parses the stringified outcomes array (also typically `Yes`/`No`); Predict reports per-outcome names; SX Bet uses outcome-one/outcome-two names (e.g. team labels with spreads applied).
+	// Outcome label as the platform reports it. Kalshi binary markets normalize to `Yes`/`No`; Polymarket parses the stringified outcomes array (also typically `Yes`/`No`); Predict reports per-outcome names; SX Bet uses outcome-one/outcome-two names (e.g. team labels with spreads applied); Hyperliquid uses the outcome `sideSpecs` names.
 	Name string `json:"name" url:"name"`
-	// Stable per-platform key for this outcome: Kalshi `yes`/`no`, Polymarket CLOB token id, Predict on-chain id, SX Bet `outcomeOne`/`outcomeTwo`. The join key for future per-outcome sub-resources (order-book depth).
+	// Stable per-platform key for this outcome: Kalshi `yes`/`no`, Polymarket CLOB token id, Predict on-chain id, SX Bet `outcomeOne`/`outcomeTwo`, Hyperliquid coin encoding (`#<10*outcome+side>`). The join key for future per-outcome sub-resources (order-book depth).
 	OutcomeID *string `json:"outcome_id,omitempty" url:"outcome_id,omitempty"`
 	// Current implied probability of this outcome in 0–1 — the headline field, equal to the implied probability on every supported platform. Derivation cascade: mid of bid/ask when two-sided → the single available side → last trade → platform mark (Polymarket `outcomePrices`, which preserves 0/1 resolution marks on settled markets). Because the cascade differs by what each platform exposes, `price` is a DISPLAY number — when comparing across platforms or sizing trades, prefer `bid`/`ask` directly where present. Null when no quote of any kind exists. GUARANTEE: when `pricing.availability` is `live`, `price` is non-null on every outcome. Values are rounded to at most 6 decimal places.
 	Price *float64 `json:"price,omitempty" url:"price,omitempty"`
-	// Best bid for this outcome in 0–1 probability. Null when that book side is empty or the platform doesn't publish per-outcome quotes on the record (Polymarket non-primary outcomes) — never synthesized from `1 − ask`.
+	// Best bid for this outcome in 0–1 probability. Null when that book side is empty or the platform doesn't publish per-outcome quotes on the record (Polymarket non-primary outcomes). Hyperliquid's second side is derived from the merged book complement (`1 − first-side ask`), matching the platform's order-book structure; no other platform synthesizes bid from `1 − ask`.
 	Bid *float64 `json:"bid,omitempty" url:"bid,omitempty"`
-	// Best ask (price to take this outcome) in 0–1 probability. For SX Bet this is derived from the opposite side's best maker quote (`1 − bid(other)`), which is that book's actual taker price.
+	// Best ask (price to take this outcome) in 0–1 probability. For SX Bet this is derived from the opposite side's best maker quote (`1 − bid(other)`), which is that book's actual taker price. For Hyperliquid's second side this is derived from the merged book complement (`1 − first-side bid`).
 	Ask *float64 `json:"ask,omitempty" url:"ask,omitempty"`
-	// Last traded price for this outcome in 0–1 probability. Null where the platform exposes no last-trade on the record (Predict, SX Bet).
+	// Last traded price for this outcome in 0–1 probability. Null where the platform exposes no last-trade on the record (Predict, SX Bet, Hyperliquid).
 	Last *float64 `json:"last,omitempty" url:"last,omitempty"`
-	// Resting size at the best bid in native contract/share units (NOT USD). Omitted where the platform publishes no per-side size — Kalshi publishes YES-side sizes only; Polymarket and SX Bet publish none on this path.
+	// Resting size at the best bid in native contract/share units (NOT USD). Omitted where the platform publishes no per-side size — Kalshi publishes YES-side sizes only; Hyperliquid publishes top-of-book sizes from `l2Book`; Polymarket and SX Bet publish none on this path.
 	BidSize *float64 `json:"bid_size,omitempty" url:"bid_size,omitempty"`
 	// Resting size at the best ask in native contract/share units. Same availability as `bid_size`.
 	AskSize *float64 `json:"ask_size,omitempty" url:"ask_size,omitempty"`
@@ -1389,13 +1407,13 @@ var (
 )
 
 type MarketDetailPricing struct {
-	// `live` — every outcome carries a price. `partial` — some but not all outcomes priced. `no_quotes` — the pricing fetch succeeded but the book is empty (SX Bet with no resting orders; Kalshi provisional/multivariate markets whose quotes are empty-book placeholders). `unavailable` — the pricing enrichment fetch failed or timed out (SX Bet); identity fields are still served.
+	// `live` — every outcome carries a price. `partial` — some but not all outcomes priced. `no_quotes` — the pricing fetch succeeded but the book is empty (SX Bet or Hyperliquid with no resting orders; Kalshi provisional/multivariate markets whose quotes are empty-book placeholders). `unavailable` — the pricing enrichment fetch failed or timed out (SX Bet/Hyperliquid); identity fields are still served.
 	Availability MarketDetailPricingAvailability `json:"availability" url:"availability"`
 	// Self-describing unit declaration for all price fields. Single canonical scale today; new values would be added alongside (never replacing) this one.
 	Scale MarketDetailPricingScale `json:"scale" url:"scale"`
-	// Where the quotes came from. `market_record` — embedded in the same single-market record as the identity fetch (Kalshi, Polymarket, Predict). `orderbook` — required one bounded second fetch against the platform's order-book surface (SX Bet `/orders/odds/best`).
+	// Where the quotes came from. `market_record` — embedded in the same single-market record as the identity fetch (Kalshi, Polymarket, Predict). `orderbook` — required one bounded second fetch against the platform's order-book surface (SX Bet `/orders/odds/best`, Hyperliquid `l2Book`).
 	Source MarketDetailPricingSource `json:"source" url:"source"`
-	// Quote freshness as RFC3339. When the two sides carry independent upstream timestamps (SX Bet), this is the OLDER of them — a conservative floor that never over-claims freshness. Null when the upstream record carries no quote timestamp at all (Predict) — treat freshness as UNKNOWN, not as fresh. Timestamps come from each platform's own clock; for Kalshi/Polymarket the value is the record's last-update time, the closest the platform exposes to a quote timestamp.
+	// Quote freshness as RFC3339. When the two sides carry independent upstream timestamps (SX Bet), this is the OLDER of them — a conservative floor that never over-claims freshness. Hyperliquid uses the `l2Book` server timestamp. Null when the upstream record carries no quote timestamp at all (Predict) — treat freshness as UNKNOWN, not as fresh. Timestamps come from each platform's own clock; for Kalshi/Polymarket the value is the record's last-update time, the closest the platform exposes to a quote timestamp.
 	AsOf *time.Time `json:"as_of,omitempty" url:"as_of,omitempty"`
 	// True when this market belongs to a negative-risk multi-outcome event (Polymarket `negRisk`, Predict `isNegRisk`). On a multi-outcome record, outcome prices intentionally need not sum to 1 — do not "normalize" the book. Note that for the BINARY member markets these platforms serve today the flag signals event-level structure (this market is one leg of a mutually-exclusive set); the binary pair itself still sums to ~1. Omitted when false.
 	NegRisk *bool `json:"neg_risk,omitempty" url:"neg_risk,omitempty"`
@@ -1541,7 +1559,7 @@ func (m *MarketDetailPricing) String() string {
 	return fmt.Sprintf("%#v", m)
 }
 
-// `live` — every outcome carries a price. `partial` — some but not all outcomes priced. `no_quotes` — the pricing fetch succeeded but the book is empty (SX Bet with no resting orders; Kalshi provisional/multivariate markets whose quotes are empty-book placeholders). `unavailable` — the pricing enrichment fetch failed or timed out (SX Bet); identity fields are still served.
+// `live` — every outcome carries a price. `partial` — some but not all outcomes priced. `no_quotes` — the pricing fetch succeeded but the book is empty (SX Bet or Hyperliquid with no resting orders; Kalshi provisional/multivariate markets whose quotes are empty-book placeholders). `unavailable` — the pricing enrichment fetch failed or timed out (SX Bet/Hyperliquid); identity fields are still served.
 type MarketDetailPricingAvailability string
 
 const (
@@ -1590,7 +1608,7 @@ func (m MarketDetailPricingScale) Ptr() *MarketDetailPricingScale {
 	return &m
 }
 
-// Where the quotes came from. `market_record` — embedded in the same single-market record as the identity fetch (Kalshi, Polymarket, Predict). `orderbook` — required one bounded second fetch against the platform's order-book surface (SX Bet `/orders/odds/best`).
+// Where the quotes came from. `market_record` — embedded in the same single-market record as the identity fetch (Kalshi, Polymarket, Predict). `orderbook` — required one bounded second fetch against the platform's order-book surface (SX Bet `/orders/odds/best`, Hyperliquid `l2Book`).
 type MarketDetailPricingSource string
 
 const (
@@ -1613,7 +1631,7 @@ func (m MarketDetailPricingSource) Ptr() *MarketDetailPricingSource {
 	return &m
 }
 
-// Single-market detail across all four supported platforms. Identity fields are strict-universal (no second fetch on any platform); the pricing tier carries per-outcome quotes plus market-level aggregates with explicit nulls where a platform doesn't natively expose a figure — values are never fabricated. closes_at/event_id remain deliberately omitted, see the endpoint description for the rationale.
+// Single-market detail across all six supported platforms. Identity fields are strict-universal (no second fetch on any platform); the pricing tier carries per-outcome quotes plus market-level aggregates with explicit nulls where a platform doesn't natively expose a figure — values are never fabricated. closes_at/event_id remain deliberately omitted, see the endpoint description for the rationale.
 var (
 	marketDetailResponseFieldID                   = big.NewInt(1 << 0)
 	marketDetailResponseFieldProvider             = big.NewInt(1 << 1)
@@ -1635,18 +1653,18 @@ type MarketDetailResponse struct {
 	ID string `json:"id" url:"id"`
 	// Prediction market provider the market_id resolved against.
 	Provider MarketDetailResponseProvider `json:"provider" url:"provider"`
-	// Platform-native market identifier. Kalshi ticker, Polymarket numeric id, Predict numeric id, or SX Bet `marketHash`. For Polymarket markets resolved by slug, this is normalized to the numeric id.
+	// Platform-native market identifier. Kalshi ticker, Polymarket numeric id, Predict numeric id, SX Bet `marketHash`, or Hyperliquid outcome id. For Polymarket markets resolved by slug, this is normalized to the numeric id. Hyperliquid integer ids collide with Polymarket/Predict numeric ids, so look them up via the composite id (`hyperliquid:<id>`, as returned by `/v1/markets`) or `?platform=hyperliquid`.
 	ProviderID string `json:"provider_id" url:"provider_id"`
-	// Human-readable market title. Each platform exposes a slightly different field — Kalshi `title`, Polymarket `question`, Predict `title`, SX Bet composed from outcome labels (team-pair fallback) so a game's moneyline, spread, and total markets stay distinguishable.
+	// Human-readable market title. Each platform exposes a slightly different field — Kalshi `title`, Polymarket `question`, Predict `title`, SX Bet composed from outcome labels (team-pair fallback) so a game's moneyline, spread, and total markets stay distinguishable, and Hyperliquid composed from outcome/question metadata.
 	Title string `json:"title" url:"title"`
-	// Normalized lifecycle status. Mapping per platform: Kalshi `active` → open · `closed`/`determined` → closed · `settled`/`finalized` → settled. Polymarket `archived` → settled · `closed && !archived` → closed · otherwise → open. Predict `tradingStatus=OPEN` → open · `CLOSED && !RESOLVED` → closed · `status=RESOLVED` → settled. SX Bet `ACTIVE` → open · otherwise closed. Unknown upstream values default to closed.
+	// Normalized lifecycle status. Mapping per platform: Kalshi `active` → open · `closed`/`determined` → closed · `settled`/`finalized` → settled. Polymarket `archived` → settled · `closed && !archived` → closed · otherwise → open. Predict `tradingStatus=OPEN` → open · `CLOSED && !RESOLVED` → closed · `status=RESOLVED` → settled. SX Bet `ACTIVE` → open · otherwise closed. Hyperliquid named outcomes listed in `settledNamedOutcomes` → settled · otherwise open. Unknown upstream values default to closed.
 	Status MarketDetailResponseStatus `json:"status" url:"status"`
-	// Outcomes with per-outcome quotes. ORDERING GUARANTEE: `outcomes[0]` is the platform's primary/headline outcome — Kalshi `Yes`, Polymarket's first outcome token (its `bestBid`/`bestAsk` side), Predict `indexSet=1`, SX Bet `outcomeOne`. Render `outcomes[0].price` as the headline probability; do NOT search for an outcome named "Yes" (names are free-text on Predict/SX Bet). Every supported platform models per-market outcomes as a 2-element list in practice (multi-outcome events are modeled as multiple binary markets nested under one event/category); the per-outcome quote shape handles binary and any future multi-outcome record identically with no special-casing.
+	// Outcomes with per-outcome quotes. ORDERING GUARANTEE: `outcomes[0]` is the platform's primary/headline outcome — Kalshi `Yes`, Polymarket's first outcome token (its `bestBid`/`bestAsk` side), Predict `indexSet=1`, SX Bet `outcomeOne`, Hyperliquid's first `sideSpec`. Render `outcomes[0].price` as the headline probability; do NOT search for an outcome named "Yes" (names are free-text on Predict/SX Bet/Hyperliquid). Every supported platform models per-market outcomes as a 2-element list in practice (multi-outcome events are modeled as multiple binary markets nested under one event/category); the per-outcome quote shape handles binary and any future multi-outcome record identically with no special-casing.
 	Outcomes []*MarketDetailOutcome `json:"outcomes" url:"outcomes"`
 	Pricing  *MarketDetailPricing   `json:"pricing" url:"pricing"`
-	// Resting order-book depth valued in USD — strictly CLOB book depth, never an AMM pool size or a synthetic score. Polymarket exposes it natively (`liquidityNum`); null for Kalshi (its upstream `liquidity_dollars` is deprecated and always zero), Predict (stats is null on the record), and SX Bet (no scalar without summing the raw order book).
+	// Resting order-book depth valued in USD — strictly CLOB book depth, never an AMM pool size or a synthetic score. Polymarket exposes it natively (`liquidityNum`); null for Kalshi (its upstream `liquidity_dollars` is deprecated and always zero), Predict (stats is null on the record), and SX Bet/Hyperliquid (no scalar without summing the raw order book).
 	LiquidityUsd *float64 `json:"liquidity_usd,omitempty" url:"liquidity_usd,omitempty"`
-	// Trailing-24h traded volume in USD notional. Null where the platform doesn't denominate volume in USD — notably Kalshi (contracts; see `volume_24h_contracts`) — or doesn't expose a volume aggregate at all (SX Bet, Predict's record).
+	// Trailing-24h traded volume in USD notional. Null where the platform doesn't denominate volume in USD — notably Kalshi (contracts; see `volume_24h_contracts`) — or doesn't expose a volume aggregate at all (SX Bet, Hyperliquid, Predict's record).
 	Volume24HUsd *float64 `json:"volume_24h_usd,omitempty" url:"volume_24h_usd,omitempty"`
 	// Lifetime traded volume in USD notional. Same per-platform availability as `volume_24h_usd`. Never fabricated by converting contract counts through a price.
 	VolumeTotalUsd *float64 `json:"volume_total_usd,omitempty" url:"volume_total_usd,omitempty"`
@@ -1906,10 +1924,12 @@ func (m *MarketDetailResponse) String() string {
 type MarketDetailResponseProvider string
 
 const (
-	MarketDetailResponseProviderKalshi     MarketDetailResponseProvider = "kalshi"
-	MarketDetailResponseProviderPolymarket MarketDetailResponseProvider = "polymarket"
-	MarketDetailResponseProviderPredict    MarketDetailResponseProvider = "predict"
-	MarketDetailResponseProviderSxbet      MarketDetailResponseProvider = "sxbet"
+	MarketDetailResponseProviderKalshi      MarketDetailResponseProvider = "kalshi"
+	MarketDetailResponseProviderPolymarket  MarketDetailResponseProvider = "polymarket"
+	MarketDetailResponseProviderPredict     MarketDetailResponseProvider = "predict"
+	MarketDetailResponseProviderSxbet       MarketDetailResponseProvider = "sxbet"
+	MarketDetailResponseProviderHyperliquid MarketDetailResponseProvider = "hyperliquid"
+	MarketDetailResponseProviderAlphaArcade MarketDetailResponseProvider = "alpha-arcade"
 )
 
 func NewMarketDetailResponseProviderFromString(s string) (MarketDetailResponseProvider, error) {
@@ -1922,6 +1942,10 @@ func NewMarketDetailResponseProviderFromString(s string) (MarketDetailResponsePr
 		return MarketDetailResponseProviderPredict, nil
 	case "sxbet":
 		return MarketDetailResponseProviderSxbet, nil
+	case "hyperliquid":
+		return MarketDetailResponseProviderHyperliquid, nil
+	case "alpha-arcade":
+		return MarketDetailResponseProviderAlphaArcade, nil
 	}
 	var t MarketDetailResponseProvider
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
@@ -1931,7 +1955,7 @@ func (m MarketDetailResponseProvider) Ptr() *MarketDetailResponseProvider {
 	return &m
 }
 
-// Normalized lifecycle status. Mapping per platform: Kalshi `active` → open · `closed`/`determined` → closed · `settled`/`finalized` → settled. Polymarket `archived` → settled · `closed && !archived` → closed · otherwise → open. Predict `tradingStatus=OPEN` → open · `CLOSED && !RESOLVED` → closed · `status=RESOLVED` → settled. SX Bet `ACTIVE` → open · otherwise closed. Unknown upstream values default to closed.
+// Normalized lifecycle status. Mapping per platform: Kalshi `active` → open · `closed`/`determined` → closed · `settled`/`finalized` → settled. Polymarket `archived` → settled · `closed && !archived` → closed · otherwise → open. Predict `tradingStatus=OPEN` → open · `CLOSED && !RESOLVED` → closed · `status=RESOLVED` → settled. SX Bet `ACTIVE` → open · otherwise closed. Hyperliquid named outcomes listed in `settledNamedOutcomes` → settled · otherwise open. Unknown upstream values default to closed.
 type MarketDetailResponseStatus string
 
 const (
@@ -2610,10 +2634,11 @@ func (p *PlatformMarket) String() string {
 type PlatformMarketPlatform string
 
 const (
-	PlatformMarketPlatformKalshi     PlatformMarketPlatform = "KALSHI"
-	PlatformMarketPlatformPolymarket PlatformMarketPlatform = "POLYMARKET"
-	PlatformMarketPlatformPredict    PlatformMarketPlatform = "PREDICT"
-	PlatformMarketPlatformSxbet      PlatformMarketPlatform = "SXBET"
+	PlatformMarketPlatformKalshi      PlatformMarketPlatform = "KALSHI"
+	PlatformMarketPlatformPolymarket  PlatformMarketPlatform = "POLYMARKET"
+	PlatformMarketPlatformPredict     PlatformMarketPlatform = "PREDICT"
+	PlatformMarketPlatformSxbet       PlatformMarketPlatform = "SXBET"
+	PlatformMarketPlatformAlphaArcade PlatformMarketPlatform = "ALPHA-ARCADE"
 )
 
 func NewPlatformMarketPlatformFromString(s string) (PlatformMarketPlatform, error) {
@@ -2626,6 +2651,8 @@ func NewPlatformMarketPlatformFromString(s string) (PlatformMarketPlatform, erro
 		return PlatformMarketPlatformPredict, nil
 	case "SXBET":
 		return PlatformMarketPlatformSxbet, nil
+	case "ALPHA-ARCADE":
+		return PlatformMarketPlatformAlphaArcade, nil
 	}
 	var t PlatformMarketPlatform
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
@@ -3232,10 +3259,12 @@ func (u *UnifiedMarket) String() string {
 type UnifiedMarketProvider string
 
 const (
-	UnifiedMarketProviderKalshi     UnifiedMarketProvider = "kalshi"
-	UnifiedMarketProviderPolymarket UnifiedMarketProvider = "polymarket"
-	UnifiedMarketProviderPredict    UnifiedMarketProvider = "predict"
-	UnifiedMarketProviderSxbet      UnifiedMarketProvider = "sxbet"
+	UnifiedMarketProviderKalshi      UnifiedMarketProvider = "kalshi"
+	UnifiedMarketProviderPolymarket  UnifiedMarketProvider = "polymarket"
+	UnifiedMarketProviderPredict     UnifiedMarketProvider = "predict"
+	UnifiedMarketProviderSxbet       UnifiedMarketProvider = "sxbet"
+	UnifiedMarketProviderHyperliquid UnifiedMarketProvider = "hyperliquid"
+	UnifiedMarketProviderAlphaArcade UnifiedMarketProvider = "alpha-arcade"
 )
 
 func NewUnifiedMarketProviderFromString(s string) (UnifiedMarketProvider, error) {
@@ -3248,6 +3277,10 @@ func NewUnifiedMarketProviderFromString(s string) (UnifiedMarketProvider, error)
 		return UnifiedMarketProviderPredict, nil
 	case "sxbet":
 		return UnifiedMarketProviderSxbet, nil
+	case "hyperliquid":
+		return UnifiedMarketProviderHyperliquid, nil
+	case "alpha-arcade":
+		return UnifiedMarketProviderAlphaArcade, nil
 	}
 	var t UnifiedMarketProvider
 	return "", fmt.Errorf("%s is not a valid %T", s, t)

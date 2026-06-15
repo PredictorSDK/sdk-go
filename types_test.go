@@ -7533,6 +7533,20 @@ func TestEnumEventResponsePlatform(t *testing.T) {
 		assert.Equal(t, EventResponsePlatform("sxbet"), val, "enum value should match expected wire value")
 	})
 
+	t.Run("NewFromString_hyperliquid", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewEventResponsePlatformFromString("hyperliquid")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, EventResponsePlatform("hyperliquid"), val, "enum value should match expected wire value")
+	})
+
+	t.Run("NewFromString_alpha_arcade", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewEventResponsePlatformFromString("alpha-arcade")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, EventResponsePlatform("alpha-arcade"), val, "enum value should match expected wire value")
+	})
+
 	t.Run("NewFromString_Invalid", func(t *testing.T) {
 		_, err := NewEventResponsePlatformFromString("invalid_value_that_does_not_exist")
 		assert.Error(t, err)
@@ -7576,6 +7590,20 @@ func TestEnumGetEventRequestPlatform(t *testing.T) {
 		assert.Equal(t, GetEventRequestPlatform("sxbet"), val, "enum value should match expected wire value")
 	})
 
+	t.Run("NewFromString_hyperliquid", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewGetEventRequestPlatformFromString("hyperliquid")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, GetEventRequestPlatform("hyperliquid"), val, "enum value should match expected wire value")
+	})
+
+	t.Run("NewFromString_alpha_arcade", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewGetEventRequestPlatformFromString("alpha-arcade")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, GetEventRequestPlatform("alpha-arcade"), val, "enum value should match expected wire value")
+	})
+
 	t.Run("NewFromString_Invalid", func(t *testing.T) {
 		_, err := NewGetEventRequestPlatformFromString("invalid_value_that_does_not_exist")
 		assert.Error(t, err)
@@ -7617,6 +7645,20 @@ func TestEnumGetMarketRequestPlatform(t *testing.T) {
 		val, err := NewGetMarketRequestPlatformFromString("sxbet")
 		assert.NoError(t, err, "valid enum value should not return error")
 		assert.Equal(t, GetMarketRequestPlatform("sxbet"), val, "enum value should match expected wire value")
+	})
+
+	t.Run("NewFromString_hyperliquid", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewGetMarketRequestPlatformFromString("hyperliquid")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, GetMarketRequestPlatform("hyperliquid"), val, "enum value should match expected wire value")
+	})
+
+	t.Run("NewFromString_alpha_arcade", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewGetMarketRequestPlatformFromString("alpha-arcade")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, GetMarketRequestPlatform("alpha-arcade"), val, "enum value should match expected wire value")
 	})
 
 	t.Run("NewFromString_Invalid", func(t *testing.T) {
@@ -7756,6 +7798,20 @@ func TestEnumMarketDetailResponseProvider(t *testing.T) {
 		assert.Equal(t, MarketDetailResponseProvider("sxbet"), val, "enum value should match expected wire value")
 	})
 
+	t.Run("NewFromString_hyperliquid", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewMarketDetailResponseProviderFromString("hyperliquid")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, MarketDetailResponseProvider("hyperliquid"), val, "enum value should match expected wire value")
+	})
+
+	t.Run("NewFromString_alpha_arcade", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewMarketDetailResponseProviderFromString("alpha-arcade")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, MarketDetailResponseProvider("alpha-arcade"), val, "enum value should match expected wire value")
+	})
+
 	t.Run("NewFromString_Invalid", func(t *testing.T) {
 		_, err := NewMarketDetailResponseProviderFromString("invalid_value_that_does_not_exist")
 		assert.Error(t, err)
@@ -7864,6 +7920,13 @@ func TestEnumPlatformMarketPlatform(t *testing.T) {
 		assert.Equal(t, PlatformMarketPlatform("SXBET"), val, "enum value should match expected wire value")
 	})
 
+	t.Run("NewFromString_ALPHA_ARCADE", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewPlatformMarketPlatformFromString("ALPHA-ARCADE")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, PlatformMarketPlatform("ALPHA-ARCADE"), val, "enum value should match expected wire value")
+	})
+
 	t.Run("NewFromString_Invalid", func(t *testing.T) {
 		_, err := NewPlatformMarketPlatformFromString("invalid_value_that_does_not_exist")
 		assert.Error(t, err)
@@ -7905,6 +7968,20 @@ func TestEnumUnifiedMarketProvider(t *testing.T) {
 		val, err := NewUnifiedMarketProviderFromString("sxbet")
 		assert.NoError(t, err, "valid enum value should not return error")
 		assert.Equal(t, UnifiedMarketProvider("sxbet"), val, "enum value should match expected wire value")
+	})
+
+	t.Run("NewFromString_hyperliquid", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewUnifiedMarketProviderFromString("hyperliquid")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, UnifiedMarketProvider("hyperliquid"), val, "enum value should match expected wire value")
+	})
+
+	t.Run("NewFromString_alpha_arcade", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewUnifiedMarketProviderFromString("alpha-arcade")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, UnifiedMarketProvider("alpha-arcade"), val, "enum value should match expected wire value")
 	})
 
 	t.Run("NewFromString_Invalid", func(t *testing.T) {
