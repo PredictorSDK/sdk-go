@@ -127,6 +127,46 @@ func (r *RawClient) GetMarkets(
 	}, nil
 }
 
+func (r *RawClient) GetCategories(
+	ctx context.Context,
+	opts ...option.RequestOption,
+) (*core.Response[*predictorsdk.CategoriesResponse], error) {
+	options := core.NewRequestOptions(opts...)
+	baseURL := internal.ResolveBaseURL(
+		options.BaseURL,
+		r.baseURL,
+		"https://api.predictorsdk.com",
+	)
+	endpointURL := baseURL + "/v1/categories"
+	headers := internal.MergeHeaders(
+		r.options.ToHeader(),
+		options.ToHeader(),
+	)
+	var response *predictorsdk.CategoriesResponse
+	raw, err := r.caller.Call(
+		ctx,
+		&internal.CallParams{
+			URL:             endpointURL,
+			Method:          http.MethodGet,
+			Headers:         headers,
+			MaxAttempts:     options.MaxAttempts,
+			BodyProperties:  options.BodyProperties,
+			QueryParameters: options.QueryParameters,
+			Client:          options.HTTPClient,
+			Response:        &response,
+			ErrorDecoder:    internal.NewErrorDecoder(predictorsdk.ErrorCodes),
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &core.Response[*predictorsdk.CategoriesResponse]{
+		StatusCode: raw.StatusCode,
+		Header:     raw.Header,
+		Body:       response,
+	}, nil
+}
+
 func (r *RawClient) GetMarket(
 	ctx context.Context,
 	request *predictorsdk.GetMarketRequest,

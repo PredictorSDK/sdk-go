@@ -149,8 +149,9 @@ func (g *GetMarketRequest) SetPlatform(platform *GetMarketRequestPlatform) {
 }
 
 var (
-	getMarketsRequestFieldLimit  = big.NewInt(1 << 0)
-	getMarketsRequestFieldCursor = big.NewInt(1 << 1)
+	getMarketsRequestFieldLimit    = big.NewInt(1 << 0)
+	getMarketsRequestFieldCursor   = big.NewInt(1 << 1)
+	getMarketsRequestFieldCategory = big.NewInt(1 << 2)
 )
 
 type GetMarketsRequest struct {
@@ -158,6 +159,8 @@ type GetMarketsRequest struct {
 	Limit *int `json:"-" url:"limit,omitempty"`
 	// Opaque cursor from a previous response's `pagination.nextCursor` in the SDKs (raw JSON: `pagination.next_cursor`).
 	Cursor *string `json:"-" url:"cursor,omitempty"`
+	// Canonical top-level category filter. This is PredictorSDK's normalized category, not a provider-native tag. Cursors are bound to the category filter used to create them.
+	Category *MarketCategory `json:"-" url:"category,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
 	explicitFields *big.Int `json:"-" url:"-"`
@@ -182,6 +185,13 @@ func (g *GetMarketsRequest) SetLimit(limit *int) {
 func (g *GetMarketsRequest) SetCursor(cursor *string) {
 	g.Cursor = cursor
 	g.require(getMarketsRequestFieldCursor)
+}
+
+// SetCategory sets the Category field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (g *GetMarketsRequest) SetCategory(category *MarketCategory) {
+	g.Category = category
+	g.require(getMarketsRequestFieldCategory)
 }
 
 var (
@@ -360,6 +370,208 @@ func (l *ListPolymarketWalletPositionsRequest) SetLimit(limit *int) {
 func (l *ListPolymarketWalletPositionsRequest) SetCursor(cursor *string) {
 	l.Cursor = cursor
 	l.require(listPolymarketWalletPositionsRequestFieldCursor)
+}
+
+var (
+	categoriesResponseFieldData = big.NewInt(1 << 0)
+)
+
+type CategoriesResponse struct {
+	Data []*CategoryInfo `json:"data" url:"data"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (c *CategoriesResponse) GetData() []*CategoryInfo {
+	if c == nil {
+		return nil
+	}
+	return c.Data
+}
+
+func (c *CategoriesResponse) GetExtraProperties() map[string]interface{} {
+	if c == nil {
+		return nil
+	}
+	return c.extraProperties
+}
+
+func (c *CategoriesResponse) require(field *big.Int) {
+	if c.explicitFields == nil {
+		c.explicitFields = big.NewInt(0)
+	}
+	c.explicitFields.Or(c.explicitFields, field)
+}
+
+// SetData sets the Data field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CategoriesResponse) SetData(data []*CategoryInfo) {
+	c.Data = data
+	c.require(categoriesResponseFieldData)
+}
+
+func (c *CategoriesResponse) UnmarshalJSON(data []byte) error {
+	type unmarshaler CategoriesResponse
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*c = CategoriesResponse(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *c)
+	if err != nil {
+		return err
+	}
+	c.extraProperties = extraProperties
+	c.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (c *CategoriesResponse) MarshalJSON() ([]byte, error) {
+	type embed CategoriesResponse
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*c),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, c.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (c *CategoriesResponse) String() string {
+	if c == nil {
+		return "<nil>"
+	}
+	if len(c.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(c.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(c); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", c)
+}
+
+var (
+	categoryInfoFieldID          = big.NewInt(1 << 0)
+	categoryInfoFieldName        = big.NewInt(1 << 1)
+	categoryInfoFieldDescription = big.NewInt(1 << 2)
+)
+
+type CategoryInfo struct {
+	ID MarketCategory `json:"id" url:"id"`
+	// Human-readable category label.
+	Name string `json:"name" url:"name"`
+	// Short description of the category's intended scope.
+	Description string `json:"description" url:"description"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (c *CategoryInfo) GetID() MarketCategory {
+	if c == nil {
+		return ""
+	}
+	return c.ID
+}
+
+func (c *CategoryInfo) GetName() string {
+	if c == nil {
+		return ""
+	}
+	return c.Name
+}
+
+func (c *CategoryInfo) GetDescription() string {
+	if c == nil {
+		return ""
+	}
+	return c.Description
+}
+
+func (c *CategoryInfo) GetExtraProperties() map[string]interface{} {
+	if c == nil {
+		return nil
+	}
+	return c.extraProperties
+}
+
+func (c *CategoryInfo) require(field *big.Int) {
+	if c.explicitFields == nil {
+		c.explicitFields = big.NewInt(0)
+	}
+	c.explicitFields.Or(c.explicitFields, field)
+}
+
+// SetID sets the ID field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CategoryInfo) SetID(id MarketCategory) {
+	c.ID = id
+	c.require(categoryInfoFieldID)
+}
+
+// SetName sets the Name field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CategoryInfo) SetName(name string) {
+	c.Name = name
+	c.require(categoryInfoFieldName)
+}
+
+// SetDescription sets the Description field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CategoryInfo) SetDescription(description string) {
+	c.Description = description
+	c.require(categoryInfoFieldDescription)
+}
+
+func (c *CategoryInfo) UnmarshalJSON(data []byte) error {
+	type unmarshaler CategoryInfo
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*c = CategoryInfo(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *c)
+	if err != nil {
+		return err
+	}
+	c.extraProperties = extraProperties
+	c.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (c *CategoryInfo) MarshalJSON() ([]byte, error) {
+	type embed CategoryInfo
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*c),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, c.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (c *CategoryInfo) String() string {
+	if c == nil {
+		return "<nil>"
+	}
+	if len(c.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(c.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(c); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", c)
 }
 
 var (
@@ -1191,6 +1403,56 @@ func NewGetMarketRequestPlatformFromString(s string) (GetMarketRequestPlatform, 
 
 func (g GetMarketRequestPlatform) Ptr() *GetMarketRequestPlatform {
 	return &g
+}
+
+// PredictorSDK-normalized top-level category. This is intentionally broad and stable across providers; provider-native tags are not exposed as canonical categories.
+type MarketCategory string
+
+const (
+	MarketCategorySports        MarketCategory = "sports"
+	MarketCategoryPolitics      MarketCategory = "politics"
+	MarketCategoryCrypto        MarketCategory = "crypto"
+	MarketCategoryFinance       MarketCategory = "finance"
+	MarketCategoryEconomics     MarketCategory = "economics"
+	MarketCategoryWeather       MarketCategory = "weather"
+	MarketCategoryCulture       MarketCategory = "culture"
+	MarketCategoryTechnology    MarketCategory = "technology"
+	MarketCategoryEntertainment MarketCategory = "entertainment"
+	MarketCategoryOther         MarketCategory = "other"
+	MarketCategoryUnknown       MarketCategory = "unknown"
+)
+
+func NewMarketCategoryFromString(s string) (MarketCategory, error) {
+	switch s {
+	case "sports":
+		return MarketCategorySports, nil
+	case "politics":
+		return MarketCategoryPolitics, nil
+	case "crypto":
+		return MarketCategoryCrypto, nil
+	case "finance":
+		return MarketCategoryFinance, nil
+	case "economics":
+		return MarketCategoryEconomics, nil
+	case "weather":
+		return MarketCategoryWeather, nil
+	case "culture":
+		return MarketCategoryCulture, nil
+	case "technology":
+		return MarketCategoryTechnology, nil
+	case "entertainment":
+		return MarketCategoryEntertainment, nil
+	case "other":
+		return MarketCategoryOther, nil
+	case "unknown":
+		return MarketCategoryUnknown, nil
+	}
+	var t MarketCategory
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (m MarketCategory) Ptr() *MarketCategory {
+	return &m
 }
 
 var (
@@ -3140,6 +3402,7 @@ var (
 	unifiedMarketFieldID       = big.NewInt(1 << 0)
 	unifiedMarketFieldProvider = big.NewInt(1 << 1)
 	unifiedMarketFieldTitle    = big.NewInt(1 << 2)
+	unifiedMarketFieldCategory = big.NewInt(1 << 3)
 )
 
 type UnifiedMarket struct {
@@ -3148,7 +3411,8 @@ type UnifiedMarket struct {
 	// Prediction market provider.
 	Provider UnifiedMarketProvider `json:"provider" url:"provider"`
 	// Human-readable market title/question.
-	Title string `json:"title" url:"title"`
+	Title    string         `json:"title" url:"title"`
+	Category MarketCategory `json:"category" url:"category"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
 	explicitFields *big.Int `json:"-" url:"-"`
@@ -3176,6 +3440,13 @@ func (u *UnifiedMarket) GetTitle() string {
 		return ""
 	}
 	return u.Title
+}
+
+func (u *UnifiedMarket) GetCategory() MarketCategory {
+	if u == nil {
+		return ""
+	}
+	return u.Category
 }
 
 func (u *UnifiedMarket) GetExtraProperties() map[string]interface{} {
@@ -3211,6 +3482,13 @@ func (u *UnifiedMarket) SetProvider(provider UnifiedMarketProvider) {
 func (u *UnifiedMarket) SetTitle(title string) {
 	u.Title = title
 	u.require(unifiedMarketFieldTitle)
+}
+
+// SetCategory sets the Category field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (u *UnifiedMarket) SetCategory(category MarketCategory) {
+	u.Category = category
+	u.require(unifiedMarketFieldCategory)
 }
 
 func (u *UnifiedMarket) UnmarshalJSON(data []byte) error {

@@ -46,12 +46,44 @@
       },
       "response": {
         "status": 200,
-        "body": "{\n  \"data\": [\n    {\n      \"id\": \"kalshi:KXNBAGAME-26MAR06INDLAL-LAL\",\n      \"provider\": \"kalshi\",\n      \"title\": \"Indiana at Los Angeles L Winner?\"\n    },\n    {\n      \"id\": \"polymarket:0xe9e80abc123\",\n      \"provider\": \"polymarket\",\n      \"title\": \"Will the Lakers win?\"\n    }\n  ],\n  \"pagination\": {\n    \"limit\": 25,\n    \"total\": 412,\n    \"has_more\": true,\n    \"next_cursor\": \"eyJzIjoiYWJjMTIzZWYiLCJ0IjoiMjAyNi0wNC0wM1QyMzowMDowMFoiLCJpIjoia2Fsc2hpOktYTkJBR0FNRS0yNk1BUjA2SU5ETEFMLUxBTCJ9\"\n  }\n}",
+        "body": "{\n  \"data\": [\n    {\n      \"id\": \"kalshi:KXNBAGAME-26MAR06INDLAL-LAL\",\n      \"provider\": \"kalshi\",\n      \"title\": \"Indiana at Los Angeles L Winner?\",\n      \"category\": \"sports\"\n    },\n    {\n      \"id\": \"polymarket:0xe9e80abc123\",\n      \"provider\": \"polymarket\",\n      \"title\": \"Will the Lakers win?\",\n      \"category\": \"sports\"\n    }\n  ],\n  \"pagination\": {\n    \"limit\": 25,\n    \"total\": 412,\n    \"has_more\": true,\n    \"next_cursor\": \"eyJzIjoiYWJjMTIzZWYiLCJ0IjoiMjAyNi0wNC0wM1QyMzowMDowMFoiLCJpIjoia2Fsc2hpOktYTkJBR0FNRS0yNk1BUjA2SU5ETEFMLUxBTCJ9\"\n  }\n}",
         "headers": {
           "Content-Type": "application/json"
         }
       },
       "uuid": "a841c38a-05d2-461b-a010-ca8b5631f469",
+      "persistent": true,
+      "priority": 3,
+      "metadata": {
+        "mocklab": {
+          "created": {
+            "at": "2020-01-01T00:00:00.000Z",
+            "via": "SYSTEM"
+          }
+        }
+      },
+      "postServeActions": []
+    },
+    {
+      "id": "e4c73893-2600-4f12-babd-b0a7f5fdf5d6",
+      "name": "List categories - Category list",
+      "request": {
+        "urlPathTemplate": "/v1/categories",
+        "method": "GET",
+        "headers": {
+          "Authorization": {
+            "matches": "Bearer .+"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": "{\n  \"data\": [\n    {\n      \"id\": \"sports\",\n      \"name\": \"Sports\",\n      \"description\": \"Sports events and markets.\"\n    },\n    {\n      \"id\": \"politics\",\n      \"name\": \"Politics\",\n      \"description\": \"Elections, government, and geopolitics markets.\"\n    },\n    {\n      \"id\": \"crypto\",\n      \"name\": \"Crypto\",\n      \"description\": \"Cryptocurrency and digital asset markets.\"\n    }\n  ]\n}",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "uuid": "e4c73893-2600-4f12-babd-b0a7f5fdf5d6",
       "persistent": true,
       "priority": 3,
       "metadata": {
@@ -249,6 +281,6 @@
     }
   ],
   "meta": {
-    "total": 7
+    "total": 8
   }
 }

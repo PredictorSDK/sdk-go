@@ -125,6 +125,28 @@ func TestGetMarketsWithWireMock(
 	VerifyRequestCount(t, "TestGetMarketsWithWireMock", "GET", "/v1/markets", nil, 1)
 }
 
+func TestGetCategoriesWithWireMock(
+	t *testing.T,
+) {
+	WireMockBaseURL := os.Getenv("WIREMOCK_URL")
+	if WireMockBaseURL == "" {
+		WireMockBaseURL = "http://localhost:8080"
+	}
+	client := client.New(
+		option.WithBaseURL(WireMockBaseURL),
+		option.WithToken("test-token"),
+	)
+	_, invocationErr := client.GetCategories(
+		context.TODO(),
+		option.WithHTTPHeader(
+			http.Header{"X-Test-Id": []string{"TestGetCategoriesWithWireMock"}},
+		),
+	)
+
+	require.NoError(t, invocationErr, "Client method call should succeed")
+	VerifyRequestCount(t, "TestGetCategoriesWithWireMock", "GET", "/v1/categories", nil, 1)
+}
+
 func TestGetMarketWithWireMock(
 	t *testing.T,
 ) {

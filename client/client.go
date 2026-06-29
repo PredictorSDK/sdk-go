@@ -68,6 +68,21 @@ func (c *Client) GetMarkets(
 	return response.Body, nil
 }
 
+// Returns the canonical top-level categories that can be used to filter unified market discovery with `GET /v1/markets?category=...`. Categories are PredictorSDK-normalized buckets, not provider-native tags. Sports is one category among many; sport/league facets may be added later as deeper filters without changing this top-level list.
+func (c *Client) GetCategories(
+	ctx context.Context,
+	opts ...option.RequestOption,
+) (*predictorsdk.CategoriesResponse, error) {
+	response, err := c.WithRawResponse.GetCategories(
+		ctx,
+		opts...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return response.Body, nil
+}
+
 // Returns a single market across the six supported platforms (Kalshi, Polymarket, Predict, SX Bet, Hyperliquid, AlphaArcade). The `market_id` is either the composite form returned by `GET /v1/markets` (`{provider}:{native_id}`, e.g. `kalshi:KXNBA-26-SAS`) or the platform-native identifier. Composite IDs dispatch unambiguously by prefix. Native IDs are routed by format inference: Kalshi tickers match the all-caps-with-hyphens shape (`KX…-…`); SX Bet hashes match `0x` + 64 hex characters; numeric ids and kebab-case slugs are shared shape between Polymarket and Predict and probe Polymarket first, falling back to Predict on 404. Hyperliquid integer outcome ids collide with Polymarket/Predict numeric ids and are deliberately not inferred — route them via the composite form (`hyperliquid:<id>`) or `?platform=hyperliquid` (alias `hl`). AlphaArcade market ids are ULIDs (26-char Crockford base32, e.g. `01KQV5TQ9CE20WPEVJZX2ETNQD`); like Hyperliquid they are not inferred in v1 — route them via the composite form (`alpha-arcade:<ulid>`) or `?platform=alpha-arcade` (alias `aa`). Pass `?platform=` explicitly to skip the probe.
 //
 // Identity fields (id/provider/provider_id/title/status/ outcomes[].name) are strict-universal: every platform's single-market endpoint exposes them natively without a second fetch. close timestamps and parent event ids remain omitted (not nullable) — Predict's close time lives on the parent category and Polymarket's market record carries no event id.
