@@ -31,7 +31,7 @@ func (b *BadGatewayError) Unwrap() error {
 	return b.APIError
 }
 
-// Invalid query parameters (e.g. combining multiple filter types)
+// Invalid query parameters (e.g. combining filter types or providing more than 100 unique lookup identifiers)
 type BadRequestError struct {
 	*core.APIError
 	Body *ErrorResponse

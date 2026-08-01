@@ -234,10 +234,12 @@ var (
 	getSportsMatchingMarketsRequestFieldLimit                = big.NewInt(1 << 0)
 	getSportsMatchingMarketsRequestFieldCursor               = big.NewInt(1 << 1)
 	getSportsMatchingMarketsRequestFieldIncludeSettled       = big.NewInt(1 << 2)
-	getSportsMatchingMarketsRequestFieldKalshiEventTicker    = big.NewInt(1 << 3)
-	getSportsMatchingMarketsRequestFieldPolymarketMarketSlug = big.NewInt(1 << 4)
-	getSportsMatchingMarketsRequestFieldPredictMarketID      = big.NewInt(1 << 5)
-	getSportsMatchingMarketsRequestFieldSxbetMarketID        = big.NewInt(1 << 6)
+	getSportsMatchingMarketsRequestFieldIncludeSubmarkets    = big.NewInt(1 << 3)
+	getSportsMatchingMarketsRequestFieldEventID              = big.NewInt(1 << 4)
+	getSportsMatchingMarketsRequestFieldKalshiEventTicker    = big.NewInt(1 << 5)
+	getSportsMatchingMarketsRequestFieldPolymarketMarketSlug = big.NewInt(1 << 6)
+	getSportsMatchingMarketsRequestFieldPredictMarketID      = big.NewInt(1 << 7)
+	getSportsMatchingMarketsRequestFieldSxbetMarketID        = big.NewInt(1 << 8)
 )
 
 type GetSportsMatchingMarketsRequest struct {
@@ -247,13 +249,17 @@ type GetSportsMatchingMarketsRequest struct {
 	Cursor *string `json:"-" url:"cursor,omitempty"`
 	// When `true`, include settled/archived events alongside currently live matches. Defaults to `false`.
 	IncludeSettled *bool `json:"-" url:"include_settled,omitempty"`
-	// Kalshi event ticker(s) to find matching markets for (e.g. `KXNFLGAME-25AUG16ARIDEN`). Provide the parameter multiple times for multiple tickers. Only one filter type may be used per request. Lookup mode — pagination parameters are ignored.
+	// When `true`, add `canonical_events` with normalized event, submarket, line, segment, outcome, and exact source market/outcome identity. This is an identity mapping only; fetch current status, quotes, and liquidity from the referenced market resources. Defaults to `false` so the compact Dome-compatible response is unchanged.
+	IncludeSubmarkets *bool `json:"-" url:"include_submarkets,omitempty"`
+	// Canonical event key(s) to look up directly (for example, `mlb-tex-hou-2026-07-31`). Provide the parameter multiple times for multiple events, up to 100 unique keys. Only one filter type may be used per request. Lookup mode — pagination parameters are ignored.
+	EventID []*string `json:"-" url:"event_id,omitempty"`
+	// Kalshi event ticker(s) to find matching markets for (e.g. `KXNFLGAME-25AUG16ARIDEN`). Provide the parameter multiple times for multiple tickers, up to 100 unique values. Only one filter type may be used per request. Lookup mode — pagination parameters are ignored.
 	KalshiEventTicker []*string `json:"-" url:"kalshi_event_ticker,omitempty"`
-	// Polymarket market slug(s) to find matching markets for (e.g. `nfl-ari-den-2025-08-16`). Provide the parameter multiple times for multiple slugs. Only one filter type may be used per request. Lookup mode — pagination parameters are ignored.
+	// Polymarket market slug(s) to find matching markets for (e.g. `nfl-ari-den-2025-08-16`). Provide the parameter multiple times for multiple slugs, up to 100 unique values. Only one filter type may be used per request. Lookup mode — pagination parameters are ignored.
 	PolymarketMarketSlug []*string `json:"-" url:"polymarket_market_slug,omitempty"`
-	// Predict market ID(s) to find matching markets for (e.g. `110629`). Provide the parameter multiple times for multiple IDs. Only one filter type may be used per request. Lookup mode — pagination parameters are ignored.
+	// Predict market ID(s) to find matching markets for (e.g. `110629`). Provide the parameter multiple times for multiple IDs, up to 100 unique values. Only one filter type may be used per request. Lookup mode — pagination parameters are ignored.
 	PredictMarketID []*string `json:"-" url:"predict_market_id,omitempty"`
-	// SX Bet market ID(s) to find matching markets for (e.g. `0x4c000abdbf197ef32ecdf15561b1d636f1e5b02629f466678757fd83e2ec3599`). Provide the parameter multiple times for multiple IDs. Only one filter type may be used per request. Lookup mode — pagination parameters are ignored.
+	// SX Bet market ID(s) to find matching markets for (e.g. `0x4c000abdbf197ef32ecdf15561b1d636f1e5b02629f466678757fd83e2ec3599`). Provide the parameter multiple times for multiple IDs, up to 100 unique values. Only one filter type may be used per request. Lookup mode — pagination parameters are ignored.
 	SxbetMarketID []*string `json:"-" url:"sxbet_market_id,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
@@ -286,6 +292,20 @@ func (g *GetSportsMatchingMarketsRequest) SetCursor(cursor *string) {
 func (g *GetSportsMatchingMarketsRequest) SetIncludeSettled(includeSettled *bool) {
 	g.IncludeSettled = includeSettled
 	g.require(getSportsMatchingMarketsRequestFieldIncludeSettled)
+}
+
+// SetIncludeSubmarkets sets the IncludeSubmarkets field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (g *GetSportsMatchingMarketsRequest) SetIncludeSubmarkets(includeSubmarkets *bool) {
+	g.IncludeSubmarkets = includeSubmarkets
+	g.require(getSportsMatchingMarketsRequestFieldIncludeSubmarkets)
+}
+
+// SetEventID sets the EventID field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (g *GetSportsMatchingMarketsRequest) SetEventID(eventID []*string) {
+	g.EventID = eventID
+	g.require(getSportsMatchingMarketsRequestFieldEventID)
 }
 
 // SetKalshiEventTicker sets the KalshiEventTicker field and marks it as non-optional;
@@ -370,6 +390,1185 @@ func (l *ListPolymarketWalletPositionsRequest) SetLimit(limit *int) {
 func (l *ListPolymarketWalletPositionsRequest) SetCursor(cursor *string) {
 	l.Cursor = cursor
 	l.require(listPolymarketWalletPositionsRequestFieldCursor)
+}
+
+var (
+	canonicalSportsEventFieldEventID      = big.NewInt(1 << 0)
+	canonicalSportsEventFieldSport        = big.NewInt(1 << 1)
+	canonicalSportsEventFieldLeague       = big.NewInt(1 << 2)
+	canonicalSportsEventFieldTitle        = big.NewInt(1 << 3)
+	canonicalSportsEventFieldParticipants = big.NewInt(1 << 4)
+	canonicalSportsEventFieldSubmarkets   = big.NewInt(1 << 5)
+)
+
+type CanonicalSportsEvent struct {
+	// Stable canonical event key.
+	EventID      string                        `json:"event_id" url:"event_id"`
+	Sport        *string                       `json:"sport,omitempty" url:"sport,omitempty"`
+	League       *string                       `json:"league,omitempty" url:"league,omitempty"`
+	Title        string                        `json:"title" url:"title"`
+	Participants []*CanonicalSportsParticipant `json:"participants,omitempty" url:"participants,omitempty"`
+	Submarkets   []*CanonicalSportsSubmarket   `json:"submarkets" url:"submarkets"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (c *CanonicalSportsEvent) GetEventID() string {
+	if c == nil {
+		return ""
+	}
+	return c.EventID
+}
+
+func (c *CanonicalSportsEvent) GetSport() *string {
+	if c == nil {
+		return nil
+	}
+	return c.Sport
+}
+
+func (c *CanonicalSportsEvent) GetLeague() *string {
+	if c == nil {
+		return nil
+	}
+	return c.League
+}
+
+func (c *CanonicalSportsEvent) GetTitle() string {
+	if c == nil {
+		return ""
+	}
+	return c.Title
+}
+
+func (c *CanonicalSportsEvent) GetParticipants() []*CanonicalSportsParticipant {
+	if c == nil {
+		return nil
+	}
+	return c.Participants
+}
+
+func (c *CanonicalSportsEvent) GetSubmarkets() []*CanonicalSportsSubmarket {
+	if c == nil {
+		return nil
+	}
+	return c.Submarkets
+}
+
+func (c *CanonicalSportsEvent) GetExtraProperties() map[string]interface{} {
+	if c == nil {
+		return nil
+	}
+	return c.extraProperties
+}
+
+func (c *CanonicalSportsEvent) require(field *big.Int) {
+	if c.explicitFields == nil {
+		c.explicitFields = big.NewInt(0)
+	}
+	c.explicitFields.Or(c.explicitFields, field)
+}
+
+// SetEventID sets the EventID field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsEvent) SetEventID(eventID string) {
+	c.EventID = eventID
+	c.require(canonicalSportsEventFieldEventID)
+}
+
+// SetSport sets the Sport field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsEvent) SetSport(sport *string) {
+	c.Sport = sport
+	c.require(canonicalSportsEventFieldSport)
+}
+
+// SetLeague sets the League field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsEvent) SetLeague(league *string) {
+	c.League = league
+	c.require(canonicalSportsEventFieldLeague)
+}
+
+// SetTitle sets the Title field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsEvent) SetTitle(title string) {
+	c.Title = title
+	c.require(canonicalSportsEventFieldTitle)
+}
+
+// SetParticipants sets the Participants field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsEvent) SetParticipants(participants []*CanonicalSportsParticipant) {
+	c.Participants = participants
+	c.require(canonicalSportsEventFieldParticipants)
+}
+
+// SetSubmarkets sets the Submarkets field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsEvent) SetSubmarkets(submarkets []*CanonicalSportsSubmarket) {
+	c.Submarkets = submarkets
+	c.require(canonicalSportsEventFieldSubmarkets)
+}
+
+func (c *CanonicalSportsEvent) UnmarshalJSON(data []byte) error {
+	type unmarshaler CanonicalSportsEvent
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*c = CanonicalSportsEvent(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *c)
+	if err != nil {
+		return err
+	}
+	c.extraProperties = extraProperties
+	c.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (c *CanonicalSportsEvent) MarshalJSON() ([]byte, error) {
+	type embed CanonicalSportsEvent
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*c),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, c.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (c *CanonicalSportsEvent) String() string {
+	if c == nil {
+		return "<nil>"
+	}
+	if len(c.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(c.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(c); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", c)
+}
+
+var (
+	canonicalSportsOutcomeFieldKey   = big.NewInt(1 << 0)
+	canonicalSportsOutcomeFieldLabel = big.NewInt(1 << 1)
+	canonicalSportsOutcomeFieldType  = big.NewInt(1 << 2)
+	canonicalSportsOutcomeFieldSide  = big.NewInt(1 << 3)
+)
+
+type CanonicalSportsOutcome struct {
+	Key   string  `json:"key" url:"key"`
+	Label string  `json:"label" url:"label"`
+	Type  *string `json:"type,omitempty" url:"type,omitempty"`
+	Side  *string `json:"side,omitempty" url:"side,omitempty"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (c *CanonicalSportsOutcome) GetKey() string {
+	if c == nil {
+		return ""
+	}
+	return c.Key
+}
+
+func (c *CanonicalSportsOutcome) GetLabel() string {
+	if c == nil {
+		return ""
+	}
+	return c.Label
+}
+
+func (c *CanonicalSportsOutcome) GetType() *string {
+	if c == nil {
+		return nil
+	}
+	return c.Type
+}
+
+func (c *CanonicalSportsOutcome) GetSide() *string {
+	if c == nil {
+		return nil
+	}
+	return c.Side
+}
+
+func (c *CanonicalSportsOutcome) GetExtraProperties() map[string]interface{} {
+	if c == nil {
+		return nil
+	}
+	return c.extraProperties
+}
+
+func (c *CanonicalSportsOutcome) require(field *big.Int) {
+	if c.explicitFields == nil {
+		c.explicitFields = big.NewInt(0)
+	}
+	c.explicitFields.Or(c.explicitFields, field)
+}
+
+// SetKey sets the Key field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsOutcome) SetKey(key string) {
+	c.Key = key
+	c.require(canonicalSportsOutcomeFieldKey)
+}
+
+// SetLabel sets the Label field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsOutcome) SetLabel(label string) {
+	c.Label = label
+	c.require(canonicalSportsOutcomeFieldLabel)
+}
+
+// SetType sets the Type field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsOutcome) SetType(type_ *string) {
+	c.Type = type_
+	c.require(canonicalSportsOutcomeFieldType)
+}
+
+// SetSide sets the Side field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsOutcome) SetSide(side *string) {
+	c.Side = side
+	c.require(canonicalSportsOutcomeFieldSide)
+}
+
+func (c *CanonicalSportsOutcome) UnmarshalJSON(data []byte) error {
+	type unmarshaler CanonicalSportsOutcome
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*c = CanonicalSportsOutcome(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *c)
+	if err != nil {
+		return err
+	}
+	c.extraProperties = extraProperties
+	c.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (c *CanonicalSportsOutcome) MarshalJSON() ([]byte, error) {
+	type embed CanonicalSportsOutcome
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*c),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, c.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (c *CanonicalSportsOutcome) String() string {
+	if c == nil {
+		return "<nil>"
+	}
+	if len(c.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(c.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(c); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", c)
+}
+
+var (
+	canonicalSportsParticipantFieldKey  = big.NewInt(1 << 0)
+	canonicalSportsParticipantFieldName = big.NewInt(1 << 1)
+	canonicalSportsParticipantFieldRole = big.NewInt(1 << 2)
+)
+
+type CanonicalSportsParticipant struct {
+	Key  string  `json:"key" url:"key"`
+	Name *string `json:"name,omitempty" url:"name,omitempty"`
+	Role *string `json:"role,omitempty" url:"role,omitempty"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (c *CanonicalSportsParticipant) GetKey() string {
+	if c == nil {
+		return ""
+	}
+	return c.Key
+}
+
+func (c *CanonicalSportsParticipant) GetName() *string {
+	if c == nil {
+		return nil
+	}
+	return c.Name
+}
+
+func (c *CanonicalSportsParticipant) GetRole() *string {
+	if c == nil {
+		return nil
+	}
+	return c.Role
+}
+
+func (c *CanonicalSportsParticipant) GetExtraProperties() map[string]interface{} {
+	if c == nil {
+		return nil
+	}
+	return c.extraProperties
+}
+
+func (c *CanonicalSportsParticipant) require(field *big.Int) {
+	if c.explicitFields == nil {
+		c.explicitFields = big.NewInt(0)
+	}
+	c.explicitFields.Or(c.explicitFields, field)
+}
+
+// SetKey sets the Key field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsParticipant) SetKey(key string) {
+	c.Key = key
+	c.require(canonicalSportsParticipantFieldKey)
+}
+
+// SetName sets the Name field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsParticipant) SetName(name *string) {
+	c.Name = name
+	c.require(canonicalSportsParticipantFieldName)
+}
+
+// SetRole sets the Role field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsParticipant) SetRole(role *string) {
+	c.Role = role
+	c.require(canonicalSportsParticipantFieldRole)
+}
+
+func (c *CanonicalSportsParticipant) UnmarshalJSON(data []byte) error {
+	type unmarshaler CanonicalSportsParticipant
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*c = CanonicalSportsParticipant(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *c)
+	if err != nil {
+		return err
+	}
+	c.extraProperties = extraProperties
+	c.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (c *CanonicalSportsParticipant) MarshalJSON() ([]byte, error) {
+	type embed CanonicalSportsParticipant
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*c),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, c.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (c *CanonicalSportsParticipant) String() string {
+	if c == nil {
+		return "<nil>"
+	}
+	if len(c.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(c.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(c); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", c)
+}
+
+var (
+	canonicalSportsRulesFieldSettlement = big.NewInt(1 << 0)
+)
+
+type CanonicalSportsRules struct {
+	Settlement *string `json:"settlement,omitempty" url:"settlement,omitempty"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (c *CanonicalSportsRules) GetSettlement() *string {
+	if c == nil {
+		return nil
+	}
+	return c.Settlement
+}
+
+func (c *CanonicalSportsRules) GetExtraProperties() map[string]interface{} {
+	if c == nil {
+		return nil
+	}
+	return c.extraProperties
+}
+
+func (c *CanonicalSportsRules) require(field *big.Int) {
+	if c.explicitFields == nil {
+		c.explicitFields = big.NewInt(0)
+	}
+	c.explicitFields.Or(c.explicitFields, field)
+}
+
+// SetSettlement sets the Settlement field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsRules) SetSettlement(settlement *string) {
+	c.Settlement = settlement
+	c.require(canonicalSportsRulesFieldSettlement)
+}
+
+func (c *CanonicalSportsRules) UnmarshalJSON(data []byte) error {
+	type unmarshaler CanonicalSportsRules
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*c = CanonicalSportsRules(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *c)
+	if err != nil {
+		return err
+	}
+	c.extraProperties = extraProperties
+	c.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (c *CanonicalSportsRules) MarshalJSON() ([]byte, error) {
+	type embed CanonicalSportsRules
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*c),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, c.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (c *CanonicalSportsRules) String() string {
+	if c == nil {
+		return "<nil>"
+	}
+	if len(c.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(c.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(c); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", c)
+}
+
+var (
+	canonicalSportsSourceMarketFieldProvider   = big.NewInt(1 << 0)
+	canonicalSportsSourceMarketFieldMarketID   = big.NewInt(1 << 1)
+	canonicalSportsSourceMarketFieldMarketName = big.NewInt(1 << 2)
+	canonicalSportsSourceMarketFieldMarketSlug = big.NewInt(1 << 3)
+	canonicalSportsSourceMarketFieldOutcomes   = big.NewInt(1 << 4)
+)
+
+type CanonicalSportsSourceMarket struct {
+	Provider CanonicalSportsSourceMarketProvider `json:"provider" url:"provider"`
+	// Exact provider-native market identifier.
+	MarketID   string                          `json:"market_id" url:"market_id"`
+	MarketName *string                         `json:"market_name,omitempty" url:"market_name,omitempty"`
+	MarketSlug *string                         `json:"market_slug,omitempty" url:"market_slug,omitempty"`
+	Outcomes   []*CanonicalSportsSourceOutcome `json:"outcomes" url:"outcomes"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (c *CanonicalSportsSourceMarket) GetProvider() CanonicalSportsSourceMarketProvider {
+	if c == nil {
+		return ""
+	}
+	return c.Provider
+}
+
+func (c *CanonicalSportsSourceMarket) GetMarketID() string {
+	if c == nil {
+		return ""
+	}
+	return c.MarketID
+}
+
+func (c *CanonicalSportsSourceMarket) GetMarketName() *string {
+	if c == nil {
+		return nil
+	}
+	return c.MarketName
+}
+
+func (c *CanonicalSportsSourceMarket) GetMarketSlug() *string {
+	if c == nil {
+		return nil
+	}
+	return c.MarketSlug
+}
+
+func (c *CanonicalSportsSourceMarket) GetOutcomes() []*CanonicalSportsSourceOutcome {
+	if c == nil {
+		return nil
+	}
+	return c.Outcomes
+}
+
+func (c *CanonicalSportsSourceMarket) GetExtraProperties() map[string]interface{} {
+	if c == nil {
+		return nil
+	}
+	return c.extraProperties
+}
+
+func (c *CanonicalSportsSourceMarket) require(field *big.Int) {
+	if c.explicitFields == nil {
+		c.explicitFields = big.NewInt(0)
+	}
+	c.explicitFields.Or(c.explicitFields, field)
+}
+
+// SetProvider sets the Provider field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsSourceMarket) SetProvider(provider CanonicalSportsSourceMarketProvider) {
+	c.Provider = provider
+	c.require(canonicalSportsSourceMarketFieldProvider)
+}
+
+// SetMarketID sets the MarketID field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsSourceMarket) SetMarketID(marketID string) {
+	c.MarketID = marketID
+	c.require(canonicalSportsSourceMarketFieldMarketID)
+}
+
+// SetMarketName sets the MarketName field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsSourceMarket) SetMarketName(marketName *string) {
+	c.MarketName = marketName
+	c.require(canonicalSportsSourceMarketFieldMarketName)
+}
+
+// SetMarketSlug sets the MarketSlug field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsSourceMarket) SetMarketSlug(marketSlug *string) {
+	c.MarketSlug = marketSlug
+	c.require(canonicalSportsSourceMarketFieldMarketSlug)
+}
+
+// SetOutcomes sets the Outcomes field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsSourceMarket) SetOutcomes(outcomes []*CanonicalSportsSourceOutcome) {
+	c.Outcomes = outcomes
+	c.require(canonicalSportsSourceMarketFieldOutcomes)
+}
+
+func (c *CanonicalSportsSourceMarket) UnmarshalJSON(data []byte) error {
+	type unmarshaler CanonicalSportsSourceMarket
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*c = CanonicalSportsSourceMarket(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *c)
+	if err != nil {
+		return err
+	}
+	c.extraProperties = extraProperties
+	c.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (c *CanonicalSportsSourceMarket) MarshalJSON() ([]byte, error) {
+	type embed CanonicalSportsSourceMarket
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*c),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, c.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (c *CanonicalSportsSourceMarket) String() string {
+	if c == nil {
+		return "<nil>"
+	}
+	if len(c.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(c.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(c); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", c)
+}
+
+type CanonicalSportsSourceMarketProvider string
+
+const (
+	CanonicalSportsSourceMarketProviderKalshi      CanonicalSportsSourceMarketProvider = "kalshi"
+	CanonicalSportsSourceMarketProviderPolymarket  CanonicalSportsSourceMarketProvider = "polymarket"
+	CanonicalSportsSourceMarketProviderPredict     CanonicalSportsSourceMarketProvider = "predict"
+	CanonicalSportsSourceMarketProviderSxbet       CanonicalSportsSourceMarketProvider = "sxbet"
+	CanonicalSportsSourceMarketProviderAlphaArcade CanonicalSportsSourceMarketProvider = "alpha-arcade"
+)
+
+func NewCanonicalSportsSourceMarketProviderFromString(s string) (CanonicalSportsSourceMarketProvider, error) {
+	switch s {
+	case "kalshi":
+		return CanonicalSportsSourceMarketProviderKalshi, nil
+	case "polymarket":
+		return CanonicalSportsSourceMarketProviderPolymarket, nil
+	case "predict":
+		return CanonicalSportsSourceMarketProviderPredict, nil
+	case "sxbet":
+		return CanonicalSportsSourceMarketProviderSxbet, nil
+	case "alpha-arcade":
+		return CanonicalSportsSourceMarketProviderAlphaArcade, nil
+	}
+	var t CanonicalSportsSourceMarketProvider
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (c CanonicalSportsSourceMarketProvider) Ptr() *CanonicalSportsSourceMarketProvider {
+	return &c
+}
+
+var (
+	canonicalSportsSourceOutcomeFieldCanonicalOutcomeKey = big.NewInt(1 << 0)
+	canonicalSportsSourceOutcomeFieldLabel               = big.NewInt(1 << 1)
+	canonicalSportsSourceOutcomeFieldOutcomeID           = big.NewInt(1 << 2)
+	canonicalSportsSourceOutcomeFieldSide                = big.NewInt(1 << 3)
+)
+
+type CanonicalSportsSourceOutcome struct {
+	// Canonical outcome this source-native selection represents.
+	CanonicalOutcomeKey string  `json:"canonical_outcome_key" url:"canonical_outcome_key"`
+	Label               *string `json:"label,omitempty" url:"label,omitempty"`
+	// Exact provider-native outcome/token identifier when available. SX Bet exposes one market hash and two named positions rather than separate outcome tokens, so its source-local selection reference is `<market_hash>:1` or `<market_hash>:2`. This field is never a universal cross-provider outcome ID.
+	OutcomeID *string `json:"outcome_id,omitempty" url:"outcome_id,omitempty"`
+	// Optional source-native side such as `yes` or `no`.
+	Side *string `json:"side,omitempty" url:"side,omitempty"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (c *CanonicalSportsSourceOutcome) GetCanonicalOutcomeKey() string {
+	if c == nil {
+		return ""
+	}
+	return c.CanonicalOutcomeKey
+}
+
+func (c *CanonicalSportsSourceOutcome) GetLabel() *string {
+	if c == nil {
+		return nil
+	}
+	return c.Label
+}
+
+func (c *CanonicalSportsSourceOutcome) GetOutcomeID() *string {
+	if c == nil {
+		return nil
+	}
+	return c.OutcomeID
+}
+
+func (c *CanonicalSportsSourceOutcome) GetSide() *string {
+	if c == nil {
+		return nil
+	}
+	return c.Side
+}
+
+func (c *CanonicalSportsSourceOutcome) GetExtraProperties() map[string]interface{} {
+	if c == nil {
+		return nil
+	}
+	return c.extraProperties
+}
+
+func (c *CanonicalSportsSourceOutcome) require(field *big.Int) {
+	if c.explicitFields == nil {
+		c.explicitFields = big.NewInt(0)
+	}
+	c.explicitFields.Or(c.explicitFields, field)
+}
+
+// SetCanonicalOutcomeKey sets the CanonicalOutcomeKey field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsSourceOutcome) SetCanonicalOutcomeKey(canonicalOutcomeKey string) {
+	c.CanonicalOutcomeKey = canonicalOutcomeKey
+	c.require(canonicalSportsSourceOutcomeFieldCanonicalOutcomeKey)
+}
+
+// SetLabel sets the Label field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsSourceOutcome) SetLabel(label *string) {
+	c.Label = label
+	c.require(canonicalSportsSourceOutcomeFieldLabel)
+}
+
+// SetOutcomeID sets the OutcomeID field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsSourceOutcome) SetOutcomeID(outcomeID *string) {
+	c.OutcomeID = outcomeID
+	c.require(canonicalSportsSourceOutcomeFieldOutcomeID)
+}
+
+// SetSide sets the Side field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsSourceOutcome) SetSide(side *string) {
+	c.Side = side
+	c.require(canonicalSportsSourceOutcomeFieldSide)
+}
+
+func (c *CanonicalSportsSourceOutcome) UnmarshalJSON(data []byte) error {
+	type unmarshaler CanonicalSportsSourceOutcome
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*c = CanonicalSportsSourceOutcome(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *c)
+	if err != nil {
+		return err
+	}
+	c.extraProperties = extraProperties
+	c.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (c *CanonicalSportsSourceOutcome) MarshalJSON() ([]byte, error) {
+	type embed CanonicalSportsSourceOutcome
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*c),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, c.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (c *CanonicalSportsSourceOutcome) String() string {
+	if c == nil {
+		return "<nil>"
+	}
+	if len(c.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(c.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(c); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", c)
+}
+
+var (
+	canonicalSportsSubjectFieldType = big.NewInt(1 << 0)
+	canonicalSportsSubjectFieldKey  = big.NewInt(1 << 1)
+	canonicalSportsSubjectFieldName = big.NewInt(1 << 2)
+	canonicalSportsSubjectFieldTeam = big.NewInt(1 << 3)
+)
+
+type CanonicalSportsSubject struct {
+	// Canonical subject kind, such as `participant` or `player`.
+	Type string `json:"type" url:"type"`
+	// Stable subject key within the canonical sports namespace.
+	Key string `json:"key" url:"key"`
+	// Human-readable subject name.
+	Name *string `json:"name,omitempty" url:"name,omitempty"`
+	// Canonical team key when the subject is a player.
+	Team *string `json:"team,omitempty" url:"team,omitempty"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (c *CanonicalSportsSubject) GetType() string {
+	if c == nil {
+		return ""
+	}
+	return c.Type
+}
+
+func (c *CanonicalSportsSubject) GetKey() string {
+	if c == nil {
+		return ""
+	}
+	return c.Key
+}
+
+func (c *CanonicalSportsSubject) GetName() *string {
+	if c == nil {
+		return nil
+	}
+	return c.Name
+}
+
+func (c *CanonicalSportsSubject) GetTeam() *string {
+	if c == nil {
+		return nil
+	}
+	return c.Team
+}
+
+func (c *CanonicalSportsSubject) GetExtraProperties() map[string]interface{} {
+	if c == nil {
+		return nil
+	}
+	return c.extraProperties
+}
+
+func (c *CanonicalSportsSubject) require(field *big.Int) {
+	if c.explicitFields == nil {
+		c.explicitFields = big.NewInt(0)
+	}
+	c.explicitFields.Or(c.explicitFields, field)
+}
+
+// SetType sets the Type field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsSubject) SetType(type_ string) {
+	c.Type = type_
+	c.require(canonicalSportsSubjectFieldType)
+}
+
+// SetKey sets the Key field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsSubject) SetKey(key string) {
+	c.Key = key
+	c.require(canonicalSportsSubjectFieldKey)
+}
+
+// SetName sets the Name field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsSubject) SetName(name *string) {
+	c.Name = name
+	c.require(canonicalSportsSubjectFieldName)
+}
+
+// SetTeam sets the Team field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsSubject) SetTeam(team *string) {
+	c.Team = team
+	c.require(canonicalSportsSubjectFieldTeam)
+}
+
+func (c *CanonicalSportsSubject) UnmarshalJSON(data []byte) error {
+	type unmarshaler CanonicalSportsSubject
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*c = CanonicalSportsSubject(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *c)
+	if err != nil {
+		return err
+	}
+	c.extraProperties = extraProperties
+	c.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (c *CanonicalSportsSubject) MarshalJSON() ([]byte, error) {
+	type embed CanonicalSportsSubject
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*c),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, c.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (c *CanonicalSportsSubject) String() string {
+	if c == nil {
+		return "<nil>"
+	}
+	if len(c.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(c.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(c); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", c)
+}
+
+var (
+	canonicalSportsSubmarketFieldKey           = big.NewInt(1 << 0)
+	canonicalSportsSubmarketFieldMarketType    = big.NewInt(1 << 1)
+	canonicalSportsSubmarketFieldSegment       = big.NewInt(1 << 2)
+	canonicalSportsSubmarketFieldDisplayName   = big.NewInt(1 << 3)
+	canonicalSportsSubmarketFieldMetric        = big.NewInt(1 << 4)
+	canonicalSportsSubmarketFieldLine          = big.NewInt(1 << 5)
+	canonicalSportsSubmarketFieldSubject       = big.NewInt(1 << 6)
+	canonicalSportsSubmarketFieldRules         = big.NewInt(1 << 7)
+	canonicalSportsSubmarketFieldOutcomes      = big.NewInt(1 << 8)
+	canonicalSportsSubmarketFieldSourceMarkets = big.NewInt(1 << 9)
+)
+
+type CanonicalSportsSubmarket struct {
+	// Stable canonical submarket key within the event.
+	Key         string  `json:"key" url:"key"`
+	MarketType  string  `json:"market_type" url:"market_type"`
+	Segment     string  `json:"segment" url:"segment"`
+	DisplayName *string `json:"display_name,omitempty" url:"display_name,omitempty"`
+	Metric      *string `json:"metric,omitempty" url:"metric,omitempty"`
+	// Unsigned threshold for totals and player props; signed handicap for spreads. Omitted for moneyline markets.
+	Line *float64 `json:"line,omitempty" url:"line,omitempty"`
+	// Participant or player whose line is represented. Present for subject-owned markets such as spreads and player props; omitted for event-owned moneylines and totals.
+	Subject       *CanonicalSportsSubject        `json:"subject,omitempty" url:"subject,omitempty"`
+	Rules         *CanonicalSportsRules          `json:"rules,omitempty" url:"rules,omitempty"`
+	Outcomes      []*CanonicalSportsOutcome      `json:"outcomes" url:"outcomes"`
+	SourceMarkets []*CanonicalSportsSourceMarket `json:"source_markets" url:"source_markets"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (c *CanonicalSportsSubmarket) GetKey() string {
+	if c == nil {
+		return ""
+	}
+	return c.Key
+}
+
+func (c *CanonicalSportsSubmarket) GetMarketType() string {
+	if c == nil {
+		return ""
+	}
+	return c.MarketType
+}
+
+func (c *CanonicalSportsSubmarket) GetSegment() string {
+	if c == nil {
+		return ""
+	}
+	return c.Segment
+}
+
+func (c *CanonicalSportsSubmarket) GetDisplayName() *string {
+	if c == nil {
+		return nil
+	}
+	return c.DisplayName
+}
+
+func (c *CanonicalSportsSubmarket) GetMetric() *string {
+	if c == nil {
+		return nil
+	}
+	return c.Metric
+}
+
+func (c *CanonicalSportsSubmarket) GetLine() *float64 {
+	if c == nil {
+		return nil
+	}
+	return c.Line
+}
+
+func (c *CanonicalSportsSubmarket) GetSubject() *CanonicalSportsSubject {
+	if c == nil {
+		return nil
+	}
+	return c.Subject
+}
+
+func (c *CanonicalSportsSubmarket) GetRules() *CanonicalSportsRules {
+	if c == nil {
+		return nil
+	}
+	return c.Rules
+}
+
+func (c *CanonicalSportsSubmarket) GetOutcomes() []*CanonicalSportsOutcome {
+	if c == nil {
+		return nil
+	}
+	return c.Outcomes
+}
+
+func (c *CanonicalSportsSubmarket) GetSourceMarkets() []*CanonicalSportsSourceMarket {
+	if c == nil {
+		return nil
+	}
+	return c.SourceMarkets
+}
+
+func (c *CanonicalSportsSubmarket) GetExtraProperties() map[string]interface{} {
+	if c == nil {
+		return nil
+	}
+	return c.extraProperties
+}
+
+func (c *CanonicalSportsSubmarket) require(field *big.Int) {
+	if c.explicitFields == nil {
+		c.explicitFields = big.NewInt(0)
+	}
+	c.explicitFields.Or(c.explicitFields, field)
+}
+
+// SetKey sets the Key field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsSubmarket) SetKey(key string) {
+	c.Key = key
+	c.require(canonicalSportsSubmarketFieldKey)
+}
+
+// SetMarketType sets the MarketType field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsSubmarket) SetMarketType(marketType string) {
+	c.MarketType = marketType
+	c.require(canonicalSportsSubmarketFieldMarketType)
+}
+
+// SetSegment sets the Segment field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsSubmarket) SetSegment(segment string) {
+	c.Segment = segment
+	c.require(canonicalSportsSubmarketFieldSegment)
+}
+
+// SetDisplayName sets the DisplayName field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsSubmarket) SetDisplayName(displayName *string) {
+	c.DisplayName = displayName
+	c.require(canonicalSportsSubmarketFieldDisplayName)
+}
+
+// SetMetric sets the Metric field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsSubmarket) SetMetric(metric *string) {
+	c.Metric = metric
+	c.require(canonicalSportsSubmarketFieldMetric)
+}
+
+// SetLine sets the Line field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsSubmarket) SetLine(line *float64) {
+	c.Line = line
+	c.require(canonicalSportsSubmarketFieldLine)
+}
+
+// SetSubject sets the Subject field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsSubmarket) SetSubject(subject *CanonicalSportsSubject) {
+	c.Subject = subject
+	c.require(canonicalSportsSubmarketFieldSubject)
+}
+
+// SetRules sets the Rules field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsSubmarket) SetRules(rules *CanonicalSportsRules) {
+	c.Rules = rules
+	c.require(canonicalSportsSubmarketFieldRules)
+}
+
+// SetOutcomes sets the Outcomes field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsSubmarket) SetOutcomes(outcomes []*CanonicalSportsOutcome) {
+	c.Outcomes = outcomes
+	c.require(canonicalSportsSubmarketFieldOutcomes)
+}
+
+// SetSourceMarkets sets the SourceMarkets field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsSubmarket) SetSourceMarkets(sourceMarkets []*CanonicalSportsSourceMarket) {
+	c.SourceMarkets = sourceMarkets
+	c.require(canonicalSportsSubmarketFieldSourceMarkets)
+}
+
+func (c *CanonicalSportsSubmarket) UnmarshalJSON(data []byte) error {
+	type unmarshaler CanonicalSportsSubmarket
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*c = CanonicalSportsSubmarket(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *c)
+	if err != nil {
+		return err
+	}
+	c.extraProperties = extraProperties
+	c.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (c *CanonicalSportsSubmarket) MarshalJSON() ([]byte, error) {
+	type embed CanonicalSportsSubmarket
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*c),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, c.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (c *CanonicalSportsSubmarket) String() string {
+	if c == nil {
+		return "<nil>"
+	}
+	if len(c.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(c.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(c); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", c)
 }
 
 var (
@@ -3297,13 +4496,16 @@ func (p *PolymarketWalletResponse) String() string {
 }
 
 var (
-	sportsMatchingResponseFieldMarkets    = big.NewInt(1 << 0)
-	sportsMatchingResponseFieldPagination = big.NewInt(1 << 1)
+	sportsMatchingResponseFieldMarkets         = big.NewInt(1 << 0)
+	sportsMatchingResponseFieldCanonicalEvents = big.NewInt(1 << 1)
+	sportsMatchingResponseFieldPagination      = big.NewInt(1 << 2)
 )
 
 type SportsMatchingResponse struct {
 	// Key-value pairs where each key is the queried identifier (Kalshi event ticker, Polymarket slug, or canonical event ID when no filter is provided) and each value is an array of platform market objects.
 	Markets map[string][]*PlatformMarket `json:"markets" url:"markets"`
+	// Opt-in canonical identity map, present only when `include_submarkets=true`. Keys match the `markets` response keys; each value contains the canonical event ID and every normalized submarket/source mapping for that event.
+	CanonicalEvents map[string]*CanonicalSportsEvent `json:"canonical_events,omitempty" url:"canonical_events,omitempty"`
 	// Pagination metadata for the current page. Present in list mode (no platform-ID filter). Absent in lookup mode since the response is bounded by the filter.
 	Pagination *PaginationBlock `json:"pagination,omitempty" url:"pagination,omitempty"`
 
@@ -3319,6 +4521,13 @@ func (s *SportsMatchingResponse) GetMarkets() map[string][]*PlatformMarket {
 		return nil
 	}
 	return s.Markets
+}
+
+func (s *SportsMatchingResponse) GetCanonicalEvents() map[string]*CanonicalSportsEvent {
+	if s == nil {
+		return nil
+	}
+	return s.CanonicalEvents
 }
 
 func (s *SportsMatchingResponse) GetPagination() *PaginationBlock {
@@ -3347,6 +4556,13 @@ func (s *SportsMatchingResponse) require(field *big.Int) {
 func (s *SportsMatchingResponse) SetMarkets(markets map[string][]*PlatformMarket) {
 	s.Markets = markets
 	s.require(sportsMatchingResponseFieldMarkets)
+}
+
+// SetCanonicalEvents sets the CanonicalEvents field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (s *SportsMatchingResponse) SetCanonicalEvents(canonicalEvents map[string]*CanonicalSportsEvent) {
+	s.CanonicalEvents = canonicalEvents
+	s.require(sportsMatchingResponseFieldCanonicalEvents)
 }
 
 // SetPagination sets the Pagination field and marks it as non-optional;
