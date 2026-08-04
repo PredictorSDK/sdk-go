@@ -1,6 +1,33 @@
 {
   "mappings": [
     {
+      "id": "71433ab3-51a8-49ed-8ccc-5586be77afbc",
+      "name": "List public API plans - Public plan catalog",
+      "request": {
+        "urlPathTemplate": "/v1/plans",
+        "method": "GET"
+      },
+      "response": {
+        "status": 200,
+        "body": "{\n  \"data\": [\n    {\n      \"key\": \"free\",\n      \"name\": \"Free\",\n      \"billing_tier\": \"free\",\n      \"trial_days\": 0,\n      \"tagline\": \"Sports matching, crypto prices, and Polymarket wallet data while you build.\",\n      \"monthly_price_cents\": 0,\n      \"included_requests_per_month\": 1000,\n      \"overage_cents_per_1k\": 0,\n      \"rate_limit_per_min\": 10,\n      \"max_keys\": 1,\n      \"features\": [\n        \"Sports matching endpoint (lookup + list modes, opt-in canonical submarkets)\",\n        \"Unified markets catalog and category discovery (/v1/markets, /v1/categories)\"\n      ],\n      \"cta_label\": \"Start free\",\n      \"highlighted\": false,\n      \"contact_sales\": false\n    },\n    {\n      \"key\": \"pro\",\n      \"name\": \"Pro\",\n      \"billing_tier\": \"pro\",\n      \"trial_days\": 0,\n      \"tagline\": \"Higher-throughput research and heavier production workloads.\",\n      \"monthly_price_cents\": 7900,\n      \"included_requests_per_month\": 500000,\n      \"overage_cents_per_1k\": 12,\n      \"rate_limit_per_min\": 300,\n      \"max_keys\": 10,\n      \"features\": [\n        \"Everything in Starter\",\n        \"500K monthly requests and 300 req/min\"\n      ],\n      \"cta_label\": \"Subscribe\",\n      \"highlighted\": true,\n      \"contact_sales\": false\n    }\n  ]\n}",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "uuid": "71433ab3-51a8-49ed-8ccc-5586be77afbc",
+      "persistent": true,
+      "priority": 3,
+      "metadata": {
+        "mocklab": {
+          "created": {
+            "at": "2020-01-01T00:00:00.000Z",
+            "via": "SYSTEM"
+          }
+        }
+      },
+      "postServeActions": []
+    },
+    {
       "id": "cdb08fbd-1ea1-45ec-ab40-24060619797f",
       "name": "Get sports matching markets - List mode with pagination",
       "request": {
@@ -281,6 +308,6 @@
     }
   ],
   "meta": {
-    "total": 8
+    "total": 9
   }
 }

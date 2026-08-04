@@ -174,8 +174,11 @@ func (r *Retrier) retryDelay(response *http.Response, retryAttempt uint) (time.D
 	// Then check for industry-standard X-RateLimit-Reset header, applying positive jitter
 	if rateLimitReset := response.Header.Get("X-RateLimit-Reset"); rateLimitReset != "" {
 		if resetTimestamp, err := strconv.ParseInt(rateLimitReset, 10, 64); err == nil {
-			// Assume Unix timestamp in seconds
+			// Accept the conventional seconds epoch and the legacy Unkey millisecond epoch.
 			resetTime := time.Unix(resetTimestamp, 0)
+			if resetTimestamp >= 1_000_000_000_000 {
+				resetTime = time.UnixMilli(resetTimestamp)
+			}
 			delay := time.Until(resetTime)
 			if delay > 0 {
 				if delay > maxRetryDelay {

@@ -77,6 +77,27 @@ func VerifyRequestCount(
 	require.Equal(t, expected, len(result.Requests))
 }
 
+func TestGetPlansWithWireMock(
+	t *testing.T,
+) {
+	WireMockBaseURL := os.Getenv("WIREMOCK_URL")
+	if WireMockBaseURL == "" {
+		WireMockBaseURL = "http://localhost:8080"
+	}
+	client := client.New(
+		option.WithBaseURL(WireMockBaseURL),
+	)
+	_, invocationErr := client.GetPlans(
+		context.TODO(),
+		option.WithHTTPHeader(
+			http.Header{"X-Test-Id": []string{"TestGetPlansWithWireMock"}},
+		),
+	)
+
+	require.NoError(t, invocationErr, "Client method call should succeed")
+	VerifyRequestCount(t, "TestGetPlansWithWireMock", "GET", "/v1/plans", nil, 1)
+}
+
 func TestGetSportsMatchingMarketsWithWireMock(
 	t *testing.T,
 ) {

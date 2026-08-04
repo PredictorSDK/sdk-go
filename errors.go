@@ -127,7 +127,7 @@ func (p *PaymentRequiredError) Unwrap() error {
 	return p.APIError
 }
 
-// Matching markets reader unavailable
+// Public plan catalog is not configured
 type ServiceUnavailableError struct {
 	*core.APIError
 	Body *ErrorResponse

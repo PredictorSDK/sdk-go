@@ -8,6 +8,11 @@ import (
 )
 
 var ErrorCodes internal.ErrorCodes = internal.ErrorCodes{
+	503: func(apiError *core.APIError) error {
+		return &ServiceUnavailableError{
+			APIError: apiError,
+		}
+	},
 	400: func(apiError *core.APIError) error {
 		return &BadRequestError{
 			APIError: apiError,
@@ -30,11 +35,6 @@ var ErrorCodes internal.ErrorCodes = internal.ErrorCodes{
 	},
 	429: func(apiError *core.APIError) error {
 		return &TooManyRequestsError{
-			APIError: apiError,
-		}
-	},
-	503: func(apiError *core.APIError) error {
-		return &ServiceUnavailableError{
 			APIError: apiError,
 		}
 	},

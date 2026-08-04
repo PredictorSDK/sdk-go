@@ -34,6 +34,21 @@ func New(opts ...option.RequestOption) *Client {
 	}
 }
 
+// Returns the machine-readable public billing catalog used by API consumers and pricing surfaces. This endpoint is intentionally unauthenticated. Stripe price IDs and all other provisioning secrets are excluded from the response.
+func (c *Client) GetPlans(
+	ctx context.Context,
+	opts ...option.RequestOption,
+) (*predictorsdk.PlansResponse, error) {
+	response, err := c.WithRawResponse.GetPlans(
+		ctx,
+		opts...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return response.Body, nil
+}
+
 // Find cross-platform market matches for sports events. When called without parameters, returns all currently matched sports markets with cursor-based pagination (default `limit=25`, max `100`). Provide a canonical event key, Kalshi event ticker, Polymarket slug, Predict market ID, or SX Bet market ID to look up a specific event — lookups return the full match immediately and skip pagination.
 func (c *Client) GetSportsMatchingMarkets(
 	ctx context.Context,

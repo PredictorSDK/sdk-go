@@ -3906,6 +3906,386 @@ func (p *PaymentRequiredErrorBody) String() string {
 	return fmt.Sprintf("%#v", p)
 }
 
+// Public plan metadata. Stripe price IDs and legacy provisioning IDs are intentionally absent.
+var (
+	planFieldKey                      = big.NewInt(1 << 0)
+	planFieldName                     = big.NewInt(1 << 1)
+	planFieldBillingTier              = big.NewInt(1 << 2)
+	planFieldTrialDays                = big.NewInt(1 << 3)
+	planFieldTagline                  = big.NewInt(1 << 4)
+	planFieldMonthlyPriceCents        = big.NewInt(1 << 5)
+	planFieldIncludedRequestsPerMonth = big.NewInt(1 << 6)
+	planFieldOverageCentsPer1K        = big.NewInt(1 << 7)
+	planFieldRateLimitPerMin          = big.NewInt(1 << 8)
+	planFieldMaxKeys                  = big.NewInt(1 << 9)
+	planFieldFeatures                 = big.NewInt(1 << 10)
+	planFieldCtaLabel                 = big.NewInt(1 << 11)
+	planFieldHighlighted              = big.NewInt(1 << 12)
+	planFieldContactSales             = big.NewInt(1 << 13)
+)
+
+type Plan struct {
+	// Stable public plan key.
+	Key  string `json:"key" url:"key"`
+	Name string `json:"name" url:"name"`
+	// Runtime entitlement tier; empty for a manually provisioned contact-sales plan.
+	BillingTier string `json:"billing_tier" url:"billing_tier"`
+	TrialDays   int    `json:"trial_days" url:"trial_days"`
+	Tagline     string `json:"tagline" url:"tagline"`
+	// Monthly display price in US cents; zero for free or contact-sales plans.
+	MonthlyPriceCents        int64    `json:"monthly_price_cents" url:"monthly_price_cents"`
+	IncludedRequestsPerMonth int64    `json:"included_requests_per_month" url:"included_requests_per_month"`
+	OverageCentsPer1K        int64    `json:"overage_cents_per_1k" url:"overage_cents_per_1k"`
+	RateLimitPerMin          int      `json:"rate_limit_per_min" url:"rate_limit_per_min"`
+	MaxKeys                  int      `json:"max_keys" url:"max_keys"`
+	Features                 []string `json:"features" url:"features"`
+	CtaLabel                 string   `json:"cta_label" url:"cta_label"`
+	Highlighted              bool     `json:"highlighted" url:"highlighted"`
+	ContactSales             bool     `json:"contact_sales" url:"contact_sales"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (p *Plan) GetKey() string {
+	if p == nil {
+		return ""
+	}
+	return p.Key
+}
+
+func (p *Plan) GetName() string {
+	if p == nil {
+		return ""
+	}
+	return p.Name
+}
+
+func (p *Plan) GetBillingTier() string {
+	if p == nil {
+		return ""
+	}
+	return p.BillingTier
+}
+
+func (p *Plan) GetTrialDays() int {
+	if p == nil {
+		return 0
+	}
+	return p.TrialDays
+}
+
+func (p *Plan) GetTagline() string {
+	if p == nil {
+		return ""
+	}
+	return p.Tagline
+}
+
+func (p *Plan) GetMonthlyPriceCents() int64 {
+	if p == nil {
+		return 0
+	}
+	return p.MonthlyPriceCents
+}
+
+func (p *Plan) GetIncludedRequestsPerMonth() int64 {
+	if p == nil {
+		return 0
+	}
+	return p.IncludedRequestsPerMonth
+}
+
+func (p *Plan) GetOverageCentsPer1K() int64 {
+	if p == nil {
+		return 0
+	}
+	return p.OverageCentsPer1K
+}
+
+func (p *Plan) GetRateLimitPerMin() int {
+	if p == nil {
+		return 0
+	}
+	return p.RateLimitPerMin
+}
+
+func (p *Plan) GetMaxKeys() int {
+	if p == nil {
+		return 0
+	}
+	return p.MaxKeys
+}
+
+func (p *Plan) GetFeatures() []string {
+	if p == nil {
+		return nil
+	}
+	return p.Features
+}
+
+func (p *Plan) GetCtaLabel() string {
+	if p == nil {
+		return ""
+	}
+	return p.CtaLabel
+}
+
+func (p *Plan) GetHighlighted() bool {
+	if p == nil {
+		return false
+	}
+	return p.Highlighted
+}
+
+func (p *Plan) GetContactSales() bool {
+	if p == nil {
+		return false
+	}
+	return p.ContactSales
+}
+
+func (p *Plan) GetExtraProperties() map[string]interface{} {
+	if p == nil {
+		return nil
+	}
+	return p.extraProperties
+}
+
+func (p *Plan) require(field *big.Int) {
+	if p.explicitFields == nil {
+		p.explicitFields = big.NewInt(0)
+	}
+	p.explicitFields.Or(p.explicitFields, field)
+}
+
+// SetKey sets the Key field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *Plan) SetKey(key string) {
+	p.Key = key
+	p.require(planFieldKey)
+}
+
+// SetName sets the Name field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *Plan) SetName(name string) {
+	p.Name = name
+	p.require(planFieldName)
+}
+
+// SetBillingTier sets the BillingTier field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *Plan) SetBillingTier(billingTier string) {
+	p.BillingTier = billingTier
+	p.require(planFieldBillingTier)
+}
+
+// SetTrialDays sets the TrialDays field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *Plan) SetTrialDays(trialDays int) {
+	p.TrialDays = trialDays
+	p.require(planFieldTrialDays)
+}
+
+// SetTagline sets the Tagline field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *Plan) SetTagline(tagline string) {
+	p.Tagline = tagline
+	p.require(planFieldTagline)
+}
+
+// SetMonthlyPriceCents sets the MonthlyPriceCents field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *Plan) SetMonthlyPriceCents(monthlyPriceCents int64) {
+	p.MonthlyPriceCents = monthlyPriceCents
+	p.require(planFieldMonthlyPriceCents)
+}
+
+// SetIncludedRequestsPerMonth sets the IncludedRequestsPerMonth field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *Plan) SetIncludedRequestsPerMonth(includedRequestsPerMonth int64) {
+	p.IncludedRequestsPerMonth = includedRequestsPerMonth
+	p.require(planFieldIncludedRequestsPerMonth)
+}
+
+// SetOverageCentsPer1K sets the OverageCentsPer1K field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *Plan) SetOverageCentsPer1K(overageCentsPer1K int64) {
+	p.OverageCentsPer1K = overageCentsPer1K
+	p.require(planFieldOverageCentsPer1K)
+}
+
+// SetRateLimitPerMin sets the RateLimitPerMin field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *Plan) SetRateLimitPerMin(rateLimitPerMin int) {
+	p.RateLimitPerMin = rateLimitPerMin
+	p.require(planFieldRateLimitPerMin)
+}
+
+// SetMaxKeys sets the MaxKeys field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *Plan) SetMaxKeys(maxKeys int) {
+	p.MaxKeys = maxKeys
+	p.require(planFieldMaxKeys)
+}
+
+// SetFeatures sets the Features field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *Plan) SetFeatures(features []string) {
+	p.Features = features
+	p.require(planFieldFeatures)
+}
+
+// SetCtaLabel sets the CtaLabel field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *Plan) SetCtaLabel(ctaLabel string) {
+	p.CtaLabel = ctaLabel
+	p.require(planFieldCtaLabel)
+}
+
+// SetHighlighted sets the Highlighted field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *Plan) SetHighlighted(highlighted bool) {
+	p.Highlighted = highlighted
+	p.require(planFieldHighlighted)
+}
+
+// SetContactSales sets the ContactSales field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *Plan) SetContactSales(contactSales bool) {
+	p.ContactSales = contactSales
+	p.require(planFieldContactSales)
+}
+
+func (p *Plan) UnmarshalJSON(data []byte) error {
+	type unmarshaler Plan
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*p = Plan(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *p)
+	if err != nil {
+		return err
+	}
+	p.extraProperties = extraProperties
+	p.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (p *Plan) MarshalJSON() ([]byte, error) {
+	type embed Plan
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*p),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, p.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (p *Plan) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	if len(p.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(p.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(p); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", p)
+}
+
+var (
+	plansResponseFieldData = big.NewInt(1 << 0)
+)
+
+type PlansResponse struct {
+	Data []*Plan `json:"data" url:"data"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (p *PlansResponse) GetData() []*Plan {
+	if p == nil {
+		return nil
+	}
+	return p.Data
+}
+
+func (p *PlansResponse) GetExtraProperties() map[string]interface{} {
+	if p == nil {
+		return nil
+	}
+	return p.extraProperties
+}
+
+func (p *PlansResponse) require(field *big.Int) {
+	if p.explicitFields == nil {
+		p.explicitFields = big.NewInt(0)
+	}
+	p.explicitFields.Or(p.explicitFields, field)
+}
+
+// SetData sets the Data field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *PlansResponse) SetData(data []*Plan) {
+	p.Data = data
+	p.require(plansResponseFieldData)
+}
+
+func (p *PlansResponse) UnmarshalJSON(data []byte) error {
+	type unmarshaler PlansResponse
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*p = PlansResponse(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *p)
+	if err != nil {
+		return err
+	}
+	p.extraProperties = extraProperties
+	p.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (p *PlansResponse) MarshalJSON() ([]byte, error) {
+	type embed PlansResponse
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*p),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, p.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (p *PlansResponse) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	if len(p.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(p.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(p); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", p)
+}
+
 var (
 	platformMarketFieldPlatform      = big.NewInt(1 << 0)
 	platformMarketFieldEventTicker   = big.NewInt(1 << 1)
