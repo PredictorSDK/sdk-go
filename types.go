@@ -157,7 +157,7 @@ var (
 type GetMarketsRequest struct {
 	// Maximum number of markets to return per page. Range 1–100, default 25.
 	Limit *int `json:"-" url:"limit,omitempty"`
-	// Opaque cursor from a previous response's `pagination.nextCursor` in the SDKs (raw JSON: `pagination.next_cursor`).
+	// Opaque cursor from a previous response's `pagination.nextCursor` in the SDKs (raw JSON: `pagination.next_cursor`). Market cursors stay bound to the immutable catalog snapshot that issued them. Replaced snapshots normally remain available for up to 24 hours, but storage pressure can evict a retained snapshot sooner; retry from the first page after a stale-cursor `400`.
 	Cursor *string `json:"-" url:"cursor,omitempty"`
 	// Canonical top-level category filter. This is PredictorSDK's normalized category, not a provider-native tag. Cursors are bound to the category filter used to create them.
 	Category *MarketCategory `json:"-" url:"category,omitempty"`
@@ -3680,7 +3680,7 @@ func (p *PaginationBlock) String() string {
 	return fmt.Sprintf("%#v", p)
 }
 
-// Recommended client action for this 402.
+// Recommended client action for an HTTP 402 response.
 type PaymentRequiredErrorAction string
 
 const (
@@ -3718,10 +3718,9 @@ var (
 type PaymentRequiredErrorBody struct {
 	Error string `json:"error" url:"error"`
 	// Additional detail about the error.
-	Message    *string `json:"message,omitempty" url:"message,omitempty"`
-	StatusCode int     `json:"status_code" url:"status_code"`
-	// Recommended client action for this 402.
-	Action PaymentRequiredErrorAction `json:"action" url:"action"`
+	Message    *string                    `json:"message,omitempty" url:"message,omitempty"`
+	StatusCode int                        `json:"status_code" url:"status_code"`
+	Action     PaymentRequiredErrorAction `json:"action" url:"action"`
 	// Billing tier that would satisfy the gate (e.g. `starter`, `pro`, `business`, `enterprise`).
 	RequiredTier string `json:"required_tier" url:"required_tier"`
 	// Billing tier currently associated with the caller.

@@ -27,14 +27,21 @@ func New(opts ...option.RequestOption) *Client {
 		baseURL:         options.BaseURL,
 		caller: internal.NewCaller(
 			&internal.CallerParams{
-				Client:      options.HTTPClient,
-				MaxAttempts: options.MaxAttempts,
+				Client:         options.HTTPClient,
+				MaxAttempts:    options.MaxAttempts,
+				DisableRetries: options.DisableRetries,
 			},
 		),
 	}
 }
 
 // Returns the machine-readable public billing catalog used by API consumers and pricing surfaces. This endpoint is intentionally unauthenticated. Stripe price IDs and all other provisioning secrets are excluded from the response.
+//
+// Example:
+//
+//	client.GetPlans(
+//	    context.TODO(),
+//	)
 func (c *Client) GetPlans(
 	ctx context.Context,
 	opts ...option.RequestOption,
@@ -50,6 +57,14 @@ func (c *Client) GetPlans(
 }
 
 // Find cross-platform market matches for sports events. When called without parameters, returns all currently matched sports markets with cursor-based pagination (default `limit=25`, max `100`). Provide a canonical event key, Kalshi event ticker, Polymarket slug, Predict market ID, or SX Bet market ID to look up a specific event — lookups return the full match immediately and skip pagination.
+//
+// Example:
+//
+//	request := &predictorsdk.GetSportsMatchingMarketsRequest{}
+//	client.GetSportsMatchingMarkets(
+//	    context.TODO(),
+//	    request,
+//	)
 func (c *Client) GetSportsMatchingMarkets(
 	ctx context.Context,
 	request *predictorsdk.GetSportsMatchingMarketsRequest,
@@ -67,6 +82,14 @@ func (c *Client) GetSportsMatchingMarkets(
 }
 
 // Returns a paginated list of unified markets from all supported prediction market providers. Uses cursor-based pagination with default `limit=25`, max `100`.
+//
+// Example:
+//
+//	request := &predictorsdk.GetMarketsRequest{}
+//	client.GetMarkets(
+//	    context.TODO(),
+//	    request,
+//	)
 func (c *Client) GetMarkets(
 	ctx context.Context,
 	request *predictorsdk.GetMarketsRequest,
@@ -84,6 +107,12 @@ func (c *Client) GetMarkets(
 }
 
 // Returns the canonical top-level categories that can be used to filter unified market discovery with `GET /v1/markets?category=...`. Categories are PredictorSDK-normalized buckets, not provider-native tags. Sports is one category among many; sport/league facets may be added later as deeper filters without changing this top-level list.
+//
+// Example:
+//
+//	client.GetCategories(
+//	    context.TODO(),
+//	)
 func (c *Client) GetCategories(
 	ctx context.Context,
 	opts ...option.RequestOption,
@@ -103,6 +132,16 @@ func (c *Client) GetCategories(
 // Identity fields (id/provider/provider_id/title/status/ outcomes[].name) are strict-universal: every platform's single-market endpoint exposes them natively without a second fetch. close timestamps and parent event ids remain omitted (not nullable) — Predict's close time lives on the parent category and Polymarket's market record carries no event id.
 //
 // The pricing tier adds per-outcome quotes (`price`/`bid`/`ask`/ `last` as 0–1 probability numbers — price IS the implied probability), a `pricing` envelope (`availability`/`scale`/ `source`/`as_of`/`neg_risk`), and market-level aggregates (`liquidity_usd`, `volume_24h_usd`, `volume_total_usd`, plus Kalshi contract-count mirrors and `open_interest`). Kalshi/ Polymarket/Predict quotes come from the same record the identity fetch returns (`pricing.source=market_record`). SX Bet, Hyperliquid, and AlphaArcade carry no pricing on the market record, so the server makes one bounded second fetch to the order book (`pricing.source=orderbook`) — SX Bet's best-odds endpoint, Hyperliquid's merged `l2Book`, or AlphaArcade's `get-full-orderbook` (a 4-sided YES/NO book; the second side's quotes are derived from the first by the cross-side complement, and the catalog midpoint serves as the price mark when the book is empty). On a book error the lookup still succeeds with identity intact and `pricing.availability` reflecting the marks. On timeout/error it degrades to `pricing.availability=unavailable` with identity intact — pricing failures never fail the lookup. Aggregates a platform doesn't natively expose are explicit `null` (e.g. Kalshi reports volume in contracts, so `volume_*_usd` stays null rather than fabricating a USD figure; its upstream `liquidity_dollars` field is deprecated and always zero, so `liquidity_usd` is null too).
+//
+// Example:
+//
+//	request := &predictorsdk.GetMarketRequest{
+//	    MarketID: "kalshi:KXNBA-26-SAS",
+//	}
+//	client.GetMarket(
+//	    context.TODO(),
+//	    request,
+//	)
 func (c *Client) GetMarket(
 	ctx context.Context,
 	request *predictorsdk.GetMarketRequest,
@@ -120,6 +159,16 @@ func (c *Client) GetMarket(
 }
 
 // Returns per-second price data for a Binance trading pair. When called without a time range, returns the latest price. With `start_time` and `end_time`, returns historical per-second prices in newest-first order. Supports cursor-based pagination for large result sets. Unknown or invalid symbols return `200` with `{"prices":[]}` and omit `total`.
+//
+// Example:
+//
+//	request := &predictorsdk.GetBinanceCryptoPricesRequest{
+//	    Currency: "btcusdt",
+//	}
+//	client.GetBinanceCryptoPrices(
+//	    context.TODO(),
+//	    request,
+//	)
 func (c *Client) GetBinanceCryptoPrices(
 	ctx context.Context,
 	request *predictorsdk.GetBinanceCryptoPricesRequest,
@@ -141,6 +190,18 @@ func (c *Client) GetBinanceCryptoPrices(
 // When `address` is the underlying signer EOA, the endpoint resolves it to the deterministic proxy address and returns the proxy's profile, with `signer` echoing the input.
 //
 // When `username` is supplied, the endpoint resolves it to the wallet via Polymarket's profile search. Match is case-insensitive and exact: a query of `Theo` resolves the user literally named `theo` but does not resolve `theo46` or `Theo47`. A leading `@` is accepted (and stripped) as a convenience for callers used to Twitter-style handles. `signer` is always `null` on the username path. Profiles that don't exist (or only match fuzzily) return `404`.
+//
+// Example:
+//
+//	request := &predictorsdk.GetPolymarketWalletRequest{
+//	    Address: predictorsdk.String(
+//	        "0x7c3db723f1d4d8cb9c550095203b686cb11e5c6b",
+//	    ),
+//	}
+//	client.GetPolymarketWallet(
+//	    context.TODO(),
+//	    request,
+//	)
 func (c *Client) GetPolymarketWallet(
 	ctx context.Context,
 	request *predictorsdk.GetPolymarketWalletRequest,
@@ -164,6 +225,18 @@ func (c *Client) GetPolymarketWallet(
 // `total` in the pagination block is always `0` because the upstream Data API does not return a total count; rely on `has_more` + `next_cursor` to paginate.
 //
 // **EOA inputs are not auto-resolved on this endpoint.** Unlike `/v1/polymarket/wallet`, this endpoint does not perform the EOA→proxy CREATE2 resolution. Callers with a signer EOA should call `/v1/polymarket/wallet` first to resolve the proxy, then pass the returned `address`. Passing an EOA directly will return an empty `data` array.
+//
+// Example:
+//
+//	request := &predictorsdk.ListPolymarketWalletPositionsRequest{
+//	    Address: predictorsdk.String(
+//	        "0x7c3db723f1d4d8cb9c550095203b686cb11e5c6b",
+//	    ),
+//	}
+//	client.ListPolymarketWalletPositions(
+//	    context.TODO(),
+//	    request,
+//	)
 func (c *Client) ListPolymarketWalletPositions(
 	ctx context.Context,
 	request *predictorsdk.ListPolymarketWalletPositionsRequest,
@@ -187,6 +260,16 @@ func (c *Client) ListPolymarketWalletPositions(
 // **Kalshi sibling fanout.** A single Kalshi sports game lives across multiple event tickers that share a game suffix — e.g. `KXMLBGAME-26MAY221840CLEPHI` holds the moneyline, `KXMLBF5TOTAL-26MAY221840CLEPHI` holds the totals, and so on. When the supplied event_ticker belongs to a sport in the sibling registry (MLB, NBA, NFL, NHL, WNBA today), this endpoint fans out across known sibling series in parallel and merges their markets into one response. Siblings that don't exist for a particular game silently drop. Siblings that error are reported under `fanout.siblings_missing`; the primary event still returns 200 in that case. Only the primary fetch failing produces a 4xx/5xx — partial fanouts never fail the request.
 //
 // **Polymarket** events already nest the moneyline plus all spread/totals/game-level prop markets under a single event slug, so no fanout is performed. **SX Bet** fixtures similarly bundle game lines per `eventId`. **Predict** currently treats `event_id` as a market identifier and wraps the single market as a 1-element event response, since the upstream `event` concept on Predict is closer to a category than to a multi-market container. **Hyperliquid** maps a question id to its named outcome markets, or wraps a standalone outcome id as a single-market event.
+//
+// Example:
+//
+//	request := &predictorsdk.GetEventRequest{
+//	    EventID: "KXMLBGAME-26MAY221840CLEPHI",
+//	}
+//	client.GetEvent(
+//	    context.TODO(),
+//	    request,
+//	)
 func (c *Client) GetEvent(
 	ctx context.Context,
 	request *predictorsdk.GetEventRequest,

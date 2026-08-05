@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -132,6 +133,38 @@ func TestRetrier(t *testing.T) {
 			assert.Equal(t, test.wantResponse, response)
 		})
 	}
+}
+
+func TestRetryExhaustionWithGzipErrorResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "gzip", r.Header.Get("Accept-Encoding"))
+		w.Header().Set("Content-Encoding", "gzip")
+		w.WriteHeader(http.StatusInternalServerError)
+		gzipWriter := gzip.NewWriter(w)
+		_, err := gzipWriter.Write([]byte("retry failed"))
+		require.NoError(t, err)
+		require.NoError(t, gzipWriter.Close())
+	}))
+	defer server.Close()
+
+	caller := NewCaller(&CallerParams{
+		Client: server.Client(),
+	})
+
+	_, err := caller.Call(
+		context.Background(),
+		&CallParams{
+			URL:    server.URL,
+			Method: http.MethodGet,
+			Headers: http.Header{
+				"Accept-Encoding": []string{"gzip"},
+			},
+			MaxAttempts: 1,
+		},
+	)
+
+	require.IsType(t, &core.APIError{}, err)
+	require.EqualError(t, err, "500: retry failed")
 }
 
 // newTestRetryServer returns a new *httptest.Server configured with the
@@ -348,5 +381,23 @@ func TestRetryDelayTiming(t *testing.T) {
 			assert.LessOrEqual(t, actualDelayMs, tt.expectedMaxMs,
 				"Actual delay %dms should be <= expected max %dms", actualDelayMs, tt.expectedMaxMs)
 		})
+	}
+}
+
+// TestPredictorSDKRateLimitResetDelayNeverExceedsMaximum guards the SDK's
+// public retry contract: positive jitter must not extend the 60-second cap.
+func TestPredictorSDKRateLimitResetDelayNeverExceedsMaximum(t *testing.T) {
+	t.Parallel()
+
+	for _, reset := range []string{
+		fmt.Sprintf("%d", time.Now().Add(2*maxRetryDelay).Unix()),
+		fmt.Sprintf("%d", time.Now().Add(2*maxRetryDelay).UnixMilli()),
+	} {
+		response := &http.Response{Header: make(http.Header)}
+		response.Header.Set("X-RateLimit-Reset", reset)
+
+		delay, err := (&Retrier{}).retryDelay(response, 0)
+		require.NoError(t, err)
+		assert.LessOrEqual(t, delay, maxRetryDelay)
 	}
 }

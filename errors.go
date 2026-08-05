@@ -7,7 +7,7 @@ import (
 	core "github.com/PredictorSDK/sdk-go/core"
 )
 
-// Upstream platform failed for an unclassified reason.
+// Upstream provider or API-key authorization dependency failed.
 type BadGatewayError struct {
 	*core.APIError
 	Body *ErrorResponse
