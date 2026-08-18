@@ -4287,16 +4287,19 @@ func (p *PlansResponse) String() string {
 
 var (
 	platformMarketFieldPlatform      = big.NewInt(1 << 0)
-	platformMarketFieldEventTicker   = big.NewInt(1 << 1)
-	platformMarketFieldMarketTickers = big.NewInt(1 << 2)
-	platformMarketFieldMarketSlug    = big.NewInt(1 << 3)
-	platformMarketFieldTokenIDs      = big.NewInt(1 << 4)
-	platformMarketFieldMarketID      = big.NewInt(1 << 5)
-	platformMarketFieldOutcomeIDs    = big.NewInt(1 << 6)
+	platformMarketFieldEventID       = big.NewInt(1 << 1)
+	platformMarketFieldEventTicker   = big.NewInt(1 << 2)
+	platformMarketFieldMarketTickers = big.NewInt(1 << 3)
+	platformMarketFieldMarketSlug    = big.NewInt(1 << 4)
+	platformMarketFieldTokenIDs      = big.NewInt(1 << 5)
+	platformMarketFieldMarketID      = big.NewInt(1 << 6)
+	platformMarketFieldOutcomeIDs    = big.NewInt(1 << 7)
 )
 
 type PlatformMarket struct {
 	Platform PlatformMarketPlatform `json:"platform" url:"platform"`
+	// Provider-native parent event or fixture identifier for the path in `GET /v1/events/{event_id}`. Kalshi uses its event ticker, Polymarket its event slug (or numeric event ID fallback), Predict its market ID, SX Bet its `L...` fixture ID, and AlphaArcade its parent market ULID. Always pair it with the events endpoint's `platform` query parameter, passing this row's `platform` value (matched case-insensitively). Predict market IDs and AlphaArcade ULIDs are not shape-distinguishable from Polymarket identifiers, so without that override the events endpoint probes Polymarket first and can answer `200` with an unrelated Polymarket event instead of `404`. Retained snapshots created before this field was introduced may omit it.
+	EventID *string `json:"event_id,omitempty" url:"event_id,omitempty"`
 	// Kalshi event ticker. Present when platform is KALSHI.
 	EventTicker *string `json:"event_ticker,omitempty" url:"event_ticker,omitempty"`
 	// Kalshi market tickers. Present when platform is KALSHI.
@@ -4322,6 +4325,13 @@ func (p *PlatformMarket) GetPlatform() PlatformMarketPlatform {
 		return ""
 	}
 	return p.Platform
+}
+
+func (p *PlatformMarket) GetEventID() *string {
+	if p == nil {
+		return nil
+	}
+	return p.EventID
 }
 
 func (p *PlatformMarket) GetEventTicker() *string {
@@ -4385,6 +4395,13 @@ func (p *PlatformMarket) require(field *big.Int) {
 func (p *PlatformMarket) SetPlatform(platform PlatformMarketPlatform) {
 	p.Platform = platform
 	p.require(platformMarketFieldPlatform)
+}
+
+// SetEventID sets the EventID field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (p *PlatformMarket) SetEventID(eventID *string) {
+	p.EventID = eventID
+	p.require(platformMarketFieldEventID)
 }
 
 // SetEventTicker sets the EventTicker field and marks it as non-optional;
