@@ -56,7 +56,7 @@ func (c *Client) GetPlans(
 	return response.Body, nil
 }
 
-// Find cross-platform market matches for sports events. When called without parameters, returns all currently matched sports markets with cursor-based pagination (default `limit=25`, max `100`). Provide a canonical event key, Kalshi event ticker, Polymarket slug, Predict market ID, or SX Bet market ID to look up a specific event — lookups return the full match immediately and skip pagination. Every platform row includes its provider-native `event_id` for use with `GET /v1/events/{event_id}`; pass that row's `platform` value as the events endpoint's `platform` query parameter, which is required to disambiguate Predict and AlphaArcade identifiers.
+// Find cross-platform market matches for sports events. Coverage is NBA, WNBA, NHL, and MLB; `canonical_events[].league` names the league and is the first segment of the canonical `event_id`. When called without parameters, returns all currently matched sports markets with cursor-based pagination (default `limit=25`, max `100`). Provide a canonical event key, Kalshi event ticker, Polymarket slug, Predict market ID, or SX Bet market ID to look up a specific event — lookups return the full match immediately and skip pagination. Every platform row includes its provider-native `event_id` for use with `GET /v1/events/{event_id}`; pass that row's `platform` value as the events endpoint's `platform` query parameter, which is required to disambiguate Predict and AlphaArcade identifiers.
 //
 // Example:
 //
