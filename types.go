@@ -2656,6 +2656,317 @@ func (m MarketCategory) Ptr() *MarketCategory {
 	return &m
 }
 
+// One side's fee model. Both `taker` and `maker` are always returned and you pick: PredictorSDK does not infer which side you will be, since that needs an order it has not seen. Null when the model is not determinable for that side.
+//
+// Note that "maker" and "taker" mean the venue's own definition — the resting order is the maker, the incoming order that fills it is the taker.
+var (
+	marketDetailFeeLegFieldModel    = big.NewInt(1 << 0)
+	marketDetailFeeLegFieldRate     = big.NewInt(1 << 1)
+	marketDetailFeeLegFieldExponent = big.NewInt(1 << 2)
+	marketDetailFeeLegFieldRounding = big.NewInt(1 << 3)
+)
+
+type MarketDetailFeeLeg struct {
+	// The price term of the per-share fee.
+	//
+	// `quadratic` — `rate × (price × (1 − price)) ^ exponent`. Kalshi (`roundup(0.07 × C × P × (1−P))`, exponent 1 by published formula), Polymarket (`fee = C × feeRate × p × (1 − p)`, exponent read per market), AlphaArcade (`feeBase × quantity × price × (1 − price)`).
+	//
+	// `min_price` — `rate × min(price, 1 − price)`. Predict (`Base Fee % × min(Price, 1 − Price) × Shares`). A TENT, not a parabola: the effective rate on notional is flat at `rate` for every price at or below 0.5 and only declines above it. Do not collapse this into `quadratic`; it would overstate the fee at every price below 0.5.
+	//
+	// `notional` — `rate × price`, i.e. a flat fraction of traded notional with no price curve at all.
+	//
+	// `none` — zero, asserted.
+	Model MarketDetailFeeLegModel `json:"model" url:"model"`
+	// A DECIMAL FRACTION, never basis points — matching each venue's own published unit. `0.07` is 7% of the price term, not 7 bps. Null means the shape is known but the value is not (Hyperliquid, where the effective rate is account-tiered). `0` means zero, asserted.
+	Rate *float64 `json:"rate,omitempty" url:"rate,omitempty"`
+	// Only meaningful for `model: "quadratic"`; null otherwise. Read per market from Polymarket's `feeSchedule.exponent`; `1` on Kalshi and AlphaArcade, whose published formulas are exponent-1 by construction. Never defaulted when unknown — a quadratic leg with an unreadable exponent makes the whole descriptor `partial`, because the exponent moves the fee by roughly 4x and can flip which venue is cheaper.
+	Exponent *float64                 `json:"exponent,omitempty" url:"exponent,omitempty"`
+	Rounding *MarketDetailFeeRounding `json:"rounding,omitempty" url:"rounding,omitempty"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (m *MarketDetailFeeLeg) GetModel() MarketDetailFeeLegModel {
+	if m == nil {
+		return ""
+	}
+	return m.Model
+}
+
+func (m *MarketDetailFeeLeg) GetRate() *float64 {
+	if m == nil {
+		return nil
+	}
+	return m.Rate
+}
+
+func (m *MarketDetailFeeLeg) GetExponent() *float64 {
+	if m == nil {
+		return nil
+	}
+	return m.Exponent
+}
+
+func (m *MarketDetailFeeLeg) GetRounding() *MarketDetailFeeRounding {
+	if m == nil {
+		return nil
+	}
+	return m.Rounding
+}
+
+func (m *MarketDetailFeeLeg) GetExtraProperties() map[string]interface{} {
+	if m == nil {
+		return nil
+	}
+	return m.extraProperties
+}
+
+func (m *MarketDetailFeeLeg) require(field *big.Int) {
+	if m.explicitFields == nil {
+		m.explicitFields = big.NewInt(0)
+	}
+	m.explicitFields.Or(m.explicitFields, field)
+}
+
+// SetModel sets the Model field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailFeeLeg) SetModel(model MarketDetailFeeLegModel) {
+	m.Model = model
+	m.require(marketDetailFeeLegFieldModel)
+}
+
+// SetRate sets the Rate field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailFeeLeg) SetRate(rate *float64) {
+	m.Rate = rate
+	m.require(marketDetailFeeLegFieldRate)
+}
+
+// SetExponent sets the Exponent field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailFeeLeg) SetExponent(exponent *float64) {
+	m.Exponent = exponent
+	m.require(marketDetailFeeLegFieldExponent)
+}
+
+// SetRounding sets the Rounding field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailFeeLeg) SetRounding(rounding *MarketDetailFeeRounding) {
+	m.Rounding = rounding
+	m.require(marketDetailFeeLegFieldRounding)
+}
+
+func (m *MarketDetailFeeLeg) UnmarshalJSON(data []byte) error {
+	type unmarshaler MarketDetailFeeLeg
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*m = MarketDetailFeeLeg(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *m)
+	if err != nil {
+		return err
+	}
+	m.extraProperties = extraProperties
+	m.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (m *MarketDetailFeeLeg) MarshalJSON() ([]byte, error) {
+	type embed MarketDetailFeeLeg
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*m),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, m.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (m *MarketDetailFeeLeg) String() string {
+	if m == nil {
+		return "<nil>"
+	}
+	if len(m.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(m.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(m); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", m)
+}
+
+// The price term of the per-share fee.
+//
+// `quadratic` — `rate × (price × (1 − price)) ^ exponent`. Kalshi (`roundup(0.07 × C × P × (1−P))`, exponent 1 by published formula), Polymarket (`fee = C × feeRate × p × (1 − p)`, exponent read per market), AlphaArcade (`feeBase × quantity × price × (1 − price)`).
+//
+// `min_price` — `rate × min(price, 1 − price)`. Predict (`Base Fee % × min(Price, 1 − Price) × Shares`). A TENT, not a parabola: the effective rate on notional is flat at `rate` for every price at or below 0.5 and only declines above it. Do not collapse this into `quadratic`; it would overstate the fee at every price below 0.5.
+//
+// `notional` — `rate × price`, i.e. a flat fraction of traded notional with no price curve at all.
+//
+// `none` — zero, asserted.
+type MarketDetailFeeLegModel string
+
+const (
+	MarketDetailFeeLegModelQuadratic MarketDetailFeeLegModel = "quadratic"
+	MarketDetailFeeLegModelMinPrice  MarketDetailFeeLegModel = "min_price"
+	MarketDetailFeeLegModelNotional  MarketDetailFeeLegModel = "notional"
+	MarketDetailFeeLegModelNone      MarketDetailFeeLegModel = "none"
+)
+
+func NewMarketDetailFeeLegModelFromString(s string) (MarketDetailFeeLegModel, error) {
+	switch s {
+	case "quadratic":
+		return MarketDetailFeeLegModelQuadratic, nil
+	case "min_price":
+		return MarketDetailFeeLegModelMinPrice, nil
+	case "notional":
+		return MarketDetailFeeLegModelNotional, nil
+	case "none":
+		return MarketDetailFeeLegModelNone, nil
+	}
+	var t MarketDetailFeeLegModel
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (m MarketDetailFeeLegModel) Ptr() *MarketDetailFeeLegModel {
+	return &m
+}
+
+// The venue's published rounding rule, applied to the computed fee. Null where the venue publishes no rule (Predict) — treat that as UNKNOWN rather than as "no rounding", which would understate small trades.
+//
+// Kalshi additionally charges a per-fill rounding fee that restores the member's balance precision ($0.01 for non-direct members, $0.0001 for direct), offset by a rebate once accumulated rounding exceeds $0.01. That depends on fill fragmentation and member type, so it is not predictable pre-trade and is deliberately not modeled here — expect a small positive difference between the figure you compute and the figure Kalshi charges across many partial fills.
+var (
+	marketDetailFeeRoundingFieldDirection = big.NewInt(1 << 0)
+	marketDetailFeeRoundingFieldIncrement = big.NewInt(1 << 1)
+)
+
+type MarketDetailFeeRounding struct {
+	// `up` — the venue rounds the fee UP to the next increment (Kalshi ceils to $0.0001; AlphaArcade ceils to 1e-6 USDC). `nearest` — the venue rounds to the nearest increment (Polymarket rounds to 5 decimal places, with 0.00001 USDC the smallest fee charged).
+	Direction MarketDetailFeeRoundingDirection `json:"direction" url:"direction"`
+	// The rounding increment in the market's quote currency.
+	Increment float64 `json:"increment" url:"increment"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (m *MarketDetailFeeRounding) GetDirection() MarketDetailFeeRoundingDirection {
+	if m == nil {
+		return ""
+	}
+	return m.Direction
+}
+
+func (m *MarketDetailFeeRounding) GetIncrement() float64 {
+	if m == nil {
+		return 0
+	}
+	return m.Increment
+}
+
+func (m *MarketDetailFeeRounding) GetExtraProperties() map[string]interface{} {
+	if m == nil {
+		return nil
+	}
+	return m.extraProperties
+}
+
+func (m *MarketDetailFeeRounding) require(field *big.Int) {
+	if m.explicitFields == nil {
+		m.explicitFields = big.NewInt(0)
+	}
+	m.explicitFields.Or(m.explicitFields, field)
+}
+
+// SetDirection sets the Direction field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailFeeRounding) SetDirection(direction MarketDetailFeeRoundingDirection) {
+	m.Direction = direction
+	m.require(marketDetailFeeRoundingFieldDirection)
+}
+
+// SetIncrement sets the Increment field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailFeeRounding) SetIncrement(increment float64) {
+	m.Increment = increment
+	m.require(marketDetailFeeRoundingFieldIncrement)
+}
+
+func (m *MarketDetailFeeRounding) UnmarshalJSON(data []byte) error {
+	type unmarshaler MarketDetailFeeRounding
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*m = MarketDetailFeeRounding(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *m)
+	if err != nil {
+		return err
+	}
+	m.extraProperties = extraProperties
+	m.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (m *MarketDetailFeeRounding) MarshalJSON() ([]byte, error) {
+	type embed MarketDetailFeeRounding
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*m),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, m.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (m *MarketDetailFeeRounding) String() string {
+	if m == nil {
+		return "<nil>"
+	}
+	if len(m.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(m.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(m); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", m)
+}
+
+// `up` — the venue rounds the fee UP to the next increment (Kalshi ceils to $0.0001; AlphaArcade ceils to 1e-6 USDC). `nearest` — the venue rounds to the nearest increment (Polymarket rounds to 5 decimal places, with 0.00001 USDC the smallest fee charged).
+type MarketDetailFeeRoundingDirection string
+
+const (
+	MarketDetailFeeRoundingDirectionUp      MarketDetailFeeRoundingDirection = "up"
+	MarketDetailFeeRoundingDirectionNearest MarketDetailFeeRoundingDirection = "nearest"
+)
+
+func NewMarketDetailFeeRoundingDirectionFromString(s string) (MarketDetailFeeRoundingDirection, error) {
+	switch s {
+	case "up":
+		return MarketDetailFeeRoundingDirectionUp, nil
+	case "nearest":
+		return MarketDetailFeeRoundingDirectionNearest, nil
+	}
+	var t MarketDetailFeeRoundingDirection
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (m MarketDetailFeeRoundingDirection) Ptr() *MarketDetailFeeRoundingDirection {
+	return &m
+}
+
 var (
 	marketDetailOutcomeFieldName      = big.NewInt(1 << 0)
 	marketDetailOutcomeFieldOutcomeID = big.NewInt(1 << 1)
@@ -2874,9 +3185,10 @@ type MarketDetailPricing struct {
 	Availability MarketDetailPricingAvailability `json:"availability" url:"availability"`
 	// Self-describing unit declaration for all price fields. Single canonical scale today; new values would be added alongside (never replacing) this one.
 	Scale MarketDetailPricingScale `json:"scale" url:"scale"`
-	// Where the quotes came from. `market_record` — embedded in the same single-market record as the identity fetch (Kalshi, Polymarket, Predict). `orderbook` — required one bounded second fetch against the platform's order-book surface (SX Bet `/orders/odds/best`, Hyperliquid `l2Book`).
+	// Where the quotes came from. `market_record` — embedded in the same single-market record as the identity fetch (Kalshi, Polymarket, Predict). `orderbook` — required one bounded second fetch against the platform's order-book surface (SX Bet `/orderbook-v3/snapshot`, Hyperliquid `l2Book`).
 	Source MarketDetailPricingSource `json:"source" url:"source"`
-	// Quote freshness as RFC3339. When the two sides carry independent upstream timestamps (SX Bet), this is the OLDER of them — a conservative floor that never over-claims freshness. Hyperliquid uses the `l2Book` server timestamp. Null when the upstream record carries no quote timestamp at all (Predict) — treat freshness as UNKNOWN, not as fresh. Timestamps come from each platform's own clock; for Kalshi/Polymarket the value is the record's last-update time, the closest the platform exposes to a quote timestamp.
+	// Quote freshness as RFC3339. When the two sides carry independent upstream timestamps, this is the OLDER of them — a conservative floor that never over-claims freshness. Hyperliquid uses the `l2Book` server timestamp. Null when the upstream record carries no quote timestamp at all (Predict, AlphaArcade, and SX Bet) — treat freshness as UNKNOWN, not as fresh. Timestamps come from each platform's own clock; for Kalshi/Polymarket the value is the record's last-update time, the closest the platform exposes to a quote timestamp.
+	// SX Bet moved from timestamped to null at its V3 order-book cutover (2026-08-25): V3 publishes an opaque monotonic book `version` and no wall-clock stamp anywhere, and server ingest time is not substituted because it would masquerade as an upstream stamp.
 	AsOf *time.Time `json:"as_of,omitempty" url:"as_of,omitempty"`
 	// True when this market belongs to a negative-risk multi-outcome event (Polymarket `negRisk`, Predict `isNegRisk`). On a multi-outcome record, outcome prices intentionally need not sum to 1 — do not "normalize" the book. Note that for the BINARY member markets these platforms serve today the flag signals event-level structure (this market is one leg of a mutually-exclusive set); the binary pair itself still sums to ~1. Omitted when false.
 	NegRisk *bool `json:"neg_risk,omitempty" url:"neg_risk,omitempty"`
@@ -3071,7 +3383,7 @@ func (m MarketDetailPricingScale) Ptr() *MarketDetailPricingScale {
 	return &m
 }
 
-// Where the quotes came from. `market_record` — embedded in the same single-market record as the identity fetch (Kalshi, Polymarket, Predict). `orderbook` — required one bounded second fetch against the platform's order-book surface (SX Bet `/orders/odds/best`, Hyperliquid `l2Book`).
+// Where the quotes came from. `market_record` — embedded in the same single-market record as the identity fetch (Kalshi, Polymarket, Predict). `orderbook` — required one bounded second fetch against the platform's order-book surface (SX Bet `/orderbook-v3/snapshot`, Hyperliquid `l2Book`).
 type MarketDetailPricingSource string
 
 const (
@@ -3094,7 +3406,7 @@ func (m MarketDetailPricingSource) Ptr() *MarketDetailPricingSource {
 	return &m
 }
 
-// Single-market detail across all six supported platforms. Identity fields are strict-universal (no second fetch on any platform); the pricing tier carries per-outcome quotes plus market-level aggregates with explicit nulls where a platform doesn't natively expose a figure — values are never fabricated. closes_at/event_id remain deliberately omitted, see the endpoint description for the rationale.
+// Single-market detail across all six supported platforms. Identity fields are strict-universal (no second fetch on any platform); the pricing tier carries per-outcome quotes plus market-level aggregates with explicit nulls where a platform doesn't natively expose a figure — values are never fabricated. The trading_fees tier applies the same rule to the venue's own published fee parameters. closes_at/event_id remain deliberately omitted, see the endpoint description for the rationale.
 var (
 	marketDetailResponseFieldID                   = big.NewInt(1 << 0)
 	marketDetailResponseFieldProvider             = big.NewInt(1 << 1)
@@ -3103,12 +3415,13 @@ var (
 	marketDetailResponseFieldStatus               = big.NewInt(1 << 4)
 	marketDetailResponseFieldOutcomes             = big.NewInt(1 << 5)
 	marketDetailResponseFieldPricing              = big.NewInt(1 << 6)
-	marketDetailResponseFieldLiquidityUsd         = big.NewInt(1 << 7)
-	marketDetailResponseFieldVolume24HUsd         = big.NewInt(1 << 8)
-	marketDetailResponseFieldVolumeTotalUsd       = big.NewInt(1 << 9)
-	marketDetailResponseFieldVolume24HContracts   = big.NewInt(1 << 10)
-	marketDetailResponseFieldVolumeTotalContracts = big.NewInt(1 << 11)
-	marketDetailResponseFieldOpenInterest         = big.NewInt(1 << 12)
+	marketDetailResponseFieldTradingFees          = big.NewInt(1 << 7)
+	marketDetailResponseFieldLiquidityUsd         = big.NewInt(1 << 8)
+	marketDetailResponseFieldVolume24HUsd         = big.NewInt(1 << 9)
+	marketDetailResponseFieldVolumeTotalUsd       = big.NewInt(1 << 10)
+	marketDetailResponseFieldVolume24HContracts   = big.NewInt(1 << 11)
+	marketDetailResponseFieldVolumeTotalContracts = big.NewInt(1 << 12)
+	marketDetailResponseFieldOpenInterest         = big.NewInt(1 << 13)
 )
 
 type MarketDetailResponse struct {
@@ -3123,8 +3436,9 @@ type MarketDetailResponse struct {
 	// Normalized lifecycle status. Mapping per platform: Kalshi `active` → open · `closed`/`determined` → closed · `settled`/`finalized` → settled. Polymarket `archived` → settled · `closed && !archived` → closed · otherwise → open. Predict `tradingStatus=OPEN` → open · `CLOSED && !RESOLVED` → closed · `status=RESOLVED` → settled. SX Bet `ACTIVE` → open · otherwise closed. Hyperliquid named outcomes listed in `settledNamedOutcomes` → settled · otherwise open. Unknown upstream values default to closed.
 	Status MarketDetailResponseStatus `json:"status" url:"status"`
 	// Outcomes with per-outcome quotes. ORDERING GUARANTEE: `outcomes[0]` is the platform's primary/headline outcome — Kalshi `Yes`, Polymarket's first outcome token (its `bestBid`/`bestAsk` side), Predict `indexSet=1`, SX Bet `outcomeOne`, Hyperliquid's first `sideSpec`. Render `outcomes[0].price` as the headline probability; do NOT search for an outcome named "Yes" (names are free-text on Predict/SX Bet/Hyperliquid). Every supported platform models per-market outcomes as a 2-element list in practice (multi-outcome events are modeled as multiple binary markets nested under one event/category); the per-outcome quote shape handles binary and any future multi-outcome record identically with no special-casing.
-	Outcomes []*MarketDetailOutcome `json:"outcomes" url:"outcomes"`
-	Pricing  *MarketDetailPricing   `json:"pricing" url:"pricing"`
+	Outcomes    []*MarketDetailOutcome   `json:"outcomes" url:"outcomes"`
+	Pricing     *MarketDetailPricing     `json:"pricing" url:"pricing"`
+	TradingFees *MarketDetailTradingFees `json:"trading_fees" url:"trading_fees"`
 	// Resting order-book depth valued in USD — strictly CLOB book depth, never an AMM pool size or a synthetic score. Polymarket exposes it natively (`liquidityNum`); null for Kalshi (its upstream `liquidity_dollars` is deprecated and always zero), Predict (stats is null on the record), and SX Bet/Hyperliquid (no scalar without summing the raw order book).
 	LiquidityUsd *float64 `json:"liquidity_usd,omitempty" url:"liquidity_usd,omitempty"`
 	// Trailing-24h traded volume in USD notional. Null where the platform doesn't denominate volume in USD — notably Kalshi (contracts; see `volume_24h_contracts`) — or doesn't expose a volume aggregate at all (SX Bet, Hyperliquid, Predict's record).
@@ -3192,6 +3506,13 @@ func (m *MarketDetailResponse) GetPricing() *MarketDetailPricing {
 		return nil
 	}
 	return m.Pricing
+}
+
+func (m *MarketDetailResponse) GetTradingFees() *MarketDetailTradingFees {
+	if m == nil {
+		return nil
+	}
+	return m.TradingFees
 }
 
 func (m *MarketDetailResponse) GetLiquidityUsd() *float64 {
@@ -3297,6 +3618,13 @@ func (m *MarketDetailResponse) SetOutcomes(outcomes []*MarketDetailOutcome) {
 func (m *MarketDetailResponse) SetPricing(pricing *MarketDetailPricing) {
 	m.Pricing = pricing
 	m.require(marketDetailResponseFieldPricing)
+}
+
+// SetTradingFees sets the TradingFees field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailResponse) SetTradingFees(tradingFees *MarketDetailTradingFees) {
+	m.TradingFees = tradingFees
+	m.require(marketDetailResponseFieldTradingFees)
 }
 
 // SetLiquidityUsd sets the LiquidityUsd field and marks it as non-optional;
@@ -3441,6 +3769,429 @@ func NewMarketDetailResponseStatusFromString(s string) (MarketDetailResponseStat
 }
 
 func (m MarketDetailResponseStatus) Ptr() *MarketDetailResponseStatus {
+	return &m
+}
+
+// The next PUBLISHED change to this market's fee parameters and when it takes effect. OMITTED (not null) when there is no pending change, matching `pricing.neg_risk`.
+//
+// Kalshi is the only platform that publishes this today, and it matters: every MLB series currently runs at a `fee_multiplier` of 0.5 with a per-event override restoring 1.0 at first pitch, so the fee DOUBLES mid-market on a game that is already trading. On a $100 taker order at a price of 0.42 that is 203 bps before the first pitch and 406 bps after — enough to change which venue is cheaper for the same canonical outcome at the same price. Without this field a consumer mis-costs every order placed near a game start with no way to see it coming.
+var (
+	marketDetailScheduledFeeChangeFieldEffectiveAt = big.NewInt(1 << 0)
+	marketDetailScheduledFeeChangeFieldTaker       = big.NewInt(1 << 1)
+	marketDetailScheduledFeeChangeFieldMaker       = big.NewInt(1 << 2)
+)
+
+type MarketDetailScheduledFeeChange struct {
+	// When the new parameters take effect, RFC3339.
+	EffectiveAt time.Time           `json:"effective_at" url:"effective_at"`
+	Taker       *MarketDetailFeeLeg `json:"taker,omitempty" url:"taker,omitempty"`
+	Maker       *MarketDetailFeeLeg `json:"maker,omitempty" url:"maker,omitempty"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (m *MarketDetailScheduledFeeChange) GetEffectiveAt() time.Time {
+	if m == nil {
+		return time.Time{}
+	}
+	return m.EffectiveAt
+}
+
+func (m *MarketDetailScheduledFeeChange) GetTaker() *MarketDetailFeeLeg {
+	if m == nil {
+		return nil
+	}
+	return m.Taker
+}
+
+func (m *MarketDetailScheduledFeeChange) GetMaker() *MarketDetailFeeLeg {
+	if m == nil {
+		return nil
+	}
+	return m.Maker
+}
+
+func (m *MarketDetailScheduledFeeChange) GetExtraProperties() map[string]interface{} {
+	if m == nil {
+		return nil
+	}
+	return m.extraProperties
+}
+
+func (m *MarketDetailScheduledFeeChange) require(field *big.Int) {
+	if m.explicitFields == nil {
+		m.explicitFields = big.NewInt(0)
+	}
+	m.explicitFields.Or(m.explicitFields, field)
+}
+
+// SetEffectiveAt sets the EffectiveAt field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailScheduledFeeChange) SetEffectiveAt(effectiveAt time.Time) {
+	m.EffectiveAt = effectiveAt
+	m.require(marketDetailScheduledFeeChangeFieldEffectiveAt)
+}
+
+// SetTaker sets the Taker field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailScheduledFeeChange) SetTaker(taker *MarketDetailFeeLeg) {
+	m.Taker = taker
+	m.require(marketDetailScheduledFeeChangeFieldTaker)
+}
+
+// SetMaker sets the Maker field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailScheduledFeeChange) SetMaker(maker *MarketDetailFeeLeg) {
+	m.Maker = maker
+	m.require(marketDetailScheduledFeeChangeFieldMaker)
+}
+
+func (m *MarketDetailScheduledFeeChange) UnmarshalJSON(data []byte) error {
+	type embed MarketDetailScheduledFeeChange
+	var unmarshaler = struct {
+		embed
+		EffectiveAt *internal.DateTime `json:"effective_at"`
+	}{
+		embed: embed(*m),
+	}
+	if err := json.Unmarshal(data, &unmarshaler); err != nil {
+		return err
+	}
+	*m = MarketDetailScheduledFeeChange(unmarshaler.embed)
+	m.EffectiveAt = unmarshaler.EffectiveAt.Time()
+	extraProperties, err := internal.ExtractExtraProperties(data, *m)
+	if err != nil {
+		return err
+	}
+	m.extraProperties = extraProperties
+	m.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (m *MarketDetailScheduledFeeChange) MarshalJSON() ([]byte, error) {
+	type embed MarketDetailScheduledFeeChange
+	var marshaler = struct {
+		embed
+		EffectiveAt *internal.DateTime `json:"effective_at"`
+	}{
+		embed:       embed(*m),
+		EffectiveAt: internal.NewDateTime(m.EffectiveAt),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, m.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (m *MarketDetailScheduledFeeChange) String() string {
+	if m == nil {
+		return "<nil>"
+	}
+	if len(m.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(m.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(m); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", m)
+}
+
+// The trading fee the PREDICTION MARKET charges on a trade in this market — the venue's own published parameters, normalized. This has nothing to do with PredictorSDK's subscription pricing.
+//
+// Always present on the response. Every published model across the six platforms is a per-share fee times the traded share count, and only the price term differs, so `taker.model` plus its parameters expresses each venue exactly rather than approximating any of them. Compute the fee yourself:
+//
+// `fee = shares × f(price)`, then apply `rounding`, where `f` is
+//
+// - `quadratic`: `rate × (price × (1 − price)) ^ exponent`
+// - `min_price`: `rate × min(price, 1 − price)`
+// - `notional`: `rate × price`
+// - `none`: `0`
+//
+// The effective rate on notional — what you actually compare across venues — is `f(price) / price`. For `quadratic` at `exponent: 1` that reduces to `rate × (1 − price)`, which is why no single basis-point figure can express any of these venues: at `rate: 0.07` the effective cost runs from 693 bps at a price of 0.01 down to 7 bps at 0.99.
+//
+// `availability` and the legs are on separate axes on purpose: availability says what is KNOWN, the legs say what is CHARGED. A fee-free market is `availability: published` with `model: "none"` and `rate: 0` — an asserted zero, distinguishable from `unpublished` (the venue publishes nothing) and from `account_specific` (rates exist but are per-account).
+//
+// OUT OF SCOPE and therefore not modeled as fields, though each is real and moves the number: rebates (Polymarket's maker-rebate and taker-rebate programs), per-account discounts (Predict's 10% invite discount), volume/staking tiers (Hyperliquid), and third-party pass-through (Kalshi FCM customers, Polymarket builder fees). The parameters here are the venue's PUBLISHED base for this market; a specific account may pay less.
+var (
+	marketDetailTradingFeesFieldAvailability    = big.NewInt(1 << 0)
+	marketDetailTradingFeesFieldObservedAt      = big.NewInt(1 << 1)
+	marketDetailTradingFeesFieldSource          = big.NewInt(1 << 2)
+	marketDetailTradingFeesFieldChargeBasis     = big.NewInt(1 << 3)
+	marketDetailTradingFeesFieldTaker           = big.NewInt(1 << 4)
+	marketDetailTradingFeesFieldMaker           = big.NewInt(1 << 5)
+	marketDetailTradingFeesFieldScheduledChange = big.NewInt(1 << 6)
+)
+
+type MarketDetailTradingFees struct {
+	// `published` — the full parameter set for this market is known. `partial` — fees may be charged here but a parameter is missing or uninterpretable upstream; the legs carry what is known and null the rest, never a guess. It also covers the case where the parameters in force are known but the venue's pending-change list was unreadable, so an omitted `scheduled_change` means "unknown" rather than "none". `account_specific` — rates exist but are set per trading account and require your own venue credentials (SX Bet's `GET /user/fees-v3`, Hyperliquid's `POST /info {"type":"userFees"}`). `unpublished` — the venue publishes no fee model for this market at all. `unavailable` — our own bounded parameter fetch failed or timed out; identity and pricing are still served. Same contract as `pricing.availability`.
+	Availability MarketDetailTradingFeesAvailability `json:"availability" url:"availability"`
+	// When PredictorSDK READ these parameter values — an observation timestamp, not an upstream stamp.
+	//
+	// Named `observed_at` rather than `as_of` deliberately: `pricing.as_of` is the provider record's own last-update time, which is a different thing, and reusing the name for a differently-defined timestamp would bake that confusion into a second field. Null when nothing is read at request time (`source: venue_schedule`) or when nothing could be read (`availability: unavailable`).
+	ObservedAt *time.Time `json:"observed_at,omitempty" url:"observed_at,omitempty"`
+	// Where the parameters came from, so a latency-sensitive consumer knows which platforms cost extra hops. `market_record` — embedded in the same market record the identity fetch already returned (Polymarket `feeSchedule`, Predict `feeRateBps`, AlphaArcade `feeBasePercent`); zero extra fetches. `series_record` — the parameters live on parent records and cost up to three small, TTL-cached hops (Kalshi: the event record for its series ticker and any fee override in force, the series for the base `fee_type`/`fee_multiplier` that override supersedes, then the event's pending fee changes for `scheduled_change`). `venue_schedule` — the venue exposes no per-market parameter and the answer comes from its published schedule (SX Bet, Hyperliquid).
+	Source MarketDetailTradingFeesSource `json:"source" url:"source"`
+	// What the fee is assessed on. `fill` — assessed when the order fills, from the traded share count and the fill price. `settlement_profit` — assessed at settlement, on profit (total return − stake), and only on a position that WON; a loss or a void is never charged.
+	//
+	// Read this before comparing rates across venues. SX Bet charges on winning profit at settlement, so its fee is an expected-value haircut rather than an entry cost — a consumer that models it as a percentage of notional is wrong about the shape before it is wrong about the rate. The reported basis is the one that applies to trading: SX Bet's four payout fees. Its separate `refundFee` is charged at fill time on the capital-efficiency refund rather than on profit, and is out of scope here along with its rates.
+	ChargeBasis     *MarketDetailTradingFeesChargeBasis `json:"charge_basis,omitempty" url:"charge_basis,omitempty"`
+	Taker           *MarketDetailFeeLeg                 `json:"taker,omitempty" url:"taker,omitempty"`
+	Maker           *MarketDetailFeeLeg                 `json:"maker,omitempty" url:"maker,omitempty"`
+	ScheduledChange *MarketDetailScheduledFeeChange     `json:"scheduled_change,omitempty" url:"scheduled_change,omitempty"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (m *MarketDetailTradingFees) GetAvailability() MarketDetailTradingFeesAvailability {
+	if m == nil {
+		return ""
+	}
+	return m.Availability
+}
+
+func (m *MarketDetailTradingFees) GetObservedAt() *time.Time {
+	if m == nil {
+		return nil
+	}
+	return m.ObservedAt
+}
+
+func (m *MarketDetailTradingFees) GetSource() MarketDetailTradingFeesSource {
+	if m == nil {
+		return ""
+	}
+	return m.Source
+}
+
+func (m *MarketDetailTradingFees) GetChargeBasis() *MarketDetailTradingFeesChargeBasis {
+	if m == nil {
+		return nil
+	}
+	return m.ChargeBasis
+}
+
+func (m *MarketDetailTradingFees) GetTaker() *MarketDetailFeeLeg {
+	if m == nil {
+		return nil
+	}
+	return m.Taker
+}
+
+func (m *MarketDetailTradingFees) GetMaker() *MarketDetailFeeLeg {
+	if m == nil {
+		return nil
+	}
+	return m.Maker
+}
+
+func (m *MarketDetailTradingFees) GetScheduledChange() *MarketDetailScheduledFeeChange {
+	if m == nil {
+		return nil
+	}
+	return m.ScheduledChange
+}
+
+func (m *MarketDetailTradingFees) GetExtraProperties() map[string]interface{} {
+	if m == nil {
+		return nil
+	}
+	return m.extraProperties
+}
+
+func (m *MarketDetailTradingFees) require(field *big.Int) {
+	if m.explicitFields == nil {
+		m.explicitFields = big.NewInt(0)
+	}
+	m.explicitFields.Or(m.explicitFields, field)
+}
+
+// SetAvailability sets the Availability field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailTradingFees) SetAvailability(availability MarketDetailTradingFeesAvailability) {
+	m.Availability = availability
+	m.require(marketDetailTradingFeesFieldAvailability)
+}
+
+// SetObservedAt sets the ObservedAt field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailTradingFees) SetObservedAt(observedAt *time.Time) {
+	m.ObservedAt = observedAt
+	m.require(marketDetailTradingFeesFieldObservedAt)
+}
+
+// SetSource sets the Source field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailTradingFees) SetSource(source MarketDetailTradingFeesSource) {
+	m.Source = source
+	m.require(marketDetailTradingFeesFieldSource)
+}
+
+// SetChargeBasis sets the ChargeBasis field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailTradingFees) SetChargeBasis(chargeBasis *MarketDetailTradingFeesChargeBasis) {
+	m.ChargeBasis = chargeBasis
+	m.require(marketDetailTradingFeesFieldChargeBasis)
+}
+
+// SetTaker sets the Taker field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailTradingFees) SetTaker(taker *MarketDetailFeeLeg) {
+	m.Taker = taker
+	m.require(marketDetailTradingFeesFieldTaker)
+}
+
+// SetMaker sets the Maker field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailTradingFees) SetMaker(maker *MarketDetailFeeLeg) {
+	m.Maker = maker
+	m.require(marketDetailTradingFeesFieldMaker)
+}
+
+// SetScheduledChange sets the ScheduledChange field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailTradingFees) SetScheduledChange(scheduledChange *MarketDetailScheduledFeeChange) {
+	m.ScheduledChange = scheduledChange
+	m.require(marketDetailTradingFeesFieldScheduledChange)
+}
+
+func (m *MarketDetailTradingFees) UnmarshalJSON(data []byte) error {
+	type embed MarketDetailTradingFees
+	var unmarshaler = struct {
+		embed
+		ObservedAt *internal.DateTime `json:"observed_at,omitempty"`
+	}{
+		embed: embed(*m),
+	}
+	if err := json.Unmarshal(data, &unmarshaler); err != nil {
+		return err
+	}
+	*m = MarketDetailTradingFees(unmarshaler.embed)
+	m.ObservedAt = unmarshaler.ObservedAt.TimePtr()
+	extraProperties, err := internal.ExtractExtraProperties(data, *m)
+	if err != nil {
+		return err
+	}
+	m.extraProperties = extraProperties
+	m.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (m *MarketDetailTradingFees) MarshalJSON() ([]byte, error) {
+	type embed MarketDetailTradingFees
+	var marshaler = struct {
+		embed
+		ObservedAt *internal.DateTime `json:"observed_at,omitempty"`
+	}{
+		embed:      embed(*m),
+		ObservedAt: internal.NewOptionalDateTime(m.ObservedAt),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, m.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (m *MarketDetailTradingFees) String() string {
+	if m == nil {
+		return "<nil>"
+	}
+	if len(m.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(m.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(m); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", m)
+}
+
+// `published` — the full parameter set for this market is known. `partial` — fees may be charged here but a parameter is missing or uninterpretable upstream; the legs carry what is known and null the rest, never a guess. It also covers the case where the parameters in force are known but the venue's pending-change list was unreadable, so an omitted `scheduled_change` means "unknown" rather than "none". `account_specific` — rates exist but are set per trading account and require your own venue credentials (SX Bet's `GET /user/fees-v3`, Hyperliquid's `POST /info {"type":"userFees"}`). `unpublished` — the venue publishes no fee model for this market at all. `unavailable` — our own bounded parameter fetch failed or timed out; identity and pricing are still served. Same contract as `pricing.availability`.
+type MarketDetailTradingFeesAvailability string
+
+const (
+	MarketDetailTradingFeesAvailabilityPublished       MarketDetailTradingFeesAvailability = "published"
+	MarketDetailTradingFeesAvailabilityPartial         MarketDetailTradingFeesAvailability = "partial"
+	MarketDetailTradingFeesAvailabilityAccountSpecific MarketDetailTradingFeesAvailability = "account_specific"
+	MarketDetailTradingFeesAvailabilityUnpublished     MarketDetailTradingFeesAvailability = "unpublished"
+	MarketDetailTradingFeesAvailabilityUnavailable     MarketDetailTradingFeesAvailability = "unavailable"
+)
+
+func NewMarketDetailTradingFeesAvailabilityFromString(s string) (MarketDetailTradingFeesAvailability, error) {
+	switch s {
+	case "published":
+		return MarketDetailTradingFeesAvailabilityPublished, nil
+	case "partial":
+		return MarketDetailTradingFeesAvailabilityPartial, nil
+	case "account_specific":
+		return MarketDetailTradingFeesAvailabilityAccountSpecific, nil
+	case "unpublished":
+		return MarketDetailTradingFeesAvailabilityUnpublished, nil
+	case "unavailable":
+		return MarketDetailTradingFeesAvailabilityUnavailable, nil
+	}
+	var t MarketDetailTradingFeesAvailability
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (m MarketDetailTradingFeesAvailability) Ptr() *MarketDetailTradingFeesAvailability {
+	return &m
+}
+
+// What the fee is assessed on. `fill` — assessed when the order fills, from the traded share count and the fill price. `settlement_profit` — assessed at settlement, on profit (total return − stake), and only on a position that WON; a loss or a void is never charged.
+//
+// Read this before comparing rates across venues. SX Bet charges on winning profit at settlement, so its fee is an expected-value haircut rather than an entry cost — a consumer that models it as a percentage of notional is wrong about the shape before it is wrong about the rate. The reported basis is the one that applies to trading: SX Bet's four payout fees. Its separate `refundFee` is charged at fill time on the capital-efficiency refund rather than on profit, and is out of scope here along with its rates.
+type MarketDetailTradingFeesChargeBasis string
+
+const (
+	MarketDetailTradingFeesChargeBasisFill             MarketDetailTradingFeesChargeBasis = "fill"
+	MarketDetailTradingFeesChargeBasisSettlementProfit MarketDetailTradingFeesChargeBasis = "settlement_profit"
+)
+
+func NewMarketDetailTradingFeesChargeBasisFromString(s string) (MarketDetailTradingFeesChargeBasis, error) {
+	switch s {
+	case "fill":
+		return MarketDetailTradingFeesChargeBasisFill, nil
+	case "settlement_profit":
+		return MarketDetailTradingFeesChargeBasisSettlementProfit, nil
+	}
+	var t MarketDetailTradingFeesChargeBasis
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (m MarketDetailTradingFeesChargeBasis) Ptr() *MarketDetailTradingFeesChargeBasis {
+	return &m
+}
+
+// Where the parameters came from, so a latency-sensitive consumer knows which platforms cost extra hops. `market_record` — embedded in the same market record the identity fetch already returned (Polymarket `feeSchedule`, Predict `feeRateBps`, AlphaArcade `feeBasePercent`); zero extra fetches. `series_record` — the parameters live on parent records and cost up to three small, TTL-cached hops (Kalshi: the event record for its series ticker and any fee override in force, the series for the base `fee_type`/`fee_multiplier` that override supersedes, then the event's pending fee changes for `scheduled_change`). `venue_schedule` — the venue exposes no per-market parameter and the answer comes from its published schedule (SX Bet, Hyperliquid).
+type MarketDetailTradingFeesSource string
+
+const (
+	MarketDetailTradingFeesSourceMarketRecord  MarketDetailTradingFeesSource = "market_record"
+	MarketDetailTradingFeesSourceSeriesRecord  MarketDetailTradingFeesSource = "series_record"
+	MarketDetailTradingFeesSourceVenueSchedule MarketDetailTradingFeesSource = "venue_schedule"
+)
+
+func NewMarketDetailTradingFeesSourceFromString(s string) (MarketDetailTradingFeesSource, error) {
+	switch s {
+	case "market_record":
+		return MarketDetailTradingFeesSourceMarketRecord, nil
+	case "series_record":
+		return MarketDetailTradingFeesSourceSeriesRecord, nil
+	case "venue_schedule":
+		return MarketDetailTradingFeesSourceVenueSchedule, nil
+	}
+	var t MarketDetailTradingFeesSource
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (m MarketDetailTradingFeesSource) Ptr() *MarketDetailTradingFeesSource {
 	return &m
 }
 
