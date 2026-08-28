@@ -82,9 +82,13 @@ var (
 )
 
 type GetEventRequest struct {
-	// Platform-native event identifier. Examples per platform: Kalshi event ticker (`KXMLBGAME-26MAY221840CLEPHI`), Polymarket event slug (`mlb-cle-phi-2026-05-22`), SX Bet event id (`L10073358`), Predict market id (`110629`), Hyperliquid question or outcome integer id (`19` or `172`; requires `?platform=hyperliquid` since integer ids aren't inferred).
+	// Platform-native event identifier. Examples per platform: Kalshi event ticker (`KXNBAGAME-26OCT20OKCSAS`), Polymarket event slug (`mlb-tor-cle-2026-09-02`), SX Bet event id (`L19766755`), Predict market id (`1607914`), Hyperliquid question or outcome integer id (requires `?platform=hyperliquid` since integer ids aren't inferred). The composite `{provider}:{native_id}` form (e.g. `predict:1607914`) is accepted here too and dispatches without probing.
+	//
+	// **A bare numeric id or slug is not unique across platforms.** Polymarket and Predict both use these shapes and their id spaces overlap, so sending one without a platform can fail with `409` (see that response). Pass `?platform=` — every row of `GET /v1/matching-markets/sports` carries the `platform` that goes with its `event_id`.
+	//
+	// **Sports identifiers expire.** Game tickers and slugs are delisted once an event settles, and Hyperliquid ids roll over daily. Take current ones from `GET /v1/matching-markets/sports` (every platform row carries its provider-native `event_id`) rather than copying one out of this reference.
 	EventID string `json:"-" url:"-"`
-	// Optional platform override. When omitted, inferred from the `event_id` format: `KX…` → Kalshi, `L\d+` → SX Bet. Numeric IDs and kebab-case slugs are shared shape between Polymarket and Predict; in that case the service probes Polymarket first and falls back to Predict on 404. Hyperliquid question/outcome integer ids collide with these numerics and are not inferred — pass `?platform=hyperliquid` (alias `hl`). Pass `platform` explicitly to skip the probe.
+	// Optional platform override. When omitted, inferred from the `event_id` format: `KX…` → Kalshi, `L\d+` → SX Bet. Numeric IDs and kebab-case slugs are shared shape between Polymarket and Predict; in that case the service probes both and returns `409` rather than guessing if the identifier resolves on both. Hyperliquid question/outcome integer ids collide with these numerics and are not inferred — pass `?platform=hyperliquid` (alias `hl`). Passing `platform` explicitly skips the probe entirely and is the recommended call whenever you know it. Supplying a value that contradicts a composite `{provider}:` prefix is a `400`.
 	Platform *GetEventRequestPlatform `json:"-" url:"platform,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
@@ -118,9 +122,13 @@ var (
 )
 
 type GetMarketRequest struct {
-	// Composite (`{provider}:{native_id}`) or platform-native market identifier. Examples per platform: Kalshi market ticker (`KXNBA-26-SAS`), Polymarket numeric id or slug (`540817` or `new-rhianna-album-before-gta-vi-926`), Predict market id (`356635`), SX Bet `marketHash` (`0x…64hex`), Hyperliquid outcome id (use the composite `hyperliquid:172` or `?platform=hyperliquid` — bare integer ids aren't inferred).
+	// Composite (`{provider}:{native_id}`) or platform-native market identifier. Examples per platform: Kalshi market ticker (`KXNBA-27-SAS`), Polymarket numeric id or slug (`540817` or `mlb-tor-cle-2026-09-02`), Predict market id (`356635`), SX Bet `marketHash` (`0x…64hex`), Hyperliquid outcome id (use the composite `hyperliquid:<outcome-id>` or `?platform=hyperliquid` — bare integer ids aren't inferred).
+	//
+	// **A bare numeric id or slug is not unique across platforms.** Polymarket and Predict both use these shapes and their id spaces overlap, so sending one without a platform can fail with `409` (see that response). Prefer the composite form — it is what `GET /v1/markets` returns in `data[].id` — or pass `?platform=`.
+	//
+	// **Sports identifiers expire.** Kalshi game tickers, Polymarket game slugs, and Hyperliquid outcome ids are recycled or delisted as events settle — Hyperliquid's live catalog is a handful of daily-recurring outcomes, so any specific integer id there is valid for roughly a day. Take current ids from `GET /v1/markets` or `GET /v1/matching-markets/sports` rather than copying one out of this reference. Long-dated markets (Kalshi season futures, multi-year AlphaArcade questions) and settled Polymarket/Predict/SX Bet ids stay resolvable.
 	MarketID string `json:"-" url:"-"`
-	// Optional platform override. When omitted, inferred from the composite prefix or from the native ID format (`KX…` → Kalshi, `0x…64hex` → SX Bet). Numeric IDs and kebab-case slugs are shared shape between Polymarket and Predict; in that case the service probes Polymarket first and falls back to Predict on 404. Hyperliquid integer ids collide with these numerics and are not inferred — use the composite `hyperliquid:<id>` or `?platform=hyperliquid` (alias `hl`). Pass `platform` explicitly to skip the probe. When the override contradicts a composite prefix (e.g. `kalshi:X` with `?platform=polymarket`), the request returns 400.
+	// Optional platform override. When omitted, inferred from the composite prefix or from the native ID format (`KX…` → Kalshi, `0x…64hex` → SX Bet). Numeric IDs and kebab-case slugs are shared shape between Polymarket and Predict; in that case the service probes both and returns `409` rather than guessing if the identifier resolves on both. Hyperliquid integer ids collide with these numerics and are not inferred — use the composite `hyperliquid:<id>` or `?platform=hyperliquid` (alias `hl`). Passing `platform` explicitly skips the probe entirely and is the recommended call whenever you know it. When the override contradicts a composite prefix (e.g. `kalshi:X` with `?platform=polymarket`), the request returns 400.
 	Platform *GetMarketRequestPlatform `json:"-" url:"platform,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
@@ -152,6 +160,7 @@ var (
 	getMarketsRequestFieldLimit    = big.NewInt(1 << 0)
 	getMarketsRequestFieldCursor   = big.NewInt(1 << 1)
 	getMarketsRequestFieldCategory = big.NewInt(1 << 2)
+	getMarketsRequestFieldProvider = big.NewInt(1 << 3)
 )
 
 type GetMarketsRequest struct {
@@ -161,6 +170,14 @@ type GetMarketsRequest struct {
 	Cursor *string `json:"-" url:"cursor,omitempty"`
 	// Canonical top-level category filter. This is PredictorSDK's normalized category, not a provider-native tag. Cursors are bound to the category filter used to create them.
 	Category *MarketCategory `json:"-" url:"category,omitempty"`
+	// Restrict the page to one provider, matched against each row's own `provider` value. Without it, providers are walked in the order below and a caller wanting a later one has to paginate through every earlier provider's rows first.
+	//
+	// Only the canonical provider IDs are accepted, case-insensitively. Any other value returns `400` listing the legal ones — an unrecognized filter is never ignored, because a silently dropped filter returns a full unfiltered page that looks filtered.
+	//
+	// `pagination.total` counts only the selected provider's rows, and cursors are bound to the filter that created them: replay a `next_cursor` with the same `provider` value, or start again from the first page.
+	//
+	// This is a catalog membership filter, and it is spelled `provider` because that is the field it selects on. It is unrelated to the `platform` override on `GET /v1/markets/{market_id}` and `GET /v1/events/{event_id}`, which names the venue an identifier should be resolved against rather than filtering a list.
+	Provider *GetMarketsRequestProvider `json:"-" url:"provider,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
 	explicitFields *big.Int `json:"-" url:"-"`
@@ -192,6 +209,13 @@ func (g *GetMarketsRequest) SetCursor(cursor *string) {
 func (g *GetMarketsRequest) SetCategory(category *MarketCategory) {
 	g.Category = category
 	g.require(getMarketsRequestFieldCategory)
+}
+
+// SetProvider sets the Provider field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (g *GetMarketsRequest) SetProvider(provider *GetMarketsRequestProvider) {
+	g.Provider = provider
+	g.require(getMarketsRequestFieldProvider)
 }
 
 var (
@@ -247,19 +271,23 @@ type GetSportsMatchingMarketsRequest struct {
 	Limit *int `json:"-" url:"limit,omitempty"`
 	// Opaque cursor from a previous response's `pagination.nextCursor` in the SDKs (raw JSON: `pagination.next_cursor`). Must be used with the same filter set — a cursor from `include_settled=true` cannot be replayed against `include_settled=false` and will return `400`.
 	Cursor *string `json:"-" url:"cursor,omitempty"`
-	// When `true`, include settled/archived events alongside currently live matches. Defaults to `false`.
+	// Selects which events this request draws from, in list mode and in lookup mode alike. Defaults to `false`: only events whose scheduled start has not certainly passed — today's games, plus a one-day grace so a late start that runs past midnight Eastern is never dropped mid-play. Set it to `true` to also get events whose game date is further in the past, including ones a venue still lists as open.
+	//
+	// A venue can keep quoting a market for months after the game (a 94-day-old row was still `status: open` with a live two-sided book when this was written), so the endpoint filters on the game date it already holds — the trailing date of the canonical `event_id` — rather than on an upstream status it cannot verify. Nothing is reported as settled that the venue has not settled; these events are simply not *current*, which is what the default page is for.
+	//
+	// Because it selects the population, a lookup (`?event_id=`, `?polymarket_market_slug=`, …) for a past-dated event answers `200` with an empty `markets` object unless this is `true`.
 	IncludeSettled *bool `json:"-" url:"include_settled,omitempty"`
 	// When `true`, add `canonical_events` with normalized event, submarket, line, segment, outcome, and exact source market/outcome identity. This is an identity mapping only; fetch current status, quotes, and liquidity from the referenced market resources. Defaults to `false` so the compact Dome-compatible response is unchanged.
 	IncludeSubmarkets *bool `json:"-" url:"include_submarkets,omitempty"`
-	// Canonical event key(s) to look up directly (for example, `mlb-tex-hou-2026-07-31`). Provide the parameter multiple times for multiple events, up to 100 unique keys. Only one filter type may be used per request. Lookup mode — pagination parameters are ignored.
+	// Canonical event key(s) to look up directly (for example, `nba-okc-sas-2026-10-20`). Provide the parameter multiple times for multiple events, up to 100 unique keys. Only one filter type may be used per request. Lookup mode — pagination parameters are ignored.
 	EventID []*string `json:"-" url:"event_id,omitempty"`
-	// Kalshi event ticker(s) to find matching markets for (e.g. `KXNFLGAME-25AUG16ARIDEN`). Provide the parameter multiple times for multiple tickers, up to 100 unique values. Only one filter type may be used per request. Lookup mode — pagination parameters are ignored.
+	// Kalshi event ticker(s) to find matching markets for (e.g. `KXNBAGAME-26OCT20OKCSAS`). Provide the parameter multiple times for multiple tickers, up to 100 unique values. Only one filter type may be used per request. Lookup mode — pagination parameters are ignored.
 	KalshiEventTicker []*string `json:"-" url:"kalshi_event_ticker,omitempty"`
-	// Polymarket market slug(s) to find matching markets for (e.g. `nfl-ari-den-2025-08-16`). Provide the parameter multiple times for multiple slugs, up to 100 unique values. Only one filter type may be used per request. Lookup mode — pagination parameters are ignored.
+	// Polymarket market slug(s) to find matching markets for (e.g. `mlb-tor-cle-2026-09-02`). Provide the parameter multiple times for multiple slugs, up to 100 unique values. Only one filter type may be used per request. Lookup mode — pagination parameters are ignored.
 	PolymarketMarketSlug []*string `json:"-" url:"polymarket_market_slug,omitempty"`
-	// Predict market ID(s) to find matching markets for (e.g. `110629`). Provide the parameter multiple times for multiple IDs, up to 100 unique values. Only one filter type may be used per request. Lookup mode — pagination parameters are ignored.
+	// Predict market ID(s) to find matching markets for (e.g. `1607914`). Provide the parameter multiple times for multiple IDs, up to 100 unique values. Only one filter type may be used per request. Lookup mode — pagination parameters are ignored.
 	PredictMarketID []*string `json:"-" url:"predict_market_id,omitempty"`
-	// SX Bet market ID(s) to find matching markets for (e.g. `0x4c000abdbf197ef32ecdf15561b1d636f1e5b02629f466678757fd83e2ec3599`). Provide the parameter multiple times for multiple IDs, up to 100 unique values. Only one filter type may be used per request. Lookup mode — pagination parameters are ignored.
+	// SX Bet market ID(s) to find matching markets for (e.g. `0xb4d047a709aae881e5ccad9d123592967644ee1df1f17078c762b388e41b81c5`). Provide the parameter multiple times for multiple IDs, up to 100 unique values. Only one filter type may be used per request. Lookup mode — pagination parameters are ignored.
 	SxbetMarketID []*string `json:"-" url:"sxbet_market_id,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
@@ -392,6 +420,144 @@ func (l *ListPolymarketWalletPositionsRequest) SetCursor(cursor *string) {
 	l.require(listPolymarketWalletPositionsRequestFieldCursor)
 }
 
+// Error body returned with HTTP 409. The identifier you sent is well-formed but not unique: it names a real resource on more than one platform, and nothing in the request says which one you meant. Polymarket and Predict share both the bare-numeric and kebab-case identifier shapes and their id spaces genuinely overlap, so this is a routine outcome rather than an edge case — measured 2026-08-25, 53 of 93 Predict market ids drawn from `GET /v1/matching-markets/sports` also resolved on Polymarket.
+//
+// `candidates` lists exactly the platforms the identifier resolved on, in a stable order, and every entry is a legal `?platform=` value. Retry the same identifier with `?platform={candidate}`, or with the composite `{platform}:{id}` form, and the lookup is deterministic. Clients that fan out over identifiers should handle 409 by re-issuing with the platform they already know from the listing that produced the id — every list and matching response that emits an identifier also emits its platform.
+var (
+	ambiguousIdentifierErrorFieldError      = big.NewInt(1 << 0)
+	ambiguousIdentifierErrorFieldMessage    = big.NewInt(1 << 1)
+	ambiguousIdentifierErrorFieldCandidates = big.NewInt(1 << 2)
+	ambiguousIdentifierErrorFieldStatusCode = big.NewInt(1 << 3)
+)
+
+type AmbiguousIdentifierError struct {
+	// Short machine-stable reason, e.g. `ambiguous market_id`.
+	Error string `json:"error" url:"error"`
+	// Human-readable detail naming the identifier, the platforms it resolved on, and how to disambiguate.
+	Message *string `json:"message,omitempty" url:"message,omitempty"`
+	// The platforms this identifier resolved on. Each value is accepted verbatim by the `platform` query parameter.
+	Candidates []string `json:"candidates" url:"candidates"`
+	StatusCode int      `json:"status_code" url:"status_code"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (a *AmbiguousIdentifierError) GetError() string {
+	if a == nil {
+		return ""
+	}
+	return a.Error
+}
+
+func (a *AmbiguousIdentifierError) GetMessage() *string {
+	if a == nil {
+		return nil
+	}
+	return a.Message
+}
+
+func (a *AmbiguousIdentifierError) GetCandidates() []string {
+	if a == nil {
+		return nil
+	}
+	return a.Candidates
+}
+
+func (a *AmbiguousIdentifierError) GetStatusCode() int {
+	if a == nil {
+		return 0
+	}
+	return a.StatusCode
+}
+
+func (a *AmbiguousIdentifierError) GetExtraProperties() map[string]interface{} {
+	if a == nil {
+		return nil
+	}
+	return a.extraProperties
+}
+
+func (a *AmbiguousIdentifierError) require(field *big.Int) {
+	if a.explicitFields == nil {
+		a.explicitFields = big.NewInt(0)
+	}
+	a.explicitFields.Or(a.explicitFields, field)
+}
+
+// SetError sets the Error field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (a *AmbiguousIdentifierError) SetError(error_ string) {
+	a.Error = error_
+	a.require(ambiguousIdentifierErrorFieldError)
+}
+
+// SetMessage sets the Message field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (a *AmbiguousIdentifierError) SetMessage(message *string) {
+	a.Message = message
+	a.require(ambiguousIdentifierErrorFieldMessage)
+}
+
+// SetCandidates sets the Candidates field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (a *AmbiguousIdentifierError) SetCandidates(candidates []string) {
+	a.Candidates = candidates
+	a.require(ambiguousIdentifierErrorFieldCandidates)
+}
+
+// SetStatusCode sets the StatusCode field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (a *AmbiguousIdentifierError) SetStatusCode(statusCode int) {
+	a.StatusCode = statusCode
+	a.require(ambiguousIdentifierErrorFieldStatusCode)
+}
+
+func (a *AmbiguousIdentifierError) UnmarshalJSON(data []byte) error {
+	type unmarshaler AmbiguousIdentifierError
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*a = AmbiguousIdentifierError(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *a)
+	if err != nil {
+		return err
+	}
+	a.extraProperties = extraProperties
+	a.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (a *AmbiguousIdentifierError) MarshalJSON() ([]byte, error) {
+	type embed AmbiguousIdentifierError
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*a),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, a.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (a *AmbiguousIdentifierError) String() string {
+	if a == nil {
+		return "<nil>"
+	}
+	if len(a.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(a.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(a); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", a)
+}
+
 var (
 	canonicalSportsEventFieldEventID      = big.NewInt(1 << 0)
 	canonicalSportsEventFieldSport        = big.NewInt(1 << 1)
@@ -406,7 +572,7 @@ type CanonicalSportsEvent struct {
 	EventID string `json:"event_id" url:"event_id"`
 	// Canonical sport slug. `basketball`, `hockey`, or `baseball` today.
 	Sport *string `json:"sport,omitempty" url:"sport,omitempty"`
-	// Canonical league slug. Cross-platform matching covers `nba`, `wnba`, `nhl`, and `mlb` today. The value is the first segment of `event_id`, so `wnba-tor-wsh-2026-08-19` is a WNBA game. Treat this as an open set — leagues are added without a breaking change.
+	// Canonical league slug. Cross-platform matching covers `nba`, `wnba`, `nhl`, and `mlb` today. The value is the first segment of `event_id`, so `nba-okc-sas-2026-10-20` is an NBA game. Treat this as an open set — leagues are added without a breaking change.
 	League       *string                       `json:"league,omitempty" url:"league,omitempty"`
 	Title        string                        `json:"title" url:"title"`
 	Participants []*CanonicalSportsParticipant `json:"participants,omitempty" url:"participants,omitempty"`
@@ -901,7 +1067,9 @@ var (
 
 type CanonicalSportsSourceMarket struct {
 	Provider CanonicalSportsSourceMarketProvider `json:"provider" url:"provider"`
-	// Exact provider-native market identifier.
+	// Exact provider-native market identifier. It resolves on `GET /v1/markets/{market_id}`, either as-is or prefixed with this row's `provider` in the composite form `{provider}:{market_id}`.
+	//
+	// One provider can contribute MORE THAN ONE entry to the same submarket, because a provider is free to model one canonical market as several native ones. Kalshi does exactly that for a game moneyline: it lists one binary market per team ("Arizona wins", "San Francisco wins"), so a Kalshi moneyline row appears twice, once per team ticker, each with its own `yes`/`no` outcomes. Group by `provider` if you need one row per venue; do not assume the list has at most one entry per provider.
 	MarketID   string                          `json:"market_id" url:"market_id"`
 	MarketName *string                         `json:"market_name,omitempty" url:"market_name,omitempty"`
 	MarketSlug *string                         `json:"market_slug,omitempty" url:"market_slug,omitempty"`
@@ -1082,7 +1250,11 @@ type CanonicalSportsSourceOutcome struct {
 	// Canonical outcome this source-native selection represents.
 	CanonicalOutcomeKey string  `json:"canonical_outcome_key" url:"canonical_outcome_key"`
 	Label               *string `json:"label,omitempty" url:"label,omitempty"`
-	// Exact provider-native outcome/token identifier when available. SX Bet exposes one market hash and two named positions rather than separate outcome tokens, so its source-local selection reference is `<market_hash>:1` or `<market_hash>:2`. This field is never a universal cross-provider outcome ID.
+	// Exact provider-native outcome identifier. It is never a universal cross-provider outcome ID.
+	//
+	// On every provider this is the same value `GET /v1/markets/{market_id}` returns as `outcomes[].outcome_id` for the market named by this row's `market_id`, so the two surfaces join directly.
+	//
+	// `polymarket`, `predict` and `alpha-arcade` publish a globally unique per-outcome token (Polymarket CLOB token id, Predict on-chain id, AlphaArcade CLOB token id). `sxbet` and `kalshi` publish no per-outcome token at all, so their references are market-scoped and must be read together with `market_id`: an SX Bet market has one hash and two named positions (`outcomeOne` / `outcomeTwo`), and a Kalshi market is binary (`yes` / `no`). Both are the spelling the venue itself uses to address a side — SX Bet keys its order-book snapshot by `outcomeOne`/`outcomeTwo`, and Kalshi keys its book by `yes`/`no` and reports a trade's `taker_side` the same way.
 	OutcomeID *string `json:"outcome_id,omitempty" url:"outcome_id,omitempty"`
 	// Optional source-native side such as `yes` or `no`.
 	Side *string `json:"side,omitempty" url:"side,omitempty"`
@@ -2254,7 +2426,7 @@ var (
 )
 
 type EventMarket struct {
-	// Platform-native market identifier. Kalshi ticker (`KXMLBGAME-26MAY221840CLEPHI-CLE`), Polymarket numeric market id, SX Bet `marketHash`, or Predict market id.
+	// Platform-native market identifier. Kalshi ticker (`KXMLBGAME-26AUG272145AZSF-AZ`), Polymarket numeric market id, SX Bet `marketHash`, or Predict market id.
 	MarketID string `json:"market_id" url:"market_id"`
 	// Human-readable market title/question.
 	Title string `json:"title" url:"title"`
@@ -2603,6 +2775,40 @@ func NewGetMarketRequestPlatformFromString(s string) (GetMarketRequestPlatform, 
 }
 
 func (g GetMarketRequestPlatform) Ptr() *GetMarketRequestPlatform {
+	return &g
+}
+
+type GetMarketsRequestProvider string
+
+const (
+	GetMarketsRequestProviderKalshi      GetMarketsRequestProvider = "kalshi"
+	GetMarketsRequestProviderPolymarket  GetMarketsRequestProvider = "polymarket"
+	GetMarketsRequestProviderPredict     GetMarketsRequestProvider = "predict"
+	GetMarketsRequestProviderSxbet       GetMarketsRequestProvider = "sxbet"
+	GetMarketsRequestProviderHyperliquid GetMarketsRequestProvider = "hyperliquid"
+	GetMarketsRequestProviderAlphaArcade GetMarketsRequestProvider = "alpha-arcade"
+)
+
+func NewGetMarketsRequestProviderFromString(s string) (GetMarketsRequestProvider, error) {
+	switch s {
+	case "kalshi":
+		return GetMarketsRequestProviderKalshi, nil
+	case "polymarket":
+		return GetMarketsRequestProviderPolymarket, nil
+	case "predict":
+		return GetMarketsRequestProviderPredict, nil
+	case "sxbet":
+		return GetMarketsRequestProviderSxbet, nil
+	case "hyperliquid":
+		return GetMarketsRequestProviderHyperliquid, nil
+	case "alpha-arcade":
+		return GetMarketsRequestProviderAlphaArcade, nil
+	}
+	var t GetMarketsRequestProvider
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (g GetMarketsRequestProvider) Ptr() *GetMarketsRequestProvider {
 	return &g
 }
 
@@ -2983,7 +3189,11 @@ type MarketDetailOutcome struct {
 	Name string `json:"name" url:"name"`
 	// Stable per-platform key for this outcome: Kalshi `yes`/`no`, Polymarket CLOB token id, Predict on-chain id, SX Bet `outcomeOne`/`outcomeTwo`, Hyperliquid coin encoding (`#<10*outcome+side>`). The join key for future per-outcome sub-resources (order-book depth).
 	OutcomeID *string `json:"outcome_id,omitempty" url:"outcome_id,omitempty"`
-	// Current implied probability of this outcome in 0–1 — the headline field, equal to the implied probability on every supported platform. Derivation cascade: mid of bid/ask when two-sided → the single available side → last trade → platform mark (Polymarket `outcomePrices`, which preserves 0/1 resolution marks on settled markets). Because the cascade differs by what each platform exposes, `price` is a DISPLAY number — when comparing across platforms or sizing trades, prefer `bid`/`ask` directly where present. Null when no quote of any kind exists. GUARANTEE: when `pricing.availability` is `live`, `price` is non-null on every outcome. Values are rounded to at most 6 decimal places.
+	// Current implied probability of this outcome in 0–1 — the headline field, equal to the implied probability on every supported platform. Derivation cascade: mid of bid/ask when two-sided → the single available side → last trade → platform mark (Polymarket `outcomePrices`, which preserves 0/1 resolution marks on settled markets; AlphaArcade's catalog midpoint). Because the cascade differs by what each platform exposes, `price` is a DISPLAY number — when comparing across platforms or sizing trades, prefer `bid`/`ask` directly where present. Null when no quote of any kind exists.
+	//
+	// **A non-null `price` does not mean a tradeable price.** The last two rungs of the cascade produce a number with no book behind it, and the mid of a 0.01 / 0.99 book produces a confident-looking 0.5 that no one will fill. Read `pricing.availability` first: `live` says at least one outcome has a book the venue treats as quoted; `indicative` says every price here is a mark, a lone side, or a book the venue's own spread threshold rejects.
+	//
+	// GUARANTEE: when `pricing.availability` is `live` or `indicative`, `price` is non-null on every outcome. Values are rounded to at most 6 decimal places.
 	Price *float64 `json:"price,omitempty" url:"price,omitempty"`
 	// Best bid for this outcome in 0–1 probability. Null when that book side is empty or the platform doesn't publish per-outcome quotes on the record (Polymarket non-primary outcomes). Hyperliquid's second side is derived from the merged book complement (`1 − first-side ask`), matching the platform's order-book structure; no other platform synthesizes bid from `1 − ask`.
 	Bid *float64 `json:"bid,omitempty" url:"bid,omitempty"`
@@ -3172,24 +3382,63 @@ func (m *MarketDetailOutcome) String() string {
 }
 
 // Market-wide quote metadata for the pricing tier. Always present on the response; `availability` tells the truth about what the tier could hydrate instead of leaving consumers to guess from nulls.
+//
+// **Bounding quote freshness.** `as_of` is the provider's own stamp and means something different on each platform, so read `as_of_kind` before applying an age bound to it — only `as_of_kind: quote` tracks the quote closely enough to bound at all, and how tight that bound can be still varies by venue. `observed_at` is PredictorSDK's own read time and means the same thing on every provider, so it is the field to bound when you need one threshold that behaves identically across platforms.
 var (
 	marketDetailPricingFieldAvailability = big.NewInt(1 << 0)
 	marketDetailPricingFieldScale        = big.NewInt(1 << 1)
 	marketDetailPricingFieldSource       = big.NewInt(1 << 2)
 	marketDetailPricingFieldAsOf         = big.NewInt(1 << 3)
-	marketDetailPricingFieldNegRisk      = big.NewInt(1 << 4)
+	marketDetailPricingFieldAsOfKind     = big.NewInt(1 << 4)
+	marketDetailPricingFieldObservedAt   = big.NewInt(1 << 5)
+	marketDetailPricingFieldNegRisk      = big.NewInt(1 << 6)
 )
 
 type MarketDetailPricing struct {
-	// `live` — every outcome carries a price. `partial` — some but not all outcomes priced. `no_quotes` — the pricing fetch succeeded but the book is empty (SX Bet or Hyperliquid with no resting orders; Kalshi provisional/multivariate markets whose quotes are empty-book placeholders). `unavailable` — the pricing enrichment fetch failed or timed out (SX Bet/Hyperliquid); identity fields are still served.
+	// How completely — and how honestly — the pricing tier hydrated. It answers two questions in this precedence order: did every outcome get a price, and is any of those prices backed by a book you could actually cross.
+	//
+	// `live` — every outcome carries a price AND at least one outcome has a two-sided book the venue itself treats as quoted. **This is the only value that licenses reading `price` as a tradeable level.**
+	//
+	// `indicative` — every outcome carries a price, but no outcome has such a book behind it. The prices are marks, one side of a book with nothing facing it, or a two-sided book wider than the venue's own published spread threshold for that market. Concretely: an AlphaArcade market whose order book is empty, where the catalog midpoint is the only price left standing; a Predict market quoted 0.01 / 0.99, whose 0.5 midpoint is arithmetic rather than a market (Predict publishes a per-market `spreadThreshold` and this server honours it); a settled Polymarket market whose 1/0 `outcomePrices` are resolution marks; or a book with one resting order and nothing on the other side. `price` is still populated and still the venue's own number — treat it as roughly where the market is thought to be, never as a level you can trade or arbitrage against. **Filter or flag `indicative` before computing cross-venue edges**: an `indicative` 0.5 next to a `live` 0.735 elsewhere is not a 23¢ opportunity, it is one venue with no book.
+	//
+	// `partial` — some but not all outcomes priced. Incompleteness is reported ahead of quote quality because it is the louder warning, so a `partial` market says nothing about the book behind the prices it does carry.
+	//
+	// `no_quotes` — the pricing read succeeded and there is nothing at all: no book and no mark (SX Bet or Hyperliquid with no resting orders; Kalshi provisional/multivariate markets whose quotes are empty-book placeholders; AlphaArcade markets that have never traded). An empty book truthfully read is still an observation, so `observed_at` is populated.
+	//
+	// `unavailable` — the pricing enrichment fetch failed or timed out (SX Bet/Hyperliquid); identity fields are still served and `observed_at` is null.
 	Availability MarketDetailPricingAvailability `json:"availability" url:"availability"`
 	// Self-describing unit declaration for all price fields. Single canonical scale today; new values would be added alongside (never replacing) this one.
 	Scale MarketDetailPricingScale `json:"scale" url:"scale"`
 	// Where the quotes came from. `market_record` — embedded in the same single-market record as the identity fetch (Kalshi, Polymarket, Predict). `orderbook` — required one bounded second fetch against the platform's order-book surface (SX Bet `/orderbook-v3/snapshot`, Hyperliquid `l2Book`).
 	Source MarketDetailPricingSource `json:"source" url:"source"`
-	// Quote freshness as RFC3339. When the two sides carry independent upstream timestamps, this is the OLDER of them — a conservative floor that never over-claims freshness. Hyperliquid uses the `l2Book` server timestamp. Null when the upstream record carries no quote timestamp at all (Predict, AlphaArcade, and SX Bet) — treat freshness as UNKNOWN, not as fresh. Timestamps come from each platform's own clock; for Kalshi/Polymarket the value is the record's last-update time, the closest the platform exposes to a quote timestamp.
-	// SX Bet moved from timestamped to null at its V3 order-book cutover (2026-08-25): V3 publishes an opaque monotonic book `version` and no wall-clock stamp anywhere, and server ingest time is not substituted because it would masquerade as an upstream stamp.
+	// The upstream timestamp on this platform's own clock, as RFC3339. When the two sides carry independent stamps this is the OLDER of them — a conservative floor that never over-claims freshness. Null when the record carries no timestamp at all (Predict, AlphaArcade, and SX Bet).
+	//
+	// **This field is NOT a uniform freshness bound. Read `as_of_kind` first.** What it measures differs per platform: on Hyperliquid it is the order book's server time and moves with the book, while on Kalshi it is a record write that does not move while the market is quoted. Measured live on 2026-08-24 over two runs — 100 open markets read twice 7.5 minutes apart, and 96 open markets read twice 11 minutes apart:
+	//
+	// * `kalshi` — **15 hours to 137 days old** on markets reporting `status: open` and `availability: live` with a real two-sided book. The age tracks how long ago the record was last written, so it depends entirely on the market: same-day game markets ran a median of ~23 h in one sample and ~43 h in another, while a broad sample of the market list ran a median of ~101 days (`CHINAUSGDP-30`, `status: open`, quoted 0.15 / 0.19, was stamped 2026-04-09). Advanced on 0 of 39 and 0 of 42 markets across the two runs, including five whose prices moved inside the window. **Not boundable at any threshold — do not infer one from these numbers.**
+	// * `polymarket` — 45 s to 405 s old; advanced on 60 of 60 and 25 of 25 markets, while only 1 of those 25 prices changed. Values recur identically across dozens of unrelated markets (one batch write, not one quote). Bounds record age in minutes, not quote age in seconds.
+	// * `sxbet` — a real per-side quote stamp on the V2 best-odds path, but it marks when the resting top-of-book order was posted, so on a thin book it is legitimately old: measured 39 s to 2.5 h, median ~24 min. It advances when the quote advances, which is what makes it a quote stamp — but size the bound to the venue's liquidity, not in seconds. Null from the 2026-08-25 V3 cutover onward.
+	// * `hyperliquid` — the `l2Book` server timestamp, a real quote stamp and the one field here that genuinely supports a seconds-scale bound: polled directly it tracks wall clock to the second.
+	// * `predict`, `alpha-arcade` — always null.
+	//
+	// These ranges are observed behaviour, not a contract: they are published so a consumer can pick a threshold from measured data rather than guessing, and they can change whenever a venue changes how it writes its records. Server ingest time is never substituted into this field — that would masquerade as an upstream stamp. Use `observed_at` for the read time.
 	AsOf *time.Time `json:"as_of,omitempty" url:"as_of,omitempty"`
+	// What `as_of` MEASURES on this provider, so one consumer code path can bound freshness tightly where the value is a quote time and refuse to pretend where it is not. Always present; `unknown` whenever `as_of` is null, never an empty string.
+	//
+	// `quote` — the stamp advances when the quote advances, so an age bound on it is meaningful. Hyperliquid (`l2Book` server time) and SX Bet's V2 best-odds path. How TIGHT that bound can be still depends on the venue: Hyperliquid's tracks wall clock to the second, while SX Bet's marks when the resting top-of-book order was posted and is legitimately tens of minutes old on a thin book. Size the threshold to the venue's liquidity; a blanket seconds-scale bound rejects most of SX Bet.
+	//
+	// `record_refresh` — the stamp advances on a periodic rewrite of the provider's record, independent of whether the quote moved. Bounds RECORD age (minutes), not quote age. Polymarket.
+	//
+	// `record_static` — the stamp does not advance while the market is actively quoted, so it bounds nothing at any threshold. Kalshi. Treat quote freshness as unknown here and do not gate on `as_of`; bound `observed_at` instead and take executable price from the venue's own book.
+	//
+	// `unknown` — `as_of` is null: the record carries no timestamp of any kind (Predict, AlphaArcade, SX Bet V3). Kept distinct from `record_static` because the underlying fact differs even though the consumer's action does not.
+	AsOfKind MarketDetailPricingAsOfKind `json:"as_of_kind" url:"as_of_kind"`
+	// When PREDICTORSDK read these quotes, as RFC3339 — an observation timestamp, not an upstream one. Named `observed_at` rather than `as_of` for the same reason `trading_fees.observed_at` is: `as_of` is the provider's own stamp, and reusing the name for a differently-defined value would bake that confusion into a second field.
+	//
+	// This is the one timestamp on the response whose definition does not vary by platform, which makes it the field to bound when you need a single threshold that behaves identically everywhere. It bounds the age of the READ, not the age of the quote: on a `record_static` provider a fresh `observed_at` beside a 23-hour `as_of` is the honest description of what the venue served. `/v1/markets/{market_id}` reads the venue live on every request and caches nothing, so this stamp is the request time.
+	//
+	// Taken BEFORE the upstream call, so it is never newer than the moment the quotes were actually observed and `now - observed_at` never understates their age. Null only when `availability` is `unavailable` — no quotes were observed, so there is nothing to stamp. Populated for `no_quotes`, where an empty book is a successful observation.
+	ObservedAt *time.Time `json:"observed_at,omitempty" url:"observed_at,omitempty"`
 	// True when this market belongs to a negative-risk multi-outcome event (Polymarket `negRisk`, Predict `isNegRisk`). On a multi-outcome record, outcome prices intentionally need not sum to 1 — do not "normalize" the book. Note that for the BINARY member markets these platforms serve today the flag signals event-level structure (this market is one leg of a mutually-exclusive set); the binary pair itself still sums to ~1. Omitted when false.
 	NegRisk *bool `json:"neg_risk,omitempty" url:"neg_risk,omitempty"`
 
@@ -3226,6 +3475,20 @@ func (m *MarketDetailPricing) GetAsOf() *time.Time {
 		return nil
 	}
 	return m.AsOf
+}
+
+func (m *MarketDetailPricing) GetAsOfKind() MarketDetailPricingAsOfKind {
+	if m == nil {
+		return ""
+	}
+	return m.AsOfKind
+}
+
+func (m *MarketDetailPricing) GetObservedAt() *time.Time {
+	if m == nil {
+		return nil
+	}
+	return m.ObservedAt
 }
 
 func (m *MarketDetailPricing) GetNegRisk() *bool {
@@ -3277,6 +3540,20 @@ func (m *MarketDetailPricing) SetAsOf(asOf *time.Time) {
 	m.require(marketDetailPricingFieldAsOf)
 }
 
+// SetAsOfKind sets the AsOfKind field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailPricing) SetAsOfKind(asOfKind MarketDetailPricingAsOfKind) {
+	m.AsOfKind = asOfKind
+	m.require(marketDetailPricingFieldAsOfKind)
+}
+
+// SetObservedAt sets the ObservedAt field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketDetailPricing) SetObservedAt(observedAt *time.Time) {
+	m.ObservedAt = observedAt
+	m.require(marketDetailPricingFieldObservedAt)
+}
+
 // SetNegRisk sets the NegRisk field and marks it as non-optional;
 // this prevents an empty or null value for this field from being omitted during serialization.
 func (m *MarketDetailPricing) SetNegRisk(negRisk *bool) {
@@ -3288,7 +3565,8 @@ func (m *MarketDetailPricing) UnmarshalJSON(data []byte) error {
 	type embed MarketDetailPricing
 	var unmarshaler = struct {
 		embed
-		AsOf *internal.DateTime `json:"as_of,omitempty"`
+		AsOf       *internal.DateTime `json:"as_of,omitempty"`
+		ObservedAt *internal.DateTime `json:"observed_at,omitempty"`
 	}{
 		embed: embed(*m),
 	}
@@ -3297,6 +3575,7 @@ func (m *MarketDetailPricing) UnmarshalJSON(data []byte) error {
 	}
 	*m = MarketDetailPricing(unmarshaler.embed)
 	m.AsOf = unmarshaler.AsOf.TimePtr()
+	m.ObservedAt = unmarshaler.ObservedAt.TimePtr()
 	extraProperties, err := internal.ExtractExtraProperties(data, *m)
 	if err != nil {
 		return err
@@ -3310,10 +3589,12 @@ func (m *MarketDetailPricing) MarshalJSON() ([]byte, error) {
 	type embed MarketDetailPricing
 	var marshaler = struct {
 		embed
-		AsOf *internal.DateTime `json:"as_of,omitempty"`
+		AsOf       *internal.DateTime `json:"as_of,omitempty"`
+		ObservedAt *internal.DateTime `json:"observed_at,omitempty"`
 	}{
-		embed: embed(*m),
-		AsOf:  internal.NewOptionalDateTime(m.AsOf),
+		embed:      embed(*m),
+		AsOf:       internal.NewOptionalDateTime(m.AsOf),
+		ObservedAt: internal.NewOptionalDateTime(m.ObservedAt),
 	}
 	explicitMarshaler := internal.HandleExplicitFields(marshaler, m.explicitFields)
 	return json.Marshal(explicitMarshaler)
@@ -3334,11 +3615,59 @@ func (m *MarketDetailPricing) String() string {
 	return fmt.Sprintf("%#v", m)
 }
 
-// `live` — every outcome carries a price. `partial` — some but not all outcomes priced. `no_quotes` — the pricing fetch succeeded but the book is empty (SX Bet or Hyperliquid with no resting orders; Kalshi provisional/multivariate markets whose quotes are empty-book placeholders). `unavailable` — the pricing enrichment fetch failed or timed out (SX Bet/Hyperliquid); identity fields are still served.
+// What `as_of` MEASURES on this provider, so one consumer code path can bound freshness tightly where the value is a quote time and refuse to pretend where it is not. Always present; `unknown` whenever `as_of` is null, never an empty string.
+//
+// `quote` — the stamp advances when the quote advances, so an age bound on it is meaningful. Hyperliquid (`l2Book` server time) and SX Bet's V2 best-odds path. How TIGHT that bound can be still depends on the venue: Hyperliquid's tracks wall clock to the second, while SX Bet's marks when the resting top-of-book order was posted and is legitimately tens of minutes old on a thin book. Size the threshold to the venue's liquidity; a blanket seconds-scale bound rejects most of SX Bet.
+//
+// `record_refresh` — the stamp advances on a periodic rewrite of the provider's record, independent of whether the quote moved. Bounds RECORD age (minutes), not quote age. Polymarket.
+//
+// `record_static` — the stamp does not advance while the market is actively quoted, so it bounds nothing at any threshold. Kalshi. Treat quote freshness as unknown here and do not gate on `as_of`; bound `observed_at` instead and take executable price from the venue's own book.
+//
+// `unknown` — `as_of` is null: the record carries no timestamp of any kind (Predict, AlphaArcade, SX Bet V3). Kept distinct from `record_static` because the underlying fact differs even though the consumer's action does not.
+type MarketDetailPricingAsOfKind string
+
+const (
+	MarketDetailPricingAsOfKindQuote         MarketDetailPricingAsOfKind = "quote"
+	MarketDetailPricingAsOfKindRecordRefresh MarketDetailPricingAsOfKind = "record_refresh"
+	MarketDetailPricingAsOfKindRecordStatic  MarketDetailPricingAsOfKind = "record_static"
+	MarketDetailPricingAsOfKindUnknown       MarketDetailPricingAsOfKind = "unknown"
+)
+
+func NewMarketDetailPricingAsOfKindFromString(s string) (MarketDetailPricingAsOfKind, error) {
+	switch s {
+	case "quote":
+		return MarketDetailPricingAsOfKindQuote, nil
+	case "record_refresh":
+		return MarketDetailPricingAsOfKindRecordRefresh, nil
+	case "record_static":
+		return MarketDetailPricingAsOfKindRecordStatic, nil
+	case "unknown":
+		return MarketDetailPricingAsOfKindUnknown, nil
+	}
+	var t MarketDetailPricingAsOfKind
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (m MarketDetailPricingAsOfKind) Ptr() *MarketDetailPricingAsOfKind {
+	return &m
+}
+
+// How completely — and how honestly — the pricing tier hydrated. It answers two questions in this precedence order: did every outcome get a price, and is any of those prices backed by a book you could actually cross.
+//
+// `live` — every outcome carries a price AND at least one outcome has a two-sided book the venue itself treats as quoted. **This is the only value that licenses reading `price` as a tradeable level.**
+//
+// `indicative` — every outcome carries a price, but no outcome has such a book behind it. The prices are marks, one side of a book with nothing facing it, or a two-sided book wider than the venue's own published spread threshold for that market. Concretely: an AlphaArcade market whose order book is empty, where the catalog midpoint is the only price left standing; a Predict market quoted 0.01 / 0.99, whose 0.5 midpoint is arithmetic rather than a market (Predict publishes a per-market `spreadThreshold` and this server honours it); a settled Polymarket market whose 1/0 `outcomePrices` are resolution marks; or a book with one resting order and nothing on the other side. `price` is still populated and still the venue's own number — treat it as roughly where the market is thought to be, never as a level you can trade or arbitrage against. **Filter or flag `indicative` before computing cross-venue edges**: an `indicative` 0.5 next to a `live` 0.735 elsewhere is not a 23¢ opportunity, it is one venue with no book.
+//
+// `partial` — some but not all outcomes priced. Incompleteness is reported ahead of quote quality because it is the louder warning, so a `partial` market says nothing about the book behind the prices it does carry.
+//
+// `no_quotes` — the pricing read succeeded and there is nothing at all: no book and no mark (SX Bet or Hyperliquid with no resting orders; Kalshi provisional/multivariate markets whose quotes are empty-book placeholders; AlphaArcade markets that have never traded). An empty book truthfully read is still an observation, so `observed_at` is populated.
+//
+// `unavailable` — the pricing enrichment fetch failed or timed out (SX Bet/Hyperliquid); identity fields are still served and `observed_at` is null.
 type MarketDetailPricingAvailability string
 
 const (
 	MarketDetailPricingAvailabilityLive        MarketDetailPricingAvailability = "live"
+	MarketDetailPricingAvailabilityIndicative  MarketDetailPricingAvailability = "indicative"
 	MarketDetailPricingAvailabilityPartial     MarketDetailPricingAvailability = "partial"
 	MarketDetailPricingAvailabilityNoQuotes    MarketDetailPricingAvailability = "no_quotes"
 	MarketDetailPricingAvailabilityUnavailable MarketDetailPricingAvailability = "unavailable"
@@ -3348,6 +3677,8 @@ func NewMarketDetailPricingAvailabilityFromString(s string) (MarketDetailPricing
 	switch s {
 	case "live":
 		return MarketDetailPricingAvailabilityLive, nil
+	case "indicative":
+		return MarketDetailPricingAvailabilityIndicative, nil
 	case "partial":
 		return MarketDetailPricingAvailabilityPartial, nil
 	case "no_quotes":
@@ -4197,12 +4528,15 @@ func (m MarketDetailTradingFeesSource) Ptr() *MarketDetailTradingFeesSource {
 
 var (
 	marketsListResponseFieldData       = big.NewInt(1 << 0)
-	marketsListResponseFieldPagination = big.NewInt(1 << 1)
+	marketsListResponseFieldSnapshot   = big.NewInt(1 << 1)
+	marketsListResponseFieldPagination = big.NewInt(1 << 2)
 )
 
 type MarketsListResponse struct {
 	// Array of markets for the current page.
 	Data []*UnifiedMarket `json:"data" url:"data"`
+	// Freshness of the catalog snapshot this page was served from. Describes the DATA; `pagination` describes the page.
+	Snapshot *MarketsSnapshot `json:"snapshot" url:"snapshot"`
 	// Pagination metadata for the current page.
 	Pagination *PaginationBlock `json:"pagination" url:"pagination"`
 
@@ -4218,6 +4552,13 @@ func (m *MarketsListResponse) GetData() []*UnifiedMarket {
 		return nil
 	}
 	return m.Data
+}
+
+func (m *MarketsListResponse) GetSnapshot() *MarketsSnapshot {
+	if m == nil {
+		return nil
+	}
+	return m.Snapshot
 }
 
 func (m *MarketsListResponse) GetPagination() *PaginationBlock {
@@ -4246,6 +4587,13 @@ func (m *MarketsListResponse) require(field *big.Int) {
 func (m *MarketsListResponse) SetData(data []*UnifiedMarket) {
 	m.Data = data
 	m.require(marketsListResponseFieldData)
+}
+
+// SetSnapshot sets the Snapshot field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketsListResponse) SetSnapshot(snapshot *MarketsSnapshot) {
+	m.Snapshot = snapshot
+	m.require(marketsListResponseFieldSnapshot)
 }
 
 // SetPagination sets the Pagination field and marks it as non-optional;
@@ -4283,6 +4631,108 @@ func (m *MarketsListResponse) MarshalJSON() ([]byte, error) {
 }
 
 func (m *MarketsListResponse) String() string {
+	if m == nil {
+		return "<nil>"
+	}
+	if len(m.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(m.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(m); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", m)
+}
+
+// Freshness of the immutable catalog snapshot a `GET /v1/markets` page was served from. This endpoint reads a stored snapshot rather than calling the venues, so the age of the rows is not the age of the request.
+var (
+	marketsSnapshotFieldObservedAt = big.NewInt(1 << 0)
+)
+
+type MarketsSnapshot struct {
+	// When PredictorSDK finished reading the OLDEST provider catalog contributing rows to this response — a conservative freshness floor for the whole page, in millisecond-precision ISO 8601.
+	//
+	// `observed_at` is a PredictorSDK read time, the same meaning it carries on `pricing.observed_at` and `trading_fees.observed_at`. The difference is WHICH read: those two stamp the upstream call this request made, while this one stamps the background ingestion crawl that built the snapshot, so it is normally minutes to hours old rather than milliseconds. It is not `as_of` because no venue published it.
+	//
+	// **It is a floor, not a single fact.** Providers are crawled on independent schedules, so the catalog is a merge of snapshots of different ages and one of them is the stalest. Narrow the response with `?provider=` to get that provider's own read time exactly — under a filter this field describes only the selected provider, the same way `pagination.total` does.
+	//
+	// Stable for an entire cursor traversal: a cursor stays bound to the snapshot that issued it, so every page of one traversal reports the identical value even while newer snapshots are published.
+	//
+	// `null` when the bound snapshot carries no read time. An unstamped provider makes the whole value null rather than being skipped, because reporting a newer floor than the data supports would let stale rows through a correct freshness bound.
+	ObservedAt *time.Time `json:"observed_at,omitempty" url:"observed_at,omitempty"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (m *MarketsSnapshot) GetObservedAt() *time.Time {
+	if m == nil {
+		return nil
+	}
+	return m.ObservedAt
+}
+
+func (m *MarketsSnapshot) GetExtraProperties() map[string]interface{} {
+	if m == nil {
+		return nil
+	}
+	return m.extraProperties
+}
+
+func (m *MarketsSnapshot) require(field *big.Int) {
+	if m.explicitFields == nil {
+		m.explicitFields = big.NewInt(0)
+	}
+	m.explicitFields.Or(m.explicitFields, field)
+}
+
+// SetObservedAt sets the ObservedAt field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (m *MarketsSnapshot) SetObservedAt(observedAt *time.Time) {
+	m.ObservedAt = observedAt
+	m.require(marketsSnapshotFieldObservedAt)
+}
+
+func (m *MarketsSnapshot) UnmarshalJSON(data []byte) error {
+	type embed MarketsSnapshot
+	var unmarshaler = struct {
+		embed
+		ObservedAt *internal.DateTime `json:"observed_at,omitempty"`
+	}{
+		embed: embed(*m),
+	}
+	if err := json.Unmarshal(data, &unmarshaler); err != nil {
+		return err
+	}
+	*m = MarketsSnapshot(unmarshaler.embed)
+	m.ObservedAt = unmarshaler.ObservedAt.TimePtr()
+	extraProperties, err := internal.ExtractExtraProperties(data, *m)
+	if err != nil {
+		return err
+	}
+	m.extraProperties = extraProperties
+	m.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (m *MarketsSnapshot) MarshalJSON() ([]byte, error) {
+	type embed MarketsSnapshot
+	var marshaler = struct {
+		embed
+		ObservedAt *internal.DateTime `json:"observed_at,omitempty"`
+	}{
+		embed:      embed(*m),
+		ObservedAt: internal.NewOptionalDateTime(m.ObservedAt),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, m.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (m *MarketsSnapshot) String() string {
 	if m == nil {
 		return "<nil>"
 	}
@@ -5063,7 +5513,7 @@ type PlatformMarket struct {
 	TokenIDs []string `json:"token_ids,omitempty" url:"token_ids,omitempty"`
 	// Source market ID. Present for platforms other than Kalshi and Polymarket.
 	MarketID *string `json:"market_id,omitempty" url:"market_id,omitempty"`
-	// Source outcome IDs. Present for platforms that use outcome IDs.
+	// Source outcome IDs for the market named by `market_id`, sorted and de-duplicated. These are the same values `GET /v1/markets/{market_id}` returns as `outcomes[].outcome_id`, so they join directly. SX Bet's are `outcomeOne`/`outcomeTwo` — market-scoped, because SX Bet publishes no per-outcome token; read them together with `market_id`. Present for platforms that use outcome IDs.
 	OutcomeIDs []string `json:"outcome_ids,omitempty" url:"outcome_ids,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
@@ -5771,7 +6221,7 @@ var (
 )
 
 type UnifiedMarket struct {
-	// Composite market identifier in the format `{provider}:{provider_id}` (e.g. `kalshi:KXNBAGAME-26MAR06INDLAL-LAL`).
+	// Composite market identifier in the format `{provider}:{provider_id}` (e.g. `kalshi:AMAZONFTC-29DEC31`).
 	ID string `json:"id" url:"id"`
 	// Prediction market provider.
 	Provider UnifiedMarketProvider `json:"provider" url:"provider"`

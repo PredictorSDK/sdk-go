@@ -55,6 +55,30 @@ func (b *BadRequestError) Unwrap() error {
 	return b.APIError
 }
 
+// `market_id` is ambiguous: it resolves to a different real market on more than one platform, so no single market can honestly be returned. Retry with `?platform=` naming one of the `candidates`, or use the composite `{platform}:{id}` form. Only bare identifiers whose shape is shared between Polymarket and Predict (numeric ids, kebab-case slugs) can produce this; composite ids, explicit `?platform=`, Kalshi tickers and SX Bet hashes never do.
+type ConflictError struct {
+	*core.APIError
+	Body *AmbiguousIdentifierError
+}
+
+func (c *ConflictError) UnmarshalJSON(data []byte) error {
+	var body *AmbiguousIdentifierError
+	if err := json.Unmarshal(data, &body); err != nil {
+		return err
+	}
+	c.StatusCode = 409
+	c.Body = body
+	return nil
+}
+
+func (c *ConflictError) MarshalJSON() ([]byte, error) {
+	return json.Marshal(c.Body)
+}
+
+func (c *ConflictError) Unwrap() error {
+	return c.APIError
+}
+
 // API key lacks the required permission
 type ForbiddenError struct {
 	*core.APIError
