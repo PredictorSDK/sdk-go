@@ -570,9 +570,9 @@ var (
 type CanonicalSportsEvent struct {
 	// Stable canonical event key.
 	EventID string `json:"event_id" url:"event_id"`
-	// Canonical sport slug. `basketball`, `hockey`, or `baseball` today.
+	// Canonical sport slug. `basketball`, `hockey`, `baseball`, or `football` today.
 	Sport *string `json:"sport,omitempty" url:"sport,omitempty"`
-	// Canonical league slug. Cross-platform matching covers `nba`, `wnba`, `nhl`, and `mlb` today. The value is the first segment of `event_id`, so `nba-okc-sas-2026-10-20` is an NBA game. Treat this as an open set — leagues are added without a breaking change.
+	// Canonical league slug. Cross-platform matching covers `nba`, `wnba`, `nhl`, `mlb`, and `nfl` today. The value is the first segment of `event_id`, so `nba-okc-sas-2026-10-20` is an NBA game. Treat this as an open set — leagues are added without a breaking change.
 	League       *string                       `json:"league,omitempty" url:"league,omitempty"`
 	Title        string                        `json:"title" url:"title"`
 	Participants []*CanonicalSportsParticipant `json:"participants,omitempty" url:"participants,omitempty"`
