@@ -87,6 +87,8 @@ func (c *Client) GetSportsMatchingMarkets(
 //
 // This endpoint reads a stored snapshot rather than calling the venues, so the rows are as old as the last ingestion crawl, not as old as the request. `snapshot.observed_at` reports that age and is stable across a cursor traversal.
 //
+// Kalshi's multivariate-event markets (user-built parlays under `KXMVECROSSCATEGORY…` tickers) are excluded from the catalog and from `pagination.total`; every leg they combine is listed individually. A parlay ticker still resolves on `GET /v1/markets/{market_id}`.
+//
 // Example:
 //
 //	request := &predictorsdk.GetMarketsRequest{}
