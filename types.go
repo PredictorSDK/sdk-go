@@ -82,13 +82,13 @@ var (
 )
 
 type GetEventRequest struct {
-	// Platform-native event identifier. Examples per platform: Kalshi event ticker (`KXNBAGAME-26OCT20OKCSAS`), Polymarket event slug (`nfl-pit-ne-2026-09-20`), SX Bet event id (`L19766755`), Predict market id (`1607914`), Hyperliquid question or outcome integer id (requires `?platform=hyperliquid` since integer ids aren't inferred). The composite `{provider}:{native_id}` form (e.g. `predict:1607914`) is accepted here too and dispatches without probing.
+	// Platform-native event identifier. Examples per platform: Kalshi event ticker (`KXNBAGAME-26OCT20OKCSAS`), Polymarket event slug (`nfl-pit-ne-2026-09-20`), SX Bet event id (`L19766755`), Predict market id (`1607914`), Hyperliquid question or outcome integer id (requires `?platform=hyperliquid` since integer ids aren't inferred), Pred parent market id (`0x…64hex`, requires `?platform=pred` since the shape collides with SX Bet market hashes). The composite `{provider}:{native_id}` form (e.g. `predict:1607914`) is accepted here too and dispatches without probing.
 	//
 	// **A bare numeric id or slug is not unique across platforms.** Polymarket and Predict both use these shapes and their id spaces overlap, so sending one without a platform can fail with `409` (see that response). Pass `?platform=` — every row of `GET /v1/matching-markets/sports` carries the `platform` that goes with its `event_id`.
 	//
 	// **Sports identifiers expire.** Game tickers and slugs are delisted once an event settles, and Hyperliquid ids roll over daily. Take current ones from `GET /v1/matching-markets/sports` (every platform row carries its provider-native `event_id`) rather than copying one out of this reference.
 	EventID string `json:"-" url:"-"`
-	// Optional platform override. When omitted, inferred from the `event_id` format: `KX…` → Kalshi, `L\d+` → SX Bet. Numeric IDs and kebab-case slugs are shared shape between Polymarket and Predict; in that case the service probes both and returns `409` rather than guessing if the identifier resolves on both. Hyperliquid question/outcome integer ids collide with these numerics and are not inferred — pass `?platform=hyperliquid` (alias `hl`). Passing `platform` explicitly skips the probe entirely and is the recommended call whenever you know it. Supplying a value that contradicts a composite `{provider}:` prefix is a `400`.
+	// Optional platform override. When omitted, inferred from the `event_id` format: `KX…` → Kalshi, `L\d+` → SX Bet. Numeric IDs and kebab-case slugs are shared shape between Polymarket and Predict; in that case the service probes both and returns `409` rather than guessing if the identifier resolves on both. Hyperliquid question/outcome integer ids collide with these numerics and are not inferred — pass `?platform=hyperliquid` (alias `hl`). Pred parent ids share the `0x…64hex` shape with SX Bet market hashes and are not inferred either — pass `?platform=pred`. Passing `platform` explicitly skips the probe entirely and is the recommended call whenever you know it. Supplying a value that contradicts a composite `{provider}:` prefix is a `400`.
 	Platform *GetEventRequestPlatform `json:"-" url:"platform,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
@@ -128,7 +128,7 @@ type GetMarketRequest struct {
 	//
 	// **Sports identifiers expire.** Kalshi game tickers, Polymarket game slugs, and Hyperliquid outcome ids are recycled or delisted as events settle — Hyperliquid's live catalog is a handful of daily-recurring outcomes, so any specific integer id there is valid for roughly a day. Take current ids from `GET /v1/markets` or `GET /v1/matching-markets/sports` rather than copying one out of this reference. Long-dated markets (Kalshi season futures, multi-year AlphaArcade questions) and settled Polymarket/Predict/SX Bet ids stay resolvable.
 	MarketID string `json:"-" url:"-"`
-	// Optional platform override. When omitted, inferred from the composite prefix or from the native ID format (`KX…` → Kalshi, `0x…64hex` → SX Bet). Numeric IDs and kebab-case slugs are shared shape between Polymarket and Predict; in that case the service probes both and returns `409` rather than guessing if the identifier resolves on both. Hyperliquid integer ids collide with these numerics and are not inferred — use the composite `hyperliquid:<id>` or `?platform=hyperliquid` (alias `hl`). AlphaArcade ULIDs and Limitless slugs are not inferred either — use the composite form (`alpha-arcade:<ulid>`, `limitless:<slug>`) or the matching `?platform=` value. Passing `platform` explicitly skips the probe entirely and is the recommended call whenever you know it. When the override contradicts a composite prefix (e.g. `kalshi:X` with `?platform=polymarket`), the request returns 400.
+	// Optional platform override. When omitted, inferred from the composite prefix or from the native ID format (`KX…` → Kalshi, `0x…64hex` → SX Bet — Pred ids share that shape and are never inferred; use `pred:…` or `?platform=pred`). Numeric IDs and kebab-case slugs are shared shape between Polymarket and Predict; in that case the service probes both and returns `409` rather than guessing if the identifier resolves on both. Hyperliquid integer ids collide with these numerics and are not inferred — use the composite `hyperliquid:<id>` or `?platform=hyperliquid` (alias `hl`). AlphaArcade ULIDs and Limitless slugs are not inferred either — use the composite form (`alpha-arcade:<ulid>`, `limitless:<slug>`) or the matching `?platform=` value. Pred pairs (`pred:<parent>:<child>`) are likewise composite/`?platform=` only. Passing `platform` explicitly skips the probe entirely and is the recommended call whenever you know it. When the override contradicts a composite prefix (e.g. `kalshi:X` with `?platform=polymarket`), the request returns 400.
 	Platform *GetMarketRequestPlatform `json:"-" url:"platform,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
@@ -268,6 +268,7 @@ var (
 	getSportsMatchingMarketsRequestFieldAlphaArcadeMarketID  = big.NewInt(1 << 10)
 	getSportsMatchingMarketsRequestFieldProphetxEventID      = big.NewInt(1 << 11)
 	getSportsMatchingMarketsRequestFieldProphetxMarketID     = big.NewInt(1 << 12)
+	getSportsMatchingMarketsRequestFieldPredMarketID         = big.NewInt(1 << 13)
 )
 
 type GetSportsMatchingMarketsRequest struct {
@@ -301,6 +302,8 @@ type GetSportsMatchingMarketsRequest struct {
 	ProphetxEventID []*string `json:"-" url:"prophetx_event_id,omitempty"`
 	// ProphetX market ID(s) to find matching markets for (e.g. `1700008782:219`, resolving the favourite primary-line strike). Accepts a market ID or an event ID (mirroring how `kalshi_event_ticker` accepts market tickers). Provide the parameter multiple times for multiple IDs, up to 100 unique values. Only one filter type may be used per request. Lookup mode — pagination parameters are ignored.
 	ProphetxMarketID []*string `json:"-" url:"prophetx_market_id,omitempty"`
+	// Pred market ID(s) to find matching markets for, in native form (no `pred:` prefix): the `<parent_market_id>:<child_market_id>` pair a `PRED` row publishes as `market_id`, or a bare parent market ID — the row's `event_id`, which Pred itself calls `parent_market_id` and `GET /v1/markets/pred:<parent>` also accepts. Both halves are `0x` + 64 hex. Provide the parameter multiple times for multiple IDs, up to 100 unique values. Only one filter type may be used per request. Lookup mode — pagination parameters are ignored.
+	PredMarketID []*string `json:"-" url:"pred_market_id,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
 	explicitFields *big.Int `json:"-" url:"-"`
@@ -402,6 +405,13 @@ func (g *GetSportsMatchingMarketsRequest) SetProphetxEventID(prophetxEventID []*
 func (g *GetSportsMatchingMarketsRequest) SetProphetxMarketID(prophetxMarketID []*string) {
 	g.ProphetxMarketID = prophetxMarketID
 	g.require(getSportsMatchingMarketsRequestFieldProphetxMarketID)
+}
+
+// SetPredMarketID sets the PredMarketID field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (g *GetSportsMatchingMarketsRequest) SetPredMarketID(predMarketID []*string) {
+	g.PredMarketID = predMarketID
+	g.require(getSportsMatchingMarketsRequestFieldPredMarketID)
 }
 
 var (
@@ -1257,6 +1267,7 @@ const (
 	CanonicalSportsSourceMarketProviderSxbet       CanonicalSportsSourceMarketProvider = "sxbet"
 	CanonicalSportsSourceMarketProviderAlphaArcade CanonicalSportsSourceMarketProvider = "alpha-arcade"
 	CanonicalSportsSourceMarketProviderProphetx    CanonicalSportsSourceMarketProvider = "prophetx"
+	CanonicalSportsSourceMarketProviderPred        CanonicalSportsSourceMarketProvider = "pred"
 )
 
 func NewCanonicalSportsSourceMarketProviderFromString(s string) (CanonicalSportsSourceMarketProvider, error) {
@@ -1273,6 +1284,8 @@ func NewCanonicalSportsSourceMarketProviderFromString(s string) (CanonicalSports
 		return CanonicalSportsSourceMarketProviderAlphaArcade, nil
 	case "prophetx":
 		return CanonicalSportsSourceMarketProviderProphetx, nil
+	case "pred":
+		return CanonicalSportsSourceMarketProviderPred, nil
 	}
 	var t CanonicalSportsSourceMarketProvider
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
@@ -2790,6 +2803,7 @@ const (
 	EventResponsePlatformAlphaArcade EventResponsePlatform = "alpha-arcade"
 	EventResponsePlatformProphetx    EventResponsePlatform = "prophetx"
 	EventResponsePlatformLimitless   EventResponsePlatform = "limitless"
+	EventResponsePlatformPred        EventResponsePlatform = "pred"
 )
 
 func NewEventResponsePlatformFromString(s string) (EventResponsePlatform, error) {
@@ -2810,6 +2824,8 @@ func NewEventResponsePlatformFromString(s string) (EventResponsePlatform, error)
 		return EventResponsePlatformProphetx, nil
 	case "limitless":
 		return EventResponsePlatformLimitless, nil
+	case "pred":
+		return EventResponsePlatformPred, nil
 	}
 	var t EventResponsePlatform
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
@@ -2830,6 +2846,7 @@ const (
 	GetEventRequestPlatformAlphaArcade GetEventRequestPlatform = "alpha-arcade"
 	GetEventRequestPlatformProphetx    GetEventRequestPlatform = "prophetx"
 	GetEventRequestPlatformLimitless   GetEventRequestPlatform = "limitless"
+	GetEventRequestPlatformPred        GetEventRequestPlatform = "pred"
 )
 
 func NewGetEventRequestPlatformFromString(s string) (GetEventRequestPlatform, error) {
@@ -2850,6 +2867,8 @@ func NewGetEventRequestPlatformFromString(s string) (GetEventRequestPlatform, er
 		return GetEventRequestPlatformProphetx, nil
 	case "limitless":
 		return GetEventRequestPlatformLimitless, nil
+	case "pred":
+		return GetEventRequestPlatformPred, nil
 	}
 	var t GetEventRequestPlatform
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
@@ -2870,6 +2889,7 @@ const (
 	GetMarketRequestPlatformAlphaArcade GetMarketRequestPlatform = "alpha-arcade"
 	GetMarketRequestPlatformProphetx    GetMarketRequestPlatform = "prophetx"
 	GetMarketRequestPlatformLimitless   GetMarketRequestPlatform = "limitless"
+	GetMarketRequestPlatformPred        GetMarketRequestPlatform = "pred"
 )
 
 func NewGetMarketRequestPlatformFromString(s string) (GetMarketRequestPlatform, error) {
@@ -2890,6 +2910,8 @@ func NewGetMarketRequestPlatformFromString(s string) (GetMarketRequestPlatform, 
 		return GetMarketRequestPlatformProphetx, nil
 	case "limitless":
 		return GetMarketRequestPlatformLimitless, nil
+	case "pred":
+		return GetMarketRequestPlatformPred, nil
 	}
 	var t GetMarketRequestPlatform
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
@@ -2910,6 +2932,7 @@ const (
 	GetMarketsRequestProviderAlphaArcade GetMarketsRequestProvider = "alpha-arcade"
 	GetMarketsRequestProviderProphetx    GetMarketsRequestProvider = "prophetx"
 	GetMarketsRequestProviderLimitless   GetMarketsRequestProvider = "limitless"
+	GetMarketsRequestProviderPred        GetMarketsRequestProvider = "pred"
 )
 
 func NewGetMarketsRequestProviderFromString(s string) (GetMarketsRequestProvider, error) {
@@ -2930,6 +2953,8 @@ func NewGetMarketsRequestProviderFromString(s string) (GetMarketsRequestProvider
 		return GetMarketsRequestProviderProphetx, nil
 	case "limitless":
 		return GetMarketsRequestProviderLimitless, nil
+	case "pred":
+		return GetMarketsRequestProviderPred, nil
 	}
 	var t GetMarketsRequestProvider
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
@@ -3203,7 +3228,7 @@ var (
 )
 
 type MarketDetailFeeRounding struct {
-	// `up` — the venue rounds the fee UP to the next increment (Kalshi ceils to $0.0001; AlphaArcade ceils to 1e-6 USDC). `nearest` — the venue rounds to the nearest increment (Polymarket rounds to 5 decimal places, with 0.00001 USDC the smallest fee charged).
+	// `up` — the venue rounds the fee UP to the next increment (Kalshi ceils to $0.0001; AlphaArcade ceils to 1e-6 USDC). `nearest` — the venue rounds to the nearest increment (Polymarket rounds to 5 decimal places, with 0.00001 USDC the smallest fee charged). `down` — the venue truncates the fee to the increment (Pred computes in 6-decimal base units and always rounds down; a fee below the smallest chargeable unit — 0.000001 — is zero, not clamped up to it).
 	Direction MarketDetailFeeRoundingDirection `json:"direction" url:"direction"`
 	// The rounding increment in the market's quote currency.
 	Increment float64 `json:"increment" url:"increment"`
@@ -3299,12 +3324,13 @@ func (m *MarketDetailFeeRounding) String() string {
 	return fmt.Sprintf("%#v", m)
 }
 
-// `up` — the venue rounds the fee UP to the next increment (Kalshi ceils to $0.0001; AlphaArcade ceils to 1e-6 USDC). `nearest` — the venue rounds to the nearest increment (Polymarket rounds to 5 decimal places, with 0.00001 USDC the smallest fee charged).
+// `up` — the venue rounds the fee UP to the next increment (Kalshi ceils to $0.0001; AlphaArcade ceils to 1e-6 USDC). `nearest` — the venue rounds to the nearest increment (Polymarket rounds to 5 decimal places, with 0.00001 USDC the smallest fee charged). `down` — the venue truncates the fee to the increment (Pred computes in 6-decimal base units and always rounds down; a fee below the smallest chargeable unit — 0.000001 — is zero, not clamped up to it).
 type MarketDetailFeeRoundingDirection string
 
 const (
 	MarketDetailFeeRoundingDirectionUp      MarketDetailFeeRoundingDirection = "up"
 	MarketDetailFeeRoundingDirectionNearest MarketDetailFeeRoundingDirection = "nearest"
+	MarketDetailFeeRoundingDirectionDown    MarketDetailFeeRoundingDirection = "down"
 )
 
 func NewMarketDetailFeeRoundingDirectionFromString(s string) (MarketDetailFeeRoundingDirection, error) {
@@ -3313,6 +3339,8 @@ func NewMarketDetailFeeRoundingDirectionFromString(s string) (MarketDetailFeeRou
 		return MarketDetailFeeRoundingDirectionUp, nil
 	case "nearest":
 		return MarketDetailFeeRoundingDirectionNearest, nil
+	case "down":
+		return MarketDetailFeeRoundingDirectionDown, nil
 	}
 	var t MarketDetailFeeRoundingDirection
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
@@ -3569,6 +3597,7 @@ type MarketDetailPricing struct {
 	// * `sxbet` — a real per-side quote stamp on the V2 best-odds path, but it marks when the resting top-of-book order was posted, so on a thin book it is legitimately old: measured 39 s to 2.5 h, median ~24 min. It advances when the quote advances, which is what makes it a quote stamp — but size the bound to the venue's liquidity, not in seconds. Null from the 2026-08-25 V3 cutover onward.
 	// * `hyperliquid` — the `l2Book` server timestamp, a real quote stamp and the one field here that genuinely supports a seconds-scale bound: polled directly it tracks wall clock to the second.
 	// * `limitless` — the market record's `updatedAt`: a record write stamp in the same family as Polymarket's, advancing on the venue's own rewrite cadence rather than with the quote. Bounds record age in minutes, not quote age in seconds. The order book itself carries no wall-clock stamp.
+	// * `pred` — the child order book's `last_updated_at`: the book snapshot time, advancing when the book moves, so an age bound on it is meaningful. On a thin book it is legitimately old — size the threshold to the venue's liquidity, as with SX Bet's V2 stamps. Measured seconds-old on a live NFL book 2026-09-23. Null (with `as_of_kind: unknown`) on the parent group view, which performs no book read, and whenever the book is gone (a settled child's book 503s upstream).
 	// * `predict`, `alpha-arcade` — always null.
 	//
 	// These ranges are observed behaviour, not a contract: they are published so a consumer can pick a threshold from measured data rather than guessing, and they can change whenever a venue changes how it writes its records. Server ingest time is never substituted into this field — that would masquerade as an upstream stamp. Use `observed_at` for the read time.
@@ -3887,7 +3916,7 @@ func (m MarketDetailPricingSource) Ptr() *MarketDetailPricingSource {
 	return &m
 }
 
-// Single-market detail across all eight supported platforms. Identity fields are strict-universal (no second fetch on any platform); the pricing tier carries per-outcome quotes plus market-level aggregates with explicit nulls where a platform doesn't natively expose a figure — values are never fabricated. The trading_fees tier applies the same rule to the venue's own published fee parameters. closes_at/event_id remain deliberately omitted, see the endpoint description for the rationale.
+// Single-market detail across all nine supported platforms. Identity fields are strict-universal (no second fetch on any platform); the pricing tier carries per-outcome quotes plus market-level aggregates with explicit nulls where a platform doesn't natively expose a figure — values are never fabricated. The trading_fees tier applies the same rule to the venue's own published fee parameters. closes_at/event_id remain deliberately omitted, see the endpoint description for the rationale.
 var (
 	marketDetailResponseFieldID                   = big.NewInt(1 << 0)
 	marketDetailResponseFieldProvider             = big.NewInt(1 << 1)
@@ -3910,7 +3939,7 @@ type MarketDetailResponse struct {
 	ID string `json:"id" url:"id"`
 	// Prediction market provider the market_id resolved against.
 	Provider MarketDetailResponseProvider `json:"provider" url:"provider"`
-	// Platform-native market identifier. Kalshi ticker, Polymarket numeric id, Predict numeric id, SX Bet `marketHash`, Hyperliquid outcome id, AlphaArcade market ULID, ProphetX `<event_id>:<market_id>` (resolving the favourite primary-line strike), or Limitless slug. For Polymarket markets resolved by slug, this is normalized to the numeric id. Hyperliquid integer ids collide with Polymarket/Predict numeric ids, so look them up via the composite id (`hyperliquid:<id>`, as returned by `/v1/markets`) or `?platform=hyperliquid`. Limitless slugs collide with Polymarket/Predict slugs, so look them up via the composite id (`limitless:<slug>`) or `?platform=limitless`.
+	// Platform-native market identifier. Kalshi ticker, Polymarket numeric id, Predict numeric id, SX Bet `marketHash`, Hyperliquid outcome id, AlphaArcade market ULID, ProphetX `<event_id>:<market_id>` (resolving the favourite primary-line strike), or Limitless slug. For Polymarket markets resolved by slug, this is normalized to the numeric id. Hyperliquid integer ids collide with Polymarket/Predict numeric ids, so look them up via the composite id (`hyperliquid:<id>`, as returned by `/v1/markets`) or `?platform=hyperliquid`. Limitless slugs collide with Polymarket/Predict slugs, so look them up via the composite id (`limitless:<slug>`) or `?platform=limitless`. Pred `<parent>:<child>` pairs share the `0x…64hex` shape with SX Bet hashes, so look them up via the composite id (`pred:<parent>:<child>`) or `?platform=pred`; a bare `pred:<parent>` addresses the parent as a group.
 	ProviderID string `json:"provider_id" url:"provider_id"`
 	// Human-readable market title. Each platform exposes a slightly different field — Kalshi `title`, Polymarket `question`, Predict `title`, SX Bet composed from outcome labels (team-pair fallback) so a game's moneyline, spread, and total markets stay distinguishable, and Hyperliquid composed from outcome/question metadata.
 	Title string `json:"title" url:"title"`
@@ -4204,6 +4233,7 @@ const (
 	MarketDetailResponseProviderAlphaArcade MarketDetailResponseProvider = "alpha-arcade"
 	MarketDetailResponseProviderProphetx    MarketDetailResponseProvider = "prophetx"
 	MarketDetailResponseProviderLimitless   MarketDetailResponseProvider = "limitless"
+	MarketDetailResponseProviderPred        MarketDetailResponseProvider = "pred"
 )
 
 func NewMarketDetailResponseProviderFromString(s string) (MarketDetailResponseProvider, error) {
@@ -4224,6 +4254,8 @@ func NewMarketDetailResponseProviderFromString(s string) (MarketDetailResponsePr
 		return MarketDetailResponseProviderProphetx, nil
 	case "limitless":
 		return MarketDetailResponseProviderLimitless, nil
+	case "pred":
+		return MarketDetailResponseProviderPred, nil
 	}
 	var t MarketDetailResponseProvider
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
@@ -4389,7 +4421,7 @@ func (m *MarketDetailScheduledFeeChange) String() string {
 
 // The trading fee the PREDICTION MARKET charges on a trade in this market — the venue's own published parameters, normalized. This has nothing to do with PredictorSDK's subscription pricing.
 //
-// Always present on the response. Every published model across the eight platforms is a per-share fee times the traded share count, and only the price term differs, so `taker.model` plus its parameters expresses each venue exactly rather than approximating any of them — except Limitless, whose taker curve is published as table rows with no closed form: its descriptor reports `partial` with a null taker leg instead of inventing a number. (A Limitless market with fees disabled reports `published` with both legs zero — an asserted free, never an unknown.) Compute the fee yourself:
+// Always present on the response. Every published model across the nine platforms is a per-share fee times the traded share count, and only the price term differs, so `taker.model` plus its parameters expresses each venue exactly rather than approximating any of them — except Limitless, whose taker curve is published as table rows with no closed form: its descriptor reports `partial` with a null taker leg instead of inventing a number. (A Limitless market with fees disabled reports `published` with both legs zero — an asserted free, never an unknown. A Pred market whose record omits `fee_rate_bps` reports `partial` for the same reason: the venue's own integration note says absent fee configuration must be confirmed, not assumed fee-free.) Compute the fee yourself:
 //
 // `fee = shares × f(price)`, then apply `rounding`, where `f` is
 //
@@ -5657,7 +5689,7 @@ var (
 
 type PlatformMarket struct {
 	Platform PlatformMarketPlatform `json:"platform" url:"platform"`
-	// Provider-native parent event or fixture identifier for the path in `GET /v1/events/{event_id}`. Kalshi uses its event ticker, Polymarket its event slug (or numeric event ID fallback), Predict its market ID, SX Bet its `L...` fixture ID, AlphaArcade its parent market ULID, and ProphetX its integer event id. Always pair it with the events endpoint's `platform` query parameter, passing this row's `platform` value (matched case-insensitively). Without that override, ambiguous identifiers probe only Polymarket and Predict: two hits return `409`, one hit returns that provider's event, and no hits return `404`. AlphaArcade and ProphetX are never probed or inferred; their native IDs require the override or a provider-prefixed composite ID to reach the correct venue. Retained snapshots created before this field was introduced may omit it.
+	// Provider-native parent event or fixture identifier for the path in `GET /v1/events/{event_id}`. Kalshi uses its event ticker, Polymarket its event slug (or numeric event ID fallback), Predict its market ID, SX Bet its `L...` fixture ID, AlphaArcade its parent market ULID, ProphetX its integer event id, and Pred its parent market id (`0x` + 64 hex). Always pair it with the events endpoint's `platform` query parameter, passing this row's `platform` value (matched case-insensitively). Without that override, ambiguous identifiers probe only Polymarket and Predict: two hits return `409`, one hit returns that provider's event, and no hits return `404`. AlphaArcade, ProphetX and Pred are never probed or inferred; their native IDs require the override or a provider-prefixed composite ID to reach the correct venue. Retained snapshots created before this field was introduced may omit it.
 	EventID *string `json:"event_id,omitempty" url:"event_id,omitempty"`
 	// Kalshi event ticker. Present when platform is KALSHI.
 	EventTicker *string `json:"event_ticker,omitempty" url:"event_ticker,omitempty"`
@@ -5667,9 +5699,9 @@ type PlatformMarket struct {
 	MarketSlug *string `json:"market_slug,omitempty" url:"market_slug,omitempty"`
 	// Polymarket token IDs. Present when platform is POLYMARKET.
 	TokenIDs []string `json:"token_ids,omitempty" url:"token_ids,omitempty"`
-	// Source market ID. Present for platforms other than Kalshi and Polymarket.
+	// Source market ID. Present for platforms other than Kalshi and Polymarket. Pred's is the `<parent_market_id>:<child_market_id>` pair — the composite form `pred:<parent>:<child>` resolves it on `GET /v1/markets/{market_id}`.
 	MarketID *string `json:"market_id,omitempty" url:"market_id,omitempty"`
-	// Source outcome IDs for the market named by `market_id`, sorted and de-duplicated. These are the same values `GET /v1/markets/{market_id}` returns as `outcomes[].outcome_id`, so they join directly. SX Bet's are `outcomeOne`/`outcomeTwo` — market-scoped, because SX Bet publishes no per-outcome token; read them together with `market_id`. ProphetX's are small integers (`4`, `5`) that are likewise market-scoped. Present for platforms that use outcome IDs.
+	// Source outcome IDs for the market named by `market_id`, sorted and de-duplicated. These are the same values `GET /v1/markets/{market_id}` returns as `outcomes[].outcome_id`, so they join directly. SX Bet's are `outcomeOne`/`outcomeTwo` — market-scoped, because SX Bet publishes no per-outcome token; read them together with `market_id`. ProphetX's are small integers (`4`, `5`) that are likewise market-scoped. Pred's are `yes`/`no` — also market-scoped, naming the LONG/SHORT side of the child market the row's `market_id` pair addresses. Present for platforms that use outcome IDs.
 	OutcomeIDs []string `json:"outcome_ids,omitempty" url:"outcome_ids,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
@@ -5856,6 +5888,7 @@ const (
 	PlatformMarketPlatformSxbet       PlatformMarketPlatform = "SXBET"
 	PlatformMarketPlatformAlphaArcade PlatformMarketPlatform = "ALPHA-ARCADE"
 	PlatformMarketPlatformProphetx    PlatformMarketPlatform = "PROPHETX"
+	PlatformMarketPlatformPred        PlatformMarketPlatform = "PRED"
 )
 
 func NewPlatformMarketPlatformFromString(s string) (PlatformMarketPlatform, error) {
@@ -5872,6 +5905,8 @@ func NewPlatformMarketPlatformFromString(s string) (PlatformMarketPlatform, erro
 		return PlatformMarketPlatformAlphaArcade, nil
 	case "PROPHETX":
 		return PlatformMarketPlatformProphetx, nil
+	case "PRED":
+		return PlatformMarketPlatformPred, nil
 	}
 	var t PlatformMarketPlatform
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
@@ -6875,6 +6910,7 @@ const (
 	UnifiedMarketProviderAlphaArcade UnifiedMarketProvider = "alpha-arcade"
 	UnifiedMarketProviderProphetx    UnifiedMarketProvider = "prophetx"
 	UnifiedMarketProviderLimitless   UnifiedMarketProvider = "limitless"
+	UnifiedMarketProviderPred        UnifiedMarketProvider = "pred"
 )
 
 func NewUnifiedMarketProviderFromString(s string) (UnifiedMarketProvider, error) {
@@ -6895,6 +6931,8 @@ func NewUnifiedMarketProviderFromString(s string) (UnifiedMarketProvider, error)
 		return UnifiedMarketProviderProphetx, nil
 	case "limitless":
 		return UnifiedMarketProviderLimitless, nil
+	case "pred":
+		return UnifiedMarketProviderPred, nil
 	}
 	var t UnifiedMarketProvider
 	return "", fmt.Errorf("%s is not a valid %T", s, t)

@@ -730,6 +730,14 @@ func TestSettersGetSportsMatchingMarketsRequest(t *testing.T) {
 		assert.NotNil(t, obj.explicitFields)
 	})
 
+	t.Run("SetPredMarketID", func(t *testing.T) {
+		obj := &GetSportsMatchingMarketsRequest{}
+		var fernTestValuePredMarketID []*string
+		obj.SetPredMarketID(fernTestValuePredMarketID)
+		assert.Equal(t, fernTestValuePredMarketID, obj.PredMarketID)
+		assert.NotNil(t, obj.explicitFields)
+	})
+
 }
 
 func TestSettersMarkExplicitGetSportsMatchingMarketsRequest(t *testing.T) {
@@ -1113,6 +1121,37 @@ func TestSettersMarkExplicitGetSportsMatchingMarketsRequest(t *testing.T) {
 
 		// Act
 		obj.SetProphetxMarketID(fernTestValueProphetxMarketID)
+
+		// Assert - object with explicitly set field can be marshaled/unmarshaled
+		bytes, err := json.Marshal(obj)
+		require.NoError(t, err, "marshaling should succeed for test setup")
+
+		// This test ensures JSON marshaling and unmarshaling succeed when the field has a zero/nil value
+		// Detect if marshaled JSON is an object or primitive to use correct unmarshal target
+		if len(bytes) > 0 && bytes[0] == '{' {
+			// JSON object - unmarshal into map
+			var unmarshaled map[string]interface{}
+			err = json.Unmarshal(bytes, &unmarshaled)
+			require.NoError(t, err, "unmarshaling should succeed for test verification")
+		} else {
+			// JSON primitive (string, number, boolean, null) - unmarshal into interface{}
+			var unmarshaled interface{}
+			err = json.Unmarshal(bytes, &unmarshaled)
+			require.NoError(t, err, "unmarshaling should succeed for test verification")
+		}
+
+		// Note: This does not explicitly assert the presence of a specific JSON field
+		// It verifies that setting a field via setter allows successful JSON round-trip
+	})
+
+	t.Run("SetPredMarketID_MarksExplicit", func(t *testing.T) {
+		t.Parallel()
+		// Arrange
+		obj := &GetSportsMatchingMarketsRequest{}
+		var fernTestValuePredMarketID []*string
+
+		// Act
+		obj.SetPredMarketID(fernTestValuePredMarketID)
 
 		// Assert - object with explicitly set field can be marshaled/unmarshaled
 		bytes, err := json.Marshal(obj)
@@ -15399,6 +15438,13 @@ func TestEnumCanonicalSportsSourceMarketProvider(t *testing.T) {
 		assert.Equal(t, CanonicalSportsSourceMarketProvider("prophetx"), val, "enum value should match expected wire value")
 	})
 
+	t.Run("NewFromString_pred", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewCanonicalSportsSourceMarketProviderFromString("pred")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, CanonicalSportsSourceMarketProvider("pred"), val, "enum value should match expected wire value")
+	})
+
 	t.Run("NewFromString_Invalid", func(t *testing.T) {
 		_, err := NewCanonicalSportsSourceMarketProviderFromString("invalid_value_that_does_not_exist")
 		assert.Error(t, err)
@@ -15506,6 +15552,13 @@ func TestEnumEventResponsePlatform(t *testing.T) {
 		assert.Equal(t, EventResponsePlatform("limitless"), val, "enum value should match expected wire value")
 	})
 
+	t.Run("NewFromString_pred", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewEventResponsePlatformFromString("pred")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, EventResponsePlatform("pred"), val, "enum value should match expected wire value")
+	})
+
 	t.Run("NewFromString_Invalid", func(t *testing.T) {
 		_, err := NewEventResponsePlatformFromString("invalid_value_that_does_not_exist")
 		assert.Error(t, err)
@@ -15575,6 +15628,13 @@ func TestEnumGetEventRequestPlatform(t *testing.T) {
 		val, err := NewGetEventRequestPlatformFromString("limitless")
 		assert.NoError(t, err, "valid enum value should not return error")
 		assert.Equal(t, GetEventRequestPlatform("limitless"), val, "enum value should match expected wire value")
+	})
+
+	t.Run("NewFromString_pred", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewGetEventRequestPlatformFromString("pred")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, GetEventRequestPlatform("pred"), val, "enum value should match expected wire value")
 	})
 
 	t.Run("NewFromString_Invalid", func(t *testing.T) {
@@ -15648,6 +15708,13 @@ func TestEnumGetMarketRequestPlatform(t *testing.T) {
 		assert.Equal(t, GetMarketRequestPlatform("limitless"), val, "enum value should match expected wire value")
 	})
 
+	t.Run("NewFromString_pred", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewGetMarketRequestPlatformFromString("pred")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, GetMarketRequestPlatform("pred"), val, "enum value should match expected wire value")
+	})
+
 	t.Run("NewFromString_Invalid", func(t *testing.T) {
 		_, err := NewGetMarketRequestPlatformFromString("invalid_value_that_does_not_exist")
 		assert.Error(t, err)
@@ -15717,6 +15784,13 @@ func TestEnumGetMarketsRequestProvider(t *testing.T) {
 		val, err := NewGetMarketsRequestProviderFromString("limitless")
 		assert.NoError(t, err, "valid enum value should not return error")
 		assert.Equal(t, GetMarketsRequestProvider("limitless"), val, "enum value should match expected wire value")
+	})
+
+	t.Run("NewFromString_pred", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewGetMarketsRequestProviderFromString("pred")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, GetMarketsRequestProvider("pred"), val, "enum value should match expected wire value")
 	})
 
 	t.Run("NewFromString_Invalid", func(t *testing.T) {
@@ -15910,6 +15984,13 @@ func TestEnumMarketDetailFeeRoundingDirection(t *testing.T) {
 		val, err := NewMarketDetailFeeRoundingDirectionFromString("nearest")
 		assert.NoError(t, err, "valid enum value should not return error")
 		assert.Equal(t, MarketDetailFeeRoundingDirection("nearest"), val, "enum value should match expected wire value")
+	})
+
+	t.Run("NewFromString_down", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewMarketDetailFeeRoundingDirectionFromString("down")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, MarketDetailFeeRoundingDirection("down"), val, "enum value should match expected wire value")
 	})
 
 	t.Run("NewFromString_Invalid", func(t *testing.T) {
@@ -16125,6 +16206,13 @@ func TestEnumMarketDetailResponseProvider(t *testing.T) {
 		val, err := NewMarketDetailResponseProviderFromString("limitless")
 		assert.NoError(t, err, "valid enum value should not return error")
 		assert.Equal(t, MarketDetailResponseProvider("limitless"), val, "enum value should match expected wire value")
+	})
+
+	t.Run("NewFromString_pred", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewMarketDetailResponseProviderFromString("pred")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, MarketDetailResponseProvider("pred"), val, "enum value should match expected wire value")
 	})
 
 	t.Run("NewFromString_Invalid", func(t *testing.T) {
@@ -16364,6 +16452,13 @@ func TestEnumPlatformMarketPlatform(t *testing.T) {
 		assert.Equal(t, PlatformMarketPlatform("PROPHETX"), val, "enum value should match expected wire value")
 	})
 
+	t.Run("NewFromString_PRED", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewPlatformMarketPlatformFromString("PRED")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, PlatformMarketPlatform("PRED"), val, "enum value should match expected wire value")
+	})
+
 	t.Run("NewFromString_Invalid", func(t *testing.T) {
 		_, err := NewPlatformMarketPlatformFromString("invalid_value_that_does_not_exist")
 		assert.Error(t, err)
@@ -16547,6 +16642,13 @@ func TestEnumUnifiedMarketProvider(t *testing.T) {
 		val, err := NewUnifiedMarketProviderFromString("limitless")
 		assert.NoError(t, err, "valid enum value should not return error")
 		assert.Equal(t, UnifiedMarketProvider("limitless"), val, "enum value should match expected wire value")
+	})
+
+	t.Run("NewFromString_pred", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewUnifiedMarketProviderFromString("pred")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, UnifiedMarketProvider("pred"), val, "enum value should match expected wire value")
 	})
 
 	t.Run("NewFromString_Invalid", func(t *testing.T) {
