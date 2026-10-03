@@ -58,6 +58,8 @@ func (c *Client) GetPlans(
 
 // Find cross-platform market matches for sports events. Coverage is NBA, WNBA, NHL, MLB, and NFL; `canonical_events[].league` names the league and is the first segment of the canonical `event_id`. When called without parameters, returns all currently matched sports markets with cursor-based pagination (default `limit=25`, max `100`) — games whose date has passed are excluded unless you ask for them with `include_settled=true`. Provide a canonical event key, Kalshi event ticker, Polymarket slug, Predict market ID, SX Bet market ID, AlphaArcade market ULID, ProphetX event ID, ProphetX market ID, or Pred market ID to look up a specific event — lookups return the full match immediately and skip pagination. Every platform row includes its provider-native `event_id` for use with `GET /v1/events/{event_id}`; pass that row's `platform` value as the events endpoint's `platform` query parameter, which is required to disambiguate Predict and AlphaArcade identifiers and to reach ProphetX and Pred at all. Player props use strict settlement-equivalent matching by default. Set `include_submarkets=true&player_prop_match=same_prop` to compare roster-verified props with the same player, game, statistic, full-game period, and threshold even when settlement rules differ or remain unverified. Each player prop includes a nine-dimension rule matrix. This policy applies only to player props, not game lines; a same-prop match is not a guarantee of identical payouts or a perfect hedge.
 //
+// Matching runs continuously in the background and this endpoint reads the stored result, so every response carries `snapshot.observed_at`: how old the venue data behind it is. Check it before treating an event a response does not contain as unmatched — a lookup that finds nothing in a snapshot that stopped updating looks exactly like one that finds nothing in a current one.
+//
 // Example:
 //
 //	request := &predictorsdk.GetSportsMatchingMarketsRequest{}
@@ -234,7 +236,7 @@ func (c *Client) GetPolymarketWallet(
 	return response.Body, nil
 }
 
-// Returns the current Polymarket positions for a wallet. Accepts either a wallet `address` (proxy address only — see note below) or a Polymarket `username`. Exactly one of the two must be supplied — passing both returns `400`.
+// Returns the current Polymarket positions for a wallet. The upstream source is Polymarket Data API v2; this public route keeps its existing response shape. Accepts either a wallet `address` (proxy address only — see note below) or a Polymarket `username`. Exactly one of the two must be supplied — passing both returns `400`.
 //
 // v1 surfaces a minimal field set so the endpoint scaffolding can be verified end-to-end: `condition_id` (which market), `outcome` (which side), and `shares` (how much). Title/slug, avg/current price, PnL (`cash_pnl`, `realized_pnl`), `redeemable`/`mergeable` flags, and event metadata will be added in follow-ups.
 //

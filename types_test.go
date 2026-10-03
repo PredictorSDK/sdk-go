@@ -13076,6 +13076,14 @@ func TestSettersSportsMatchingResponse(t *testing.T) {
 		assert.NotNil(t, obj.explicitFields)
 	})
 
+	t.Run("SetSnapshot", func(t *testing.T) {
+		obj := &SportsMatchingResponse{}
+		var fernTestValueSnapshot *SportsMatchingSnapshot
+		obj.SetSnapshot(fernTestValueSnapshot)
+		assert.Equal(t, fernTestValueSnapshot, obj.Snapshot)
+		assert.NotNil(t, obj.explicitFields)
+	})
+
 }
 
 func TestGettersSportsMatchingResponse(t *testing.T) {
@@ -13178,6 +13186,39 @@ func TestGettersSportsMatchingResponse(t *testing.T) {
 		_ = obj.GetPagination() // Should return zero value
 	})
 
+	t.Run("GetSnapshot", func(t *testing.T) {
+		t.Parallel()
+		// Arrange
+		obj := &SportsMatchingResponse{}
+		var expected *SportsMatchingSnapshot
+		obj.Snapshot = expected
+
+		// Act & Assert
+		assert.Equal(t, expected, obj.GetSnapshot(), "getter should return the property value")
+	})
+
+	t.Run("GetSnapshot_NilValue", func(t *testing.T) {
+		t.Parallel()
+		// Arrange
+		obj := &SportsMatchingResponse{}
+		obj.Snapshot = nil
+
+		// Act & Assert
+		assert.Nil(t, obj.GetSnapshot(), "getter should return nil when property is nil")
+	})
+
+	t.Run("GetSnapshot_NilReceiver", func(t *testing.T) {
+		t.Parallel()
+		var obj *SportsMatchingResponse
+		// Should not panic - getters should handle nil receiver gracefully
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("Getter panicked on nil receiver: %v", r)
+			}
+		}()
+		_ = obj.GetSnapshot() // Should return zero value
+	})
+
 }
 
 func TestSettersMarkExplicitSportsMatchingResponse(t *testing.T) {
@@ -13251,6 +13292,118 @@ func TestSettersMarkExplicitSportsMatchingResponse(t *testing.T) {
 
 		// Act
 		obj.SetPagination(fernTestValuePagination)
+
+		// Assert - object with explicitly set field can be marshaled/unmarshaled
+		bytes, err := json.Marshal(obj)
+		require.NoError(t, err, "marshaling should succeed for test setup")
+
+		// This test ensures JSON marshaling and unmarshaling succeed when the field has a zero/nil value
+		// Detect if marshaled JSON is an object or primitive to use correct unmarshal target
+		if len(bytes) > 0 && bytes[0] == '{' {
+			// JSON object - unmarshal into map
+			var unmarshaled map[string]interface{}
+			err = json.Unmarshal(bytes, &unmarshaled)
+			require.NoError(t, err, "unmarshaling should succeed for test verification")
+		} else {
+			// JSON primitive (string, number, boolean, null) - unmarshal into interface{}
+			var unmarshaled interface{}
+			err = json.Unmarshal(bytes, &unmarshaled)
+			require.NoError(t, err, "unmarshaling should succeed for test verification")
+		}
+
+		// Note: This does not explicitly assert the presence of a specific JSON field
+		// It verifies that setting a field via setter allows successful JSON round-trip
+	})
+
+	t.Run("SetSnapshot_MarksExplicit", func(t *testing.T) {
+		t.Parallel()
+		// Arrange
+		obj := &SportsMatchingResponse{}
+		var fernTestValueSnapshot *SportsMatchingSnapshot
+
+		// Act
+		obj.SetSnapshot(fernTestValueSnapshot)
+
+		// Assert - object with explicitly set field can be marshaled/unmarshaled
+		bytes, err := json.Marshal(obj)
+		require.NoError(t, err, "marshaling should succeed for test setup")
+
+		// This test ensures JSON marshaling and unmarshaling succeed when the field has a zero/nil value
+		// Detect if marshaled JSON is an object or primitive to use correct unmarshal target
+		if len(bytes) > 0 && bytes[0] == '{' {
+			// JSON object - unmarshal into map
+			var unmarshaled map[string]interface{}
+			err = json.Unmarshal(bytes, &unmarshaled)
+			require.NoError(t, err, "unmarshaling should succeed for test verification")
+		} else {
+			// JSON primitive (string, number, boolean, null) - unmarshal into interface{}
+			var unmarshaled interface{}
+			err = json.Unmarshal(bytes, &unmarshaled)
+			require.NoError(t, err, "unmarshaling should succeed for test verification")
+		}
+
+		// Note: This does not explicitly assert the presence of a specific JSON field
+		// It verifies that setting a field via setter allows successful JSON round-trip
+	})
+
+}
+
+func TestSettersSportsMatchingSnapshot(t *testing.T) {
+	t.Run("SetObservedAt", func(t *testing.T) {
+		obj := &SportsMatchingSnapshot{}
+		var fernTestValueObservedAt *time.Time
+		obj.SetObservedAt(fernTestValueObservedAt)
+		assert.Equal(t, fernTestValueObservedAt, obj.ObservedAt)
+		assert.NotNil(t, obj.explicitFields)
+	})
+
+}
+
+func TestGettersSportsMatchingSnapshot(t *testing.T) {
+	t.Run("GetObservedAt", func(t *testing.T) {
+		t.Parallel()
+		// Arrange
+		obj := &SportsMatchingSnapshot{}
+		var expected *time.Time
+		obj.ObservedAt = expected
+
+		// Act & Assert
+		assert.Equal(t, expected, obj.GetObservedAt(), "getter should return the property value")
+	})
+
+	t.Run("GetObservedAt_NilValue", func(t *testing.T) {
+		t.Parallel()
+		// Arrange
+		obj := &SportsMatchingSnapshot{}
+		obj.ObservedAt = nil
+
+		// Act & Assert
+		assert.Nil(t, obj.GetObservedAt(), "getter should return nil when property is nil")
+	})
+
+	t.Run("GetObservedAt_NilReceiver", func(t *testing.T) {
+		t.Parallel()
+		var obj *SportsMatchingSnapshot
+		// Should not panic - getters should handle nil receiver gracefully
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("Getter panicked on nil receiver: %v", r)
+			}
+		}()
+		_ = obj.GetObservedAt() // Should return zero value
+	})
+
+}
+
+func TestSettersMarkExplicitSportsMatchingSnapshot(t *testing.T) {
+	t.Run("SetObservedAt_MarksExplicit", func(t *testing.T) {
+		t.Parallel()
+		// Arrange
+		obj := &SportsMatchingSnapshot{}
+		var fernTestValueObservedAt *time.Time
+
+		// Act
+		obj.SetObservedAt(fernTestValueObservedAt)
 
 		// Assert - object with explicitly set field can be marshaled/unmarshaled
 		bytes, err := json.Marshal(obj)
@@ -14754,6 +14907,39 @@ func TestJSONMarshalingSportsMatchingResponse(t *testing.T) {
 	})
 }
 
+func TestJSONMarshalingSportsMatchingSnapshot(t *testing.T) {
+	t.Run("MarshalUnmarshal", func(t *testing.T) {
+		t.Parallel()
+		// Arrange
+		obj := &SportsMatchingSnapshot{}
+
+		// Act - Marshal to JSON
+		data, err := json.Marshal(obj)
+		require.NoError(t, err, "marshaling should succeed")
+		assert.NotNil(t, data, "marshaled data should not be nil")
+		assert.NotEmpty(t, data, "marshaled data should not be empty")
+
+		// Unmarshal back and verify round-trip
+		var unmarshaled SportsMatchingSnapshot
+		err = json.Unmarshal(data, &unmarshaled)
+		assert.NoError(t, err, "round-trip unmarshal should succeed")
+	})
+
+	t.Run("UnmarshalInvalidJSON", func(t *testing.T) {
+		t.Parallel()
+		var obj SportsMatchingSnapshot
+		err := json.Unmarshal([]byte(`{invalid json}`), &obj)
+		assert.Error(t, err, "unmarshaling invalid JSON should return an error")
+	})
+
+	t.Run("UnmarshalEmptyObject", func(t *testing.T) {
+		t.Parallel()
+		var obj SportsMatchingSnapshot
+		err := json.Unmarshal([]byte(`{}`), &obj)
+		assert.NoError(t, err, "unmarshaling empty object should succeed")
+	})
+}
+
 func TestJSONMarshalingUnifiedMarket(t *testing.T) {
 	t.Run("MarshalUnmarshal", func(t *testing.T) {
 		t.Parallel()
@@ -15374,6 +15560,22 @@ func TestStringSportsMatchingResponse(t *testing.T) {
 	t.Run("StringMethod_NilReceiver", func(t *testing.T) {
 		t.Parallel()
 		var obj *SportsMatchingResponse
+		result := obj.String()
+		assert.Equal(t, "<nil>", result, "String() should return <nil> for nil receiver")
+	})
+}
+
+func TestStringSportsMatchingSnapshot(t *testing.T) {
+	t.Run("StringMethod", func(t *testing.T) {
+		t.Parallel()
+		obj := &SportsMatchingSnapshot{}
+		result := obj.String()
+		assert.NotEmpty(t, result, "String() should return a non-empty representation")
+	})
+
+	t.Run("StringMethod_NilReceiver", func(t *testing.T) {
+		t.Parallel()
+		var obj *SportsMatchingSnapshot
 		result := obj.String()
 		assert.Equal(t, "<nil>", result, "String() should return <nil> for nil receiver")
 	})
@@ -17511,6 +17713,29 @@ func TestExtraPropertiesSportsMatchingResponse(t *testing.T) {
 	t.Run("GetExtraProperties_NilReceiver", func(t *testing.T) {
 		t.Parallel()
 		var obj *SportsMatchingResponse
+		extraProps := obj.GetExtraProperties()
+		assert.Nil(t, extraProps, "nil receiver should return nil without panicking")
+	})
+}
+
+func TestExtraPropertiesSportsMatchingSnapshot(t *testing.T) {
+	t.Run("GetExtraProperties", func(t *testing.T) {
+		t.Parallel()
+		obj := &SportsMatchingSnapshot{}
+		// Should not panic when calling GetExtraProperties()
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("GetExtraProperties() panicked: %v", r)
+			}
+		}()
+		extraProps := obj.GetExtraProperties()
+		// Result can be nil or an empty/non-empty map
+		_ = extraProps
+	})
+
+	t.Run("GetExtraProperties_NilReceiver", func(t *testing.T) {
+		t.Parallel()
+		var obj *SportsMatchingSnapshot
 		extraProps := obj.GetExtraProperties()
 		assert.Nil(t, extraProps, "nil receiver should return nil without panicking")
 	})

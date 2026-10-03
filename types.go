@@ -426,9 +426,9 @@ type ListPolymarketWalletPositionsRequest struct {
 	Address *string `json:"-" url:"address,omitempty"`
 	// Polymarket display name to resolve to a proxy wallet. Match is case-insensitive and exact against the user's stored `name`. A leading `@` is accepted and stripped. Mutually exclusive with `address`.
 	Username *string `json:"-" url:"username,omitempty"`
-	// Number of items per page. Defaults to 50.
+	// Number of items requested for the first page. Defaults to 50. Once a cursor is supplied, the cursor's page size is used.
 	Limit *int `json:"-" url:"limit,omitempty"`
-	// Opaque cursor from a previous response's `pagination.next_cursor`. Bound to the resolved wallet address — replaying a cursor against a different identifier returns `400`.
+	// Opaque cursor from a previous response's `pagination.next_cursor`. Bound to the resolved wallet address — replaying a cursor against a different wallet returns `400`. Cursors issued by the previous offset-based implementation are rejected; restart from the first page. A cursor cannot carry a page size above 100.
 	Cursor *string `json:"-" url:"cursor,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
@@ -4943,7 +4943,7 @@ var (
 )
 
 type PaginationBlock struct {
-	// Number of items requested per page (echoes the `limit` query param).
+	// Page size this page was served with. It echoes the first-page `limit` query value; for cursor-native passthrough endpoints, a supplied cursor's page size takes precedence on later pages.
 	Limit int `json:"limit" url:"limit"`
 	// Total matching items across all pages, when known. Set to `0` for endpoints whose upstream does not expose a total count — clients should rely on `has_more` and `next_cursor` to paginate in that case.
 	Total int `json:"total" url:"total"`
@@ -6283,7 +6283,7 @@ type PolymarketPosition struct {
 	ConditionID string `json:"condition_id" url:"condition_id"`
 	// Outcome label held in this position (`Yes`/`No` for binary markets).
 	Outcome string `json:"outcome" url:"outcome"`
-	// Number of outcome shares held.
+	// Current number of outcome shares held, not lifetime shares bought.
 	Shares float64 `json:"shares" url:"shares"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
@@ -6648,6 +6648,7 @@ var (
 	sportsMatchingResponseFieldMarkets         = big.NewInt(1 << 0)
 	sportsMatchingResponseFieldCanonicalEvents = big.NewInt(1 << 1)
 	sportsMatchingResponseFieldPagination      = big.NewInt(1 << 2)
+	sportsMatchingResponseFieldSnapshot        = big.NewInt(1 << 3)
 )
 
 type SportsMatchingResponse struct {
@@ -6657,6 +6658,8 @@ type SportsMatchingResponse struct {
 	CanonicalEvents map[string]*CanonicalSportsEvent `json:"canonical_events,omitempty" url:"canonical_events,omitempty"`
 	// Pagination metadata for the current page. Present in list mode (no platform-ID filter). Absent in lookup mode since the response is bounded by the filter.
 	Pagination *PaginationBlock `json:"pagination,omitempty" url:"pagination,omitempty"`
+	// Freshness of the matching snapshot this response was read from. Present in list and lookup mode alike. Describes the DATA; `pagination` describes the page.
+	Snapshot *SportsMatchingSnapshot `json:"snapshot" url:"snapshot"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
 	explicitFields *big.Int `json:"-" url:"-"`
@@ -6684,6 +6687,13 @@ func (s *SportsMatchingResponse) GetPagination() *PaginationBlock {
 		return nil
 	}
 	return s.Pagination
+}
+
+func (s *SportsMatchingResponse) GetSnapshot() *SportsMatchingSnapshot {
+	if s == nil {
+		return nil
+	}
+	return s.Snapshot
 }
 
 func (s *SportsMatchingResponse) GetExtraProperties() map[string]interface{} {
@@ -6721,6 +6731,13 @@ func (s *SportsMatchingResponse) SetPagination(pagination *PaginationBlock) {
 	s.require(sportsMatchingResponseFieldPagination)
 }
 
+// SetSnapshot sets the Snapshot field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (s *SportsMatchingResponse) SetSnapshot(snapshot *SportsMatchingSnapshot) {
+	s.Snapshot = snapshot
+	s.require(sportsMatchingResponseFieldSnapshot)
+}
+
 func (s *SportsMatchingResponse) UnmarshalJSON(data []byte) error {
 	type unmarshaler SportsMatchingResponse
 	var value unmarshaler
@@ -6749,6 +6766,108 @@ func (s *SportsMatchingResponse) MarshalJSON() ([]byte, error) {
 }
 
 func (s *SportsMatchingResponse) String() string {
+	if s == nil {
+		return "<nil>"
+	}
+	if len(s.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(s.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(s); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", s)
+}
+
+// Freshness of the matching snapshot a `GET /v1/matching-markets/sports` response was read from. Matching runs continuously in the background, so an event a response does not contain may be unmatched across venues, or missing from a snapshot that stopped updating. This block tells you whether the snapshot is still updating.
+var (
+	sportsMatchingSnapshotFieldObservedAt = big.NewInt(1 << 0)
+)
+
+type SportsMatchingSnapshot struct {
+	// When PredictorSDK began the OLDEST venue read behind the matching snapshot this response came from — a conservative freshness floor for every event in that snapshot, in millisecond-precision ISO 8601. Present in list and lookup mode alike, including a lookup that matched nothing, which is when it matters most.
+	//
+	// **What to expect.** Matching re-reads every venue about every 30 seconds plus the time the read itself takes, and keeps a venue's last good read for at most 10 minutes after that read finished. While matching is healthy this value is therefore never more than about 12 minutes old, and normally under two minutes. Anything older means the snapshot has stopped updating: treat an event the response does not contain as unknown rather than unmatched. The value dates the venue reads the snapshot holds; a venue whose reads keep failing is dropped from it once its last good read is 10 minutes old, so that venue's events can be missing even from a current snapshot.
+	//
+	// `observed_at` is a PredictorSDK read time, the same meaning it carries on `pricing.observed_at` and on the catalog's `snapshot.observed_at`. It is not when a venue last changed a market, and not a game time. It is the start of the read, never its end, so it can never claim data is newer than it is.
+	//
+	// Each response reports the snapshot it read. Pages of one cursor traversal can come from successive snapshots, so the value can advance between pages. Events that `include_settled=true` adds from the settled archive have left the current snapshot; they keep the identity they had when they left it, which can be days old, and do not affect this value.
+	//
+	// `null` when the age is unknown, for example while a snapshot written before this field existed is still being served.
+	ObservedAt *time.Time `json:"observed_at,omitempty" url:"observed_at,omitempty"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (s *SportsMatchingSnapshot) GetObservedAt() *time.Time {
+	if s == nil {
+		return nil
+	}
+	return s.ObservedAt
+}
+
+func (s *SportsMatchingSnapshot) GetExtraProperties() map[string]interface{} {
+	if s == nil {
+		return nil
+	}
+	return s.extraProperties
+}
+
+func (s *SportsMatchingSnapshot) require(field *big.Int) {
+	if s.explicitFields == nil {
+		s.explicitFields = big.NewInt(0)
+	}
+	s.explicitFields.Or(s.explicitFields, field)
+}
+
+// SetObservedAt sets the ObservedAt field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (s *SportsMatchingSnapshot) SetObservedAt(observedAt *time.Time) {
+	s.ObservedAt = observedAt
+	s.require(sportsMatchingSnapshotFieldObservedAt)
+}
+
+func (s *SportsMatchingSnapshot) UnmarshalJSON(data []byte) error {
+	type embed SportsMatchingSnapshot
+	var unmarshaler = struct {
+		embed
+		ObservedAt *internal.DateTime `json:"observed_at,omitempty"`
+	}{
+		embed: embed(*s),
+	}
+	if err := json.Unmarshal(data, &unmarshaler); err != nil {
+		return err
+	}
+	*s = SportsMatchingSnapshot(unmarshaler.embed)
+	s.ObservedAt = unmarshaler.ObservedAt.TimePtr()
+	extraProperties, err := internal.ExtractExtraProperties(data, *s)
+	if err != nil {
+		return err
+	}
+	s.extraProperties = extraProperties
+	s.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (s *SportsMatchingSnapshot) MarshalJSON() ([]byte, error) {
+	type embed SportsMatchingSnapshot
+	var marshaler = struct {
+		embed
+		ObservedAt *internal.DateTime `json:"observed_at,omitempty"`
+	}{
+		embed:      embed(*s),
+		ObservedAt: internal.NewOptionalDateTime(s.ObservedAt),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, s.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (s *SportsMatchingSnapshot) String() string {
 	if s == nil {
 		return "<nil>"
 	}
