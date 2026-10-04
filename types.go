@@ -267,7 +267,7 @@ var (
 type GetSportsMatchingMarketsRequest struct {
 	// Maximum number of matched events to return per page. Range 1–100, default 25. Ignored in lookup mode, when `event_id` or `source_id` is supplied.
 	Limit *int `json:"-" url:"limit,omitempty"`
-	// Opaque cursor from a previous response's `pagination.nextCursor` in the SDKs (raw JSON: `pagination.next_cursor`). Must be used with the same filter set — a cursor from `include_settled=true` cannot be replayed against `include_settled=false` and will return `400`.
+	// Opaque cursor from a previous response's `pagination.next_cursor` (`nextCursor` in TypeScript, `NextCursor` in Go). Must be used with the same filter set — a cursor from `include_settled=true` cannot be replayed against `include_settled=false` and will return `400`.
 	Cursor *string `json:"-" url:"cursor,omitempty"`
 	// Selects which events this request draws from, in list mode and in lookup mode alike. Defaults to `false`: only events whose scheduled start has not certainly passed — today's games, plus a one-day grace so a late start that runs past midnight Eastern is never dropped mid-play. Set it to `true` to also get events whose game date is further in the past, including ones a venue still lists as open.
 	//
@@ -277,11 +277,11 @@ type GetSportsMatchingMarketsRequest struct {
 	IncludeSettled *bool `json:"-" url:"include_settled,omitempty"`
 	// Player-prop admission policy. Explicit use requires `include_submarkets=true`; otherwise returns 400. `strict` (the default) includes only groups of at least two distinct providers with verified player/game/stat/threshold/side identity and a completely reviewed equivalent settlement profile. `same_prop` retains exact prop identity but also admits different or unverified settlement rules, identified by `settlement_equivalence` and `rule_comparisons`. Unknown rules never prove equivalence. Applies in list and lookup mode, including `include_settled`; cursors cannot be reused between policies. Does not change game-line matching or the default moneyline projection. Historical snapshots without verified player identity do not expose props.
 	PlayerPropMatch *GetSportsMatchingMarketsRequestPlayerPropMatch `json:"-" url:"player_prop_match,omitempty"`
-	// When `true`, each event lists every matched submarket (spreads, totals, period lines and player props) instead of only its full-game moneyline. Every submarket has the same shape, so code written against the default reads the rest unchanged. This is an identity mapping only; fetch current status, quotes, and liquidity from the referenced market resources. Explicit `player_prop_match` requires this to be `true`.
+	// When `true`, each event lists every matched submarket (spreads, totals, period lines and player props) instead of only its full-game moneyline, and events matched only on those submarkets are included too. Without it, an event appears only when its full-game moneyline is matched, so `submarkets` is never empty. Every submarket has the same shape, so code written against the default reads the rest unchanged. This is an identity mapping only; fetch current status, quotes, and liquidity from the referenced market resources. Explicit `player_prop_match` requires this to be `true`.
 	IncludeSubmarkets *bool `json:"-" url:"include_submarkets,omitempty"`
-	// Canonical event key(s) to look up directly (for example, `nba-okc-sas-2026-10-20`). Repeat the parameter for several events, and combine it freely with `source_id`, up to 100 unique identifiers in all. Lookup mode — pagination parameters are ignored. A provider identifier here is a `400`; send it as `source_id`.
+	// Canonical event key(s) to look up directly (for example, `nba-okc-sas-2026-10-20`), matched case-insensitively. Repeat the parameter for several events (do not comma-join them), and combine it freely with `source_id`, up to 100 unique identifiers in all. Lookup mode — pagination parameters are ignored. A venue's own ID here (a Kalshi ticker, a numeric ID, an SX Bet `L…` fixture, an `0x` hash, a ULID or a `{provider}:{id}` composite) is a `400` telling you to send it as `source_id`, and so is an empty value.
 	EventID []*string `json:"-" url:"event_id,omitempty"`
-	// Venue identifier(s) to look up, as `{provider}:{id}`: any `market_id`, `market_slug` or `event_id` that a `canonical_events[].submarkets[].source_markets[]` entry publishes, prefixed with that entry's `provider`. For example `kalshi:KXNBAGAME-26OCT20OKCSAS` (an event ticker), `kalshi:KXNBAGAME-26OCT20OKCSAS-OKC` (a market ticker), `sxbet:L19766755` (a fixture), or Pred's `pred:<parent_market_id>:<child_market_id>` pair. Only the text before the first colon is the provider, and it must be one of `kalshi`, `polymarket`, `predict`, `sxbet`, `alpha-arcade`, `prophetx` or `pred`; anything else is a `400`. Each matched event is keyed by the identifier exactly as sent (surrounding whitespace trimmed), so the keys of the response are the identifiers that matched. Repeat the parameter for several identifiers, across providers; combined with `event_id`, up to 100 unique identifiers in all. Lookup mode — pagination parameters are ignored. A lookup finds the event an identifier belongs to; set `include_submarkets=true` to see the submarket it names when that is not the moneyline.
+	// Venue identifier(s) to look up, as `{provider}:{id}`: any `market_id`, `market_slug` or `event_id` that a `canonical_events[].submarkets[].source_markets[]` entry publishes, prefixed with that entry's `provider`. On Polymarket, Predict and AlphaArcade an outcome token (`outcomes[].outcome_id`) works too, because those tokens identify one market; elsewhere outcome IDs are side names such as `yes` that repeat in every market. For example `kalshi:KXNBAGAME-26OCT20OKCSAS` (an event ticker), `kalshi:KXNBAGAME-26OCT20OKCSAS-OKC` (a market ticker), `sxbet:L19766755` (a fixture), or Pred's `pred:<parent_market_id>:<child_market_id>` pair. Only the text before the first colon is the provider, and it must be one of `kalshi`, `polymarket`, `predict`, `sxbet`, `alpha-arcade`, `prophetx` or `pred`; anything else is a `400` naming the value. Matching is case-insensitive. Each matched event is keyed by the identifier as sent, with whitespace around the provider and ID trimmed, so the keys of the response are the identifiers that matched. Repeat the parameter for several identifiers, across providers (a comma-joined list or an empty value is a `400`); combined with `event_id`, up to 100 unique identifiers in all. Lookup mode — pagination parameters are ignored. A lookup finds the event an identifier belongs to; set `include_submarkets=true` to see the submarket it names when that is not the moneyline, or to find an event whose full-game moneyline is not matched.
 	SourceID []*string `json:"-" url:"source_id,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
@@ -1049,14 +1049,14 @@ var (
 
 type CanonicalSportsSourceMarket struct {
 	Provider CanonicalSportsSourceMarketProvider `json:"provider" url:"provider"`
-	// The provider's own parent event for this market, for `GET /v1/events/{event_id}`: Kalshi's event ticker (a game's spread and total markets sit under events of their own), Polymarket's event slug, Predict's market ID, SX Bet's `L…` fixture ID, AlphaArcade's parent market ULID, ProphetX's integer event ID, or Pred's parent market ID. It names a parent, not this market, so it is not a `market_id`: a Kalshi event ticker answers `404` on market detail. Snapshots written before this field existed may omit it.
-	EventID *string `json:"event_id,omitempty" url:"event_id,omitempty"`
+	// The provider's own parent event for this market, for `GET /v1/events/{event_id}`: Kalshi's event ticker (a game's spread and total markets sit under events of their own), Polymarket's event slug, Predict's market ID, SX Bet's `L…` fixture ID, AlphaArcade's parent market ULID, ProphetX's integer event ID, or Pred's parent market ID. It names a parent, not this market, so it is not a `market_id`: a Kalshi event ticker answers `404` on market detail.
+	EventID string `json:"event_id" url:"event_id"`
 	// Exact provider-native market identifier. It resolves on `GET /v1/markets/{market_id}`, either as-is or prefixed with this row's `provider` in the composite form `{provider}:{market_id}`.
 	//
 	// One provider can contribute MORE THAN ONE entry to the same submarket, because a provider is free to model one canonical market as several native ones. Kalshi does exactly that for a game moneyline: it lists one binary market per team ("Arizona wins", "San Francisco wins"), so a Kalshi moneyline row appears twice, once per team ticker, each with its own `yes`/`no` outcomes. Group by `provider` if you need one row per venue; do not assume the list has at most one entry per provider.
 	MarketID   string  `json:"market_id" url:"market_id"`
 	MarketName *string `json:"market_name,omitempty" url:"market_name,omitempty"`
-	// The venue's slug for this market, where it has one (Polymarket). `GET /v1/markets/{market_id}` accepts it in place of `market_id`.
+	// The venue's slug for this market, where it has one (Polymarket and AlphaArcade). `source_id` accepts it. For market detail send `market_id`, which works on every venue: `GET /v1/markets/{market_id}` also accepts a Polymarket slug, but not an AlphaArcade one.
 	MarketSlug *string                         `json:"market_slug,omitempty" url:"market_slug,omitempty"`
 	Outcomes   []*CanonicalSportsSourceOutcome `json:"outcomes" url:"outcomes"`
 
@@ -1074,9 +1074,9 @@ func (c *CanonicalSportsSourceMarket) GetProvider() CanonicalSportsSourceMarketP
 	return c.Provider
 }
 
-func (c *CanonicalSportsSourceMarket) GetEventID() *string {
+func (c *CanonicalSportsSourceMarket) GetEventID() string {
 	if c == nil {
-		return nil
+		return ""
 	}
 	return c.EventID
 }
@@ -1132,7 +1132,7 @@ func (c *CanonicalSportsSourceMarket) SetProvider(provider CanonicalSportsSource
 
 // SetEventID sets the EventID field and marks it as non-optional;
 // this prevents an empty or null value for this field from being omitted during serialization.
-func (c *CanonicalSportsSourceMarket) SetEventID(eventID *string) {
+func (c *CanonicalSportsSourceMarket) SetEventID(eventID string) {
 	c.EventID = eventID
 	c.require(canonicalSportsSourceMarketFieldEventID)
 }
@@ -1259,7 +1259,7 @@ type CanonicalSportsSourceOutcome struct {
 	//
 	// On every provider this is the same value `GET /v1/markets/{market_id}` returns as `outcomes[].outcome_id` for the market named by this row's `market_id`, so the two surfaces join directly.
 	//
-	// `polymarket`, `predict` and `alpha-arcade` publish a globally unique per-outcome token (Polymarket CLOB token id, Predict on-chain id, AlphaArcade CLOB token id). `sxbet` and `kalshi` publish no per-outcome token at all, so their references are market-scoped and must be read together with `market_id`: an SX Bet market has one hash and two named positions (`outcomeOne` / `outcomeTwo`), and a Kalshi market is binary (`yes` / `no`). Both are the spelling the venue itself uses to address a side — SX Bet keys its order-book snapshot by `outcomeOne`/`outcomeTwo`, and Kalshi keys its book by `yes`/`no` and reports a trade's `taker_side` the same way. `prophetx` publishes small market-scoped integer outcome ids (e.g. `4`, `5`) that join to the same market's detail row, like SX Bet's positions.
+	// `polymarket`, `predict` and `alpha-arcade` publish a globally unique per-outcome token (Polymarket CLOB token id, Predict on-chain id, AlphaArcade CLOB token id), so `source_id={provider}:{outcome_id}` finds this event from the token alone. `sxbet` and `kalshi` publish no per-outcome token at all, so their references are market-scoped and must be read together with `market_id`: an SX Bet market has one hash and two named positions (`outcomeOne` / `outcomeTwo`), and a Kalshi market is binary (`yes` / `no`). Both are the spelling the venue itself uses to address a side — SX Bet keys its order-book snapshot by `outcomeOne`/`outcomeTwo`, and Kalshi keys its book by `yes`/`no` and reports a trade's `taker_side` the same way. `prophetx` publishes small market-scoped integer outcome ids (e.g. `4`, `5`) that join to the same market's detail row, like SX Bet's positions, and `pred` publishes `yes` / `no` like Kalshi. Market-scoped outcome ids are not accepted by `source_id`.
 	OutcomeID *string `json:"outcome_id,omitempty" url:"outcome_id,omitempty"`
 	// Optional source-native side such as `yes` or `no`.
 	Side *string `json:"side,omitempty" url:"side,omitempty"`
@@ -6360,7 +6360,7 @@ var (
 )
 
 type SportsMatchingResponse struct {
-	// Matched events. Keyed by canonical event ID in list mode, and in lookup mode by each `event_id` or `source_id` exactly as sent (surrounding whitespace trimmed), so an identifier that matched nothing is simply absent. Present on every response, as `{}` when nothing matched.
+	// Matched events. Keyed by canonical event ID in list mode, and in lookup mode by each `event_id` or `source_id` as sent (whitespace around the provider and ID trimmed; matching itself is case-insensitive), so an identifier that matched nothing is simply absent. Present on every response, as `{}` when nothing matched.
 	CanonicalEvents map[string]*CanonicalSportsEvent `json:"canonical_events" url:"canonical_events"`
 	// Pagination metadata for the current page. Present in list mode (no `event_id` or `source_id`). Absent in lookup mode, since the response is bounded by the identifiers requested.
 	Pagination *PaginationBlock `json:"pagination,omitempty" url:"pagination,omitempty"`

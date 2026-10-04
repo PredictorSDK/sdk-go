@@ -2348,7 +2348,7 @@ func TestSettersCanonicalSportsSourceMarket(t *testing.T) {
 
 	t.Run("SetEventID", func(t *testing.T) {
 		obj := &CanonicalSportsSourceMarket{}
-		var fernTestValueEventID *string
+		var fernTestValueEventID string
 		obj.SetEventID(fernTestValueEventID)
 		assert.Equal(t, fernTestValueEventID, obj.EventID)
 		assert.NotNil(t, obj.explicitFields)
@@ -2416,21 +2416,11 @@ func TestGettersCanonicalSportsSourceMarket(t *testing.T) {
 		t.Parallel()
 		// Arrange
 		obj := &CanonicalSportsSourceMarket{}
-		var expected *string
+		var expected string
 		obj.EventID = expected
 
 		// Act & Assert
 		assert.Equal(t, expected, obj.GetEventID(), "getter should return the property value")
-	})
-
-	t.Run("GetEventID_NilValue", func(t *testing.T) {
-		t.Parallel()
-		// Arrange
-		obj := &CanonicalSportsSourceMarket{}
-		obj.EventID = nil
-
-		// Act & Assert
-		assert.Nil(t, obj.GetEventID(), "getter should return nil when property is nil")
 	})
 
 	t.Run("GetEventID_NilReceiver", func(t *testing.T) {
@@ -2605,7 +2595,7 @@ func TestSettersMarkExplicitCanonicalSportsSourceMarket(t *testing.T) {
 		t.Parallel()
 		// Arrange
 		obj := &CanonicalSportsSourceMarket{}
-		var fernTestValueEventID *string
+		var fernTestValueEventID string
 
 		// Act
 		obj.SetEventID(fernTestValueEventID)

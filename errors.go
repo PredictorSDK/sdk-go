@@ -31,7 +31,7 @@ func (b *BadGatewayError) Unwrap() error {
 	return b.APIError
 }
 
-// Invalid query parameters: a `source_id` that is not `{provider}:{id}` with a matching provider, a provider identifier sent as `event_id`, more than 100 unique lookup identifiers, or an invalid flag, `limit` or `cursor`
+// Invalid query parameters: a `source_id` that is not `{provider}:{id}` with a matching provider, a venue's own ID sent as `event_id`, an empty or comma-joined lookup value, more than 100 unique lookup identifiers, a retired parameter (its message names the replacement), or an invalid flag, `limit` or `cursor`. The message quotes the offending value.
 type BadRequestError struct {
 	*core.APIError
 	Body *ErrorResponse
