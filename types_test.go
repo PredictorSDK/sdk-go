@@ -1354,7 +1354,7 @@ func TestSettersCanonicalSportsEvent(t *testing.T) {
 
 	t.Run("SetSport", func(t *testing.T) {
 		obj := &CanonicalSportsEvent{}
-		var fernTestValueSport *string
+		var fernTestValueSport string
 		obj.SetSport(fernTestValueSport)
 		assert.Equal(t, fernTestValueSport, obj.Sport)
 		assert.NotNil(t, obj.explicitFields)
@@ -1362,7 +1362,7 @@ func TestSettersCanonicalSportsEvent(t *testing.T) {
 
 	t.Run("SetLeague", func(t *testing.T) {
 		obj := &CanonicalSportsEvent{}
-		var fernTestValueLeague *string
+		var fernTestValueLeague string
 		obj.SetLeague(fernTestValueLeague)
 		assert.Equal(t, fernTestValueLeague, obj.League)
 		assert.NotNil(t, obj.explicitFields)
@@ -1422,21 +1422,11 @@ func TestGettersCanonicalSportsEvent(t *testing.T) {
 		t.Parallel()
 		// Arrange
 		obj := &CanonicalSportsEvent{}
-		var expected *string
+		var expected string
 		obj.Sport = expected
 
 		// Act & Assert
 		assert.Equal(t, expected, obj.GetSport(), "getter should return the property value")
-	})
-
-	t.Run("GetSport_NilValue", func(t *testing.T) {
-		t.Parallel()
-		// Arrange
-		obj := &CanonicalSportsEvent{}
-		obj.Sport = nil
-
-		// Act & Assert
-		assert.Nil(t, obj.GetSport(), "getter should return nil when property is nil")
 	})
 
 	t.Run("GetSport_NilReceiver", func(t *testing.T) {
@@ -1455,21 +1445,11 @@ func TestGettersCanonicalSportsEvent(t *testing.T) {
 		t.Parallel()
 		// Arrange
 		obj := &CanonicalSportsEvent{}
-		var expected *string
+		var expected string
 		obj.League = expected
 
 		// Act & Assert
 		assert.Equal(t, expected, obj.GetLeague(), "getter should return the property value")
-	})
-
-	t.Run("GetLeague_NilValue", func(t *testing.T) {
-		t.Parallel()
-		// Arrange
-		obj := &CanonicalSportsEvent{}
-		obj.League = nil
-
-		// Act & Assert
-		assert.Nil(t, obj.GetLeague(), "getter should return nil when property is nil")
 	})
 
 	t.Run("GetLeague_NilReceiver", func(t *testing.T) {
@@ -1611,7 +1591,7 @@ func TestSettersMarkExplicitCanonicalSportsEvent(t *testing.T) {
 		t.Parallel()
 		// Arrange
 		obj := &CanonicalSportsEvent{}
-		var fernTestValueSport *string
+		var fernTestValueSport string
 
 		// Act
 		obj.SetSport(fernTestValueSport)
@@ -1642,7 +1622,7 @@ func TestSettersMarkExplicitCanonicalSportsEvent(t *testing.T) {
 		t.Parallel()
 		// Arrange
 		obj := &CanonicalSportsEvent{}
-		var fernTestValueLeague *string
+		var fernTestValueLeague string
 
 		// Act
 		obj.SetLeague(fernTestValueLeague)
@@ -1783,7 +1763,7 @@ func TestSettersCanonicalSportsOutcome(t *testing.T) {
 
 	t.Run("SetType", func(t *testing.T) {
 		obj := &CanonicalSportsOutcome{}
-		var fernTestValueType *string
+		var fernTestValueType string
 		obj.SetType(fernTestValueType)
 		assert.Equal(t, fernTestValueType, obj.Type)
 		assert.NotNil(t, obj.explicitFields)
@@ -1791,7 +1771,7 @@ func TestSettersCanonicalSportsOutcome(t *testing.T) {
 
 	t.Run("SetSide", func(t *testing.T) {
 		obj := &CanonicalSportsOutcome{}
-		var fernTestValueSide *string
+		var fernTestValueSide string
 		obj.SetSide(fernTestValueSide)
 		assert.Equal(t, fernTestValueSide, obj.Side)
 		assert.NotNil(t, obj.explicitFields)
@@ -1850,21 +1830,11 @@ func TestGettersCanonicalSportsOutcome(t *testing.T) {
 		t.Parallel()
 		// Arrange
 		obj := &CanonicalSportsOutcome{}
-		var expected *string
+		var expected string
 		obj.Type = expected
 
 		// Act & Assert
 		assert.Equal(t, expected, obj.GetType(), "getter should return the property value")
-	})
-
-	t.Run("GetType_NilValue", func(t *testing.T) {
-		t.Parallel()
-		// Arrange
-		obj := &CanonicalSportsOutcome{}
-		obj.Type = nil
-
-		// Act & Assert
-		assert.Nil(t, obj.GetType(), "getter should return nil when property is nil")
 	})
 
 	t.Run("GetType_NilReceiver", func(t *testing.T) {
@@ -1883,21 +1853,11 @@ func TestGettersCanonicalSportsOutcome(t *testing.T) {
 		t.Parallel()
 		// Arrange
 		obj := &CanonicalSportsOutcome{}
-		var expected *string
+		var expected string
 		obj.Side = expected
 
 		// Act & Assert
 		assert.Equal(t, expected, obj.GetSide(), "getter should return the property value")
-	})
-
-	t.Run("GetSide_NilValue", func(t *testing.T) {
-		t.Parallel()
-		// Arrange
-		obj := &CanonicalSportsOutcome{}
-		obj.Side = nil
-
-		// Act & Assert
-		assert.Nil(t, obj.GetSide(), "getter should return nil when property is nil")
 	})
 
 	t.Run("GetSide_NilReceiver", func(t *testing.T) {
@@ -1981,7 +1941,7 @@ func TestSettersMarkExplicitCanonicalSportsOutcome(t *testing.T) {
 		t.Parallel()
 		// Arrange
 		obj := &CanonicalSportsOutcome{}
-		var fernTestValueType *string
+		var fernTestValueType string
 
 		// Act
 		obj.SetType(fernTestValueType)
@@ -2012,7 +1972,7 @@ func TestSettersMarkExplicitCanonicalSportsOutcome(t *testing.T) {
 		t.Parallel()
 		// Arrange
 		obj := &CanonicalSportsOutcome{}
-		var fernTestValueSide *string
+		var fernTestValueSide string
 
 		// Act
 		obj.SetSide(fernTestValueSide)
@@ -2052,7 +2012,7 @@ func TestSettersCanonicalSportsParticipant(t *testing.T) {
 
 	t.Run("SetName", func(t *testing.T) {
 		obj := &CanonicalSportsParticipant{}
-		var fernTestValueName *string
+		var fernTestValueName string
 		obj.SetName(fernTestValueName)
 		assert.Equal(t, fernTestValueName, obj.Name)
 		assert.NotNil(t, obj.explicitFields)
@@ -2060,7 +2020,7 @@ func TestSettersCanonicalSportsParticipant(t *testing.T) {
 
 	t.Run("SetRole", func(t *testing.T) {
 		obj := &CanonicalSportsParticipant{}
-		var fernTestValueRole *string
+		var fernTestValueRole string
 		obj.SetRole(fernTestValueRole)
 		assert.Equal(t, fernTestValueRole, obj.Role)
 		assert.NotNil(t, obj.explicitFields)
@@ -2096,21 +2056,11 @@ func TestGettersCanonicalSportsParticipant(t *testing.T) {
 		t.Parallel()
 		// Arrange
 		obj := &CanonicalSportsParticipant{}
-		var expected *string
+		var expected string
 		obj.Name = expected
 
 		// Act & Assert
 		assert.Equal(t, expected, obj.GetName(), "getter should return the property value")
-	})
-
-	t.Run("GetName_NilValue", func(t *testing.T) {
-		t.Parallel()
-		// Arrange
-		obj := &CanonicalSportsParticipant{}
-		obj.Name = nil
-
-		// Act & Assert
-		assert.Nil(t, obj.GetName(), "getter should return nil when property is nil")
 	})
 
 	t.Run("GetName_NilReceiver", func(t *testing.T) {
@@ -2129,21 +2079,11 @@ func TestGettersCanonicalSportsParticipant(t *testing.T) {
 		t.Parallel()
 		// Arrange
 		obj := &CanonicalSportsParticipant{}
-		var expected *string
+		var expected string
 		obj.Role = expected
 
 		// Act & Assert
 		assert.Equal(t, expected, obj.GetRole(), "getter should return the property value")
-	})
-
-	t.Run("GetRole_NilValue", func(t *testing.T) {
-		t.Parallel()
-		// Arrange
-		obj := &CanonicalSportsParticipant{}
-		obj.Role = nil
-
-		// Act & Assert
-		assert.Nil(t, obj.GetRole(), "getter should return nil when property is nil")
 	})
 
 	t.Run("GetRole_NilReceiver", func(t *testing.T) {
@@ -2196,7 +2136,7 @@ func TestSettersMarkExplicitCanonicalSportsParticipant(t *testing.T) {
 		t.Parallel()
 		// Arrange
 		obj := &CanonicalSportsParticipant{}
-		var fernTestValueName *string
+		var fernTestValueName string
 
 		// Act
 		obj.SetName(fernTestValueName)
@@ -2227,7 +2167,7 @@ func TestSettersMarkExplicitCanonicalSportsParticipant(t *testing.T) {
 		t.Parallel()
 		// Arrange
 		obj := &CanonicalSportsParticipant{}
-		var fernTestValueRole *string
+		var fernTestValueRole string
 
 		// Act
 		obj.SetRole(fernTestValueRole)
@@ -2364,7 +2304,7 @@ func TestSettersCanonicalSportsSourceMarket(t *testing.T) {
 
 	t.Run("SetMarketName", func(t *testing.T) {
 		obj := &CanonicalSportsSourceMarket{}
-		var fernTestValueMarketName *string
+		var fernTestValueMarketName string
 		obj.SetMarketName(fernTestValueMarketName)
 		assert.Equal(t, fernTestValueMarketName, obj.MarketName)
 		assert.NotNil(t, obj.explicitFields)
@@ -2462,21 +2402,11 @@ func TestGettersCanonicalSportsSourceMarket(t *testing.T) {
 		t.Parallel()
 		// Arrange
 		obj := &CanonicalSportsSourceMarket{}
-		var expected *string
+		var expected string
 		obj.MarketName = expected
 
 		// Act & Assert
 		assert.Equal(t, expected, obj.GetMarketName(), "getter should return the property value")
-	})
-
-	t.Run("GetMarketName_NilValue", func(t *testing.T) {
-		t.Parallel()
-		// Arrange
-		obj := &CanonicalSportsSourceMarket{}
-		obj.MarketName = nil
-
-		// Act & Assert
-		assert.Nil(t, obj.GetMarketName(), "getter should return nil when property is nil")
 	})
 
 	t.Run("GetMarketName_NilReceiver", func(t *testing.T) {
@@ -2657,7 +2587,7 @@ func TestSettersMarkExplicitCanonicalSportsSourceMarket(t *testing.T) {
 		t.Parallel()
 		// Arrange
 		obj := &CanonicalSportsSourceMarket{}
-		var fernTestValueMarketName *string
+		var fernTestValueMarketName string
 
 		// Act
 		obj.SetMarketName(fernTestValueMarketName)
@@ -2759,7 +2689,7 @@ func TestSettersCanonicalSportsSourceOutcome(t *testing.T) {
 
 	t.Run("SetLabel", func(t *testing.T) {
 		obj := &CanonicalSportsSourceOutcome{}
-		var fernTestValueLabel *string
+		var fernTestValueLabel string
 		obj.SetLabel(fernTestValueLabel)
 		assert.Equal(t, fernTestValueLabel, obj.Label)
 		assert.NotNil(t, obj.explicitFields)
@@ -2767,7 +2697,7 @@ func TestSettersCanonicalSportsSourceOutcome(t *testing.T) {
 
 	t.Run("SetOutcomeID", func(t *testing.T) {
 		obj := &CanonicalSportsSourceOutcome{}
-		var fernTestValueOutcomeID *string
+		var fernTestValueOutcomeID string
 		obj.SetOutcomeID(fernTestValueOutcomeID)
 		assert.Equal(t, fernTestValueOutcomeID, obj.OutcomeID)
 		assert.NotNil(t, obj.explicitFields)
@@ -2811,21 +2741,11 @@ func TestGettersCanonicalSportsSourceOutcome(t *testing.T) {
 		t.Parallel()
 		// Arrange
 		obj := &CanonicalSportsSourceOutcome{}
-		var expected *string
+		var expected string
 		obj.Label = expected
 
 		// Act & Assert
 		assert.Equal(t, expected, obj.GetLabel(), "getter should return the property value")
-	})
-
-	t.Run("GetLabel_NilValue", func(t *testing.T) {
-		t.Parallel()
-		// Arrange
-		obj := &CanonicalSportsSourceOutcome{}
-		obj.Label = nil
-
-		// Act & Assert
-		assert.Nil(t, obj.GetLabel(), "getter should return nil when property is nil")
 	})
 
 	t.Run("GetLabel_NilReceiver", func(t *testing.T) {
@@ -2844,21 +2764,11 @@ func TestGettersCanonicalSportsSourceOutcome(t *testing.T) {
 		t.Parallel()
 		// Arrange
 		obj := &CanonicalSportsSourceOutcome{}
-		var expected *string
+		var expected string
 		obj.OutcomeID = expected
 
 		// Act & Assert
 		assert.Equal(t, expected, obj.GetOutcomeID(), "getter should return the property value")
-	})
-
-	t.Run("GetOutcomeID_NilValue", func(t *testing.T) {
-		t.Parallel()
-		// Arrange
-		obj := &CanonicalSportsSourceOutcome{}
-		obj.OutcomeID = nil
-
-		// Act & Assert
-		assert.Nil(t, obj.GetOutcomeID(), "getter should return nil when property is nil")
 	})
 
 	t.Run("GetOutcomeID_NilReceiver", func(t *testing.T) {
@@ -2944,7 +2854,7 @@ func TestSettersMarkExplicitCanonicalSportsSourceOutcome(t *testing.T) {
 		t.Parallel()
 		// Arrange
 		obj := &CanonicalSportsSourceOutcome{}
-		var fernTestValueLabel *string
+		var fernTestValueLabel string
 
 		// Act
 		obj.SetLabel(fernTestValueLabel)
@@ -2975,7 +2885,7 @@ func TestSettersMarkExplicitCanonicalSportsSourceOutcome(t *testing.T) {
 		t.Parallel()
 		// Arrange
 		obj := &CanonicalSportsSourceOutcome{}
-		var fernTestValueOutcomeID *string
+		var fernTestValueOutcomeID string
 
 		// Act
 		obj.SetOutcomeID(fernTestValueOutcomeID)
@@ -3355,7 +3265,7 @@ func TestSettersCanonicalSportsSubmarket(t *testing.T) {
 
 	t.Run("SetDisplayName", func(t *testing.T) {
 		obj := &CanonicalSportsSubmarket{}
-		var fernTestValueDisplayName *string
+		var fernTestValueDisplayName string
 		obj.SetDisplayName(fernTestValueDisplayName)
 		assert.Equal(t, fernTestValueDisplayName, obj.DisplayName)
 		assert.NotNil(t, obj.explicitFields)
@@ -3363,7 +3273,7 @@ func TestSettersCanonicalSportsSubmarket(t *testing.T) {
 
 	t.Run("SetMetric", func(t *testing.T) {
 		obj := &CanonicalSportsSubmarket{}
-		var fernTestValueMetric *string
+		var fernTestValueMetric string
 		obj.SetMetric(fernTestValueMetric)
 		assert.Equal(t, fernTestValueMetric, obj.Metric)
 		assert.NotNil(t, obj.explicitFields)
@@ -3551,21 +3461,11 @@ func TestGettersCanonicalSportsSubmarket(t *testing.T) {
 		t.Parallel()
 		// Arrange
 		obj := &CanonicalSportsSubmarket{}
-		var expected *string
+		var expected string
 		obj.DisplayName = expected
 
 		// Act & Assert
 		assert.Equal(t, expected, obj.GetDisplayName(), "getter should return the property value")
-	})
-
-	t.Run("GetDisplayName_NilValue", func(t *testing.T) {
-		t.Parallel()
-		// Arrange
-		obj := &CanonicalSportsSubmarket{}
-		obj.DisplayName = nil
-
-		// Act & Assert
-		assert.Nil(t, obj.GetDisplayName(), "getter should return nil when property is nil")
 	})
 
 	t.Run("GetDisplayName_NilReceiver", func(t *testing.T) {
@@ -3584,21 +3484,11 @@ func TestGettersCanonicalSportsSubmarket(t *testing.T) {
 		t.Parallel()
 		// Arrange
 		obj := &CanonicalSportsSubmarket{}
-		var expected *string
+		var expected string
 		obj.Metric = expected
 
 		// Act & Assert
 		assert.Equal(t, expected, obj.GetMetric(), "getter should return the property value")
-	})
-
-	t.Run("GetMetric_NilValue", func(t *testing.T) {
-		t.Parallel()
-		// Arrange
-		obj := &CanonicalSportsSubmarket{}
-		obj.Metric = nil
-
-		// Act & Assert
-		assert.Nil(t, obj.GetMetric(), "getter should return nil when property is nil")
 	})
 
 	t.Run("GetMetric_NilReceiver", func(t *testing.T) {
@@ -3940,7 +3830,7 @@ func TestSettersMarkExplicitCanonicalSportsSubmarket(t *testing.T) {
 		t.Parallel()
 		// Arrange
 		obj := &CanonicalSportsSubmarket{}
-		var fernTestValueDisplayName *string
+		var fernTestValueDisplayName string
 
 		// Act
 		obj.SetDisplayName(fernTestValueDisplayName)
@@ -3971,7 +3861,7 @@ func TestSettersMarkExplicitCanonicalSportsSubmarket(t *testing.T) {
 		t.Parallel()
 		// Arrange
 		obj := &CanonicalSportsSubmarket{}
-		var fernTestValueMetric *string
+		var fernTestValueMetric string
 
 		// Act
 		obj.SetMetric(fernTestValueMetric)
@@ -12265,12 +12155,101 @@ func TestSettersMarkExplicitPolymarketWalletResponse(t *testing.T) {
 
 }
 
+func TestSettersSportsMatchingLookup(t *testing.T) {
+	t.Run("SetEventIDs", func(t *testing.T) {
+		obj := &SportsMatchingLookup{}
+		var fernTestValueEventIDs []string
+		obj.SetEventIDs(fernTestValueEventIDs)
+		assert.Equal(t, fernTestValueEventIDs, obj.EventIDs)
+		assert.NotNil(t, obj.explicitFields)
+	})
+
+}
+
+func TestGettersSportsMatchingLookup(t *testing.T) {
+	t.Run("GetEventIDs", func(t *testing.T) {
+		t.Parallel()
+		// Arrange
+		obj := &SportsMatchingLookup{}
+		var expected []string
+		obj.EventIDs = expected
+
+		// Act & Assert
+		assert.Equal(t, expected, obj.GetEventIDs(), "getter should return the property value")
+	})
+
+	t.Run("GetEventIDs_NilValue", func(t *testing.T) {
+		t.Parallel()
+		// Arrange
+		obj := &SportsMatchingLookup{}
+		obj.EventIDs = nil
+
+		// Act & Assert
+		assert.Nil(t, obj.GetEventIDs(), "getter should return nil when property is nil")
+	})
+
+	t.Run("GetEventIDs_NilReceiver", func(t *testing.T) {
+		t.Parallel()
+		var obj *SportsMatchingLookup
+		// Should not panic - getters should handle nil receiver gracefully
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("Getter panicked on nil receiver: %v", r)
+			}
+		}()
+		_ = obj.GetEventIDs() // Should return zero value
+	})
+
+}
+
+func TestSettersMarkExplicitSportsMatchingLookup(t *testing.T) {
+	t.Run("SetEventIDs_MarksExplicit", func(t *testing.T) {
+		t.Parallel()
+		// Arrange
+		obj := &SportsMatchingLookup{}
+		var fernTestValueEventIDs []string
+
+		// Act
+		obj.SetEventIDs(fernTestValueEventIDs)
+
+		// Assert - object with explicitly set field can be marshaled/unmarshaled
+		bytes, err := json.Marshal(obj)
+		require.NoError(t, err, "marshaling should succeed for test setup")
+
+		// This test ensures JSON marshaling and unmarshaling succeed when the field has a zero/nil value
+		// Detect if marshaled JSON is an object or primitive to use correct unmarshal target
+		if len(bytes) > 0 && bytes[0] == '{' {
+			// JSON object - unmarshal into map
+			var unmarshaled map[string]interface{}
+			err = json.Unmarshal(bytes, &unmarshaled)
+			require.NoError(t, err, "unmarshaling should succeed for test verification")
+		} else {
+			// JSON primitive (string, number, boolean, null) - unmarshal into interface{}
+			var unmarshaled interface{}
+			err = json.Unmarshal(bytes, &unmarshaled)
+			require.NoError(t, err, "unmarshaling should succeed for test verification")
+		}
+
+		// Note: This does not explicitly assert the presence of a specific JSON field
+		// It verifies that setting a field via setter allows successful JSON round-trip
+	})
+
+}
+
 func TestSettersSportsMatchingResponse(t *testing.T) {
-	t.Run("SetCanonicalEvents", func(t *testing.T) {
+	t.Run("SetData", func(t *testing.T) {
 		obj := &SportsMatchingResponse{}
-		var fernTestValueCanonicalEvents map[string]*CanonicalSportsEvent
-		obj.SetCanonicalEvents(fernTestValueCanonicalEvents)
-		assert.Equal(t, fernTestValueCanonicalEvents, obj.CanonicalEvents)
+		var fernTestValueData []*CanonicalSportsEvent
+		obj.SetData(fernTestValueData)
+		assert.Equal(t, fernTestValueData, obj.Data)
+		assert.NotNil(t, obj.explicitFields)
+	})
+
+	t.Run("SetLookups", func(t *testing.T) {
+		obj := &SportsMatchingResponse{}
+		var fernTestValueLookups map[string]*SportsMatchingLookup
+		obj.SetLookups(fernTestValueLookups)
+		assert.Equal(t, fernTestValueLookups, obj.Lookups)
 		assert.NotNil(t, obj.explicitFields)
 	})
 
@@ -12293,28 +12272,28 @@ func TestSettersSportsMatchingResponse(t *testing.T) {
 }
 
 func TestGettersSportsMatchingResponse(t *testing.T) {
-	t.Run("GetCanonicalEvents", func(t *testing.T) {
+	t.Run("GetData", func(t *testing.T) {
 		t.Parallel()
 		// Arrange
 		obj := &SportsMatchingResponse{}
-		var expected map[string]*CanonicalSportsEvent
-		obj.CanonicalEvents = expected
+		var expected []*CanonicalSportsEvent
+		obj.Data = expected
 
 		// Act & Assert
-		assert.Equal(t, expected, obj.GetCanonicalEvents(), "getter should return the property value")
+		assert.Equal(t, expected, obj.GetData(), "getter should return the property value")
 	})
 
-	t.Run("GetCanonicalEvents_NilValue", func(t *testing.T) {
+	t.Run("GetData_NilValue", func(t *testing.T) {
 		t.Parallel()
 		// Arrange
 		obj := &SportsMatchingResponse{}
-		obj.CanonicalEvents = nil
+		obj.Data = nil
 
 		// Act & Assert
-		assert.Nil(t, obj.GetCanonicalEvents(), "getter should return nil when property is nil")
+		assert.Nil(t, obj.GetData(), "getter should return nil when property is nil")
 	})
 
-	t.Run("GetCanonicalEvents_NilReceiver", func(t *testing.T) {
+	t.Run("GetData_NilReceiver", func(t *testing.T) {
 		t.Parallel()
 		var obj *SportsMatchingResponse
 		// Should not panic - getters should handle nil receiver gracefully
@@ -12323,7 +12302,40 @@ func TestGettersSportsMatchingResponse(t *testing.T) {
 				t.Errorf("Getter panicked on nil receiver: %v", r)
 			}
 		}()
-		_ = obj.GetCanonicalEvents() // Should return zero value
+		_ = obj.GetData() // Should return zero value
+	})
+
+	t.Run("GetLookups", func(t *testing.T) {
+		t.Parallel()
+		// Arrange
+		obj := &SportsMatchingResponse{}
+		var expected map[string]*SportsMatchingLookup
+		obj.Lookups = expected
+
+		// Act & Assert
+		assert.Equal(t, expected, obj.GetLookups(), "getter should return the property value")
+	})
+
+	t.Run("GetLookups_NilValue", func(t *testing.T) {
+		t.Parallel()
+		// Arrange
+		obj := &SportsMatchingResponse{}
+		obj.Lookups = nil
+
+		// Act & Assert
+		assert.Nil(t, obj.GetLookups(), "getter should return nil when property is nil")
+	})
+
+	t.Run("GetLookups_NilReceiver", func(t *testing.T) {
+		t.Parallel()
+		var obj *SportsMatchingResponse
+		// Should not panic - getters should handle nil receiver gracefully
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("Getter panicked on nil receiver: %v", r)
+			}
+		}()
+		_ = obj.GetLookups() // Should return zero value
 	})
 
 	t.Run("GetPagination", func(t *testing.T) {
@@ -12395,14 +12407,45 @@ func TestGettersSportsMatchingResponse(t *testing.T) {
 }
 
 func TestSettersMarkExplicitSportsMatchingResponse(t *testing.T) {
-	t.Run("SetCanonicalEvents_MarksExplicit", func(t *testing.T) {
+	t.Run("SetData_MarksExplicit", func(t *testing.T) {
 		t.Parallel()
 		// Arrange
 		obj := &SportsMatchingResponse{}
-		var fernTestValueCanonicalEvents map[string]*CanonicalSportsEvent
+		var fernTestValueData []*CanonicalSportsEvent
 
 		// Act
-		obj.SetCanonicalEvents(fernTestValueCanonicalEvents)
+		obj.SetData(fernTestValueData)
+
+		// Assert - object with explicitly set field can be marshaled/unmarshaled
+		bytes, err := json.Marshal(obj)
+		require.NoError(t, err, "marshaling should succeed for test setup")
+
+		// This test ensures JSON marshaling and unmarshaling succeed when the field has a zero/nil value
+		// Detect if marshaled JSON is an object or primitive to use correct unmarshal target
+		if len(bytes) > 0 && bytes[0] == '{' {
+			// JSON object - unmarshal into map
+			var unmarshaled map[string]interface{}
+			err = json.Unmarshal(bytes, &unmarshaled)
+			require.NoError(t, err, "unmarshaling should succeed for test verification")
+		} else {
+			// JSON primitive (string, number, boolean, null) - unmarshal into interface{}
+			var unmarshaled interface{}
+			err = json.Unmarshal(bytes, &unmarshaled)
+			require.NoError(t, err, "unmarshaling should succeed for test verification")
+		}
+
+		// Note: This does not explicitly assert the presence of a specific JSON field
+		// It verifies that setting a field via setter allows successful JSON round-trip
+	})
+
+	t.Run("SetLookups_MarksExplicit", func(t *testing.T) {
+		t.Parallel()
+		// Arrange
+		obj := &SportsMatchingResponse{}
+		var fernTestValueLookups map[string]*SportsMatchingLookup
+
+		// Act
+		obj.SetLookups(fernTestValueLookups)
 
 		// Assert - object with explicitly set field can be marshaled/unmarshaled
 		bytes, err := json.Marshal(obj)
@@ -13983,6 +14026,39 @@ func TestJSONMarshalingPolymarketWalletResponse(t *testing.T) {
 	})
 }
 
+func TestJSONMarshalingSportsMatchingLookup(t *testing.T) {
+	t.Run("MarshalUnmarshal", func(t *testing.T) {
+		t.Parallel()
+		// Arrange
+		obj := &SportsMatchingLookup{}
+
+		// Act - Marshal to JSON
+		data, err := json.Marshal(obj)
+		require.NoError(t, err, "marshaling should succeed")
+		assert.NotNil(t, data, "marshaled data should not be nil")
+		assert.NotEmpty(t, data, "marshaled data should not be empty")
+
+		// Unmarshal back and verify round-trip
+		var unmarshaled SportsMatchingLookup
+		err = json.Unmarshal(data, &unmarshaled)
+		assert.NoError(t, err, "round-trip unmarshal should succeed")
+	})
+
+	t.Run("UnmarshalInvalidJSON", func(t *testing.T) {
+		t.Parallel()
+		var obj SportsMatchingLookup
+		err := json.Unmarshal([]byte(`{invalid json}`), &obj)
+		assert.Error(t, err, "unmarshaling invalid JSON should return an error")
+	})
+
+	t.Run("UnmarshalEmptyObject", func(t *testing.T) {
+		t.Parallel()
+		var obj SportsMatchingLookup
+		err := json.Unmarshal([]byte(`{}`), &obj)
+		assert.NoError(t, err, "unmarshaling empty object should succeed")
+	})
+}
+
 func TestJSONMarshalingSportsMatchingResponse(t *testing.T) {
 	t.Run("MarshalUnmarshal", func(t *testing.T) {
 		t.Parallel()
@@ -14637,6 +14713,22 @@ func TestStringPolymarketWalletResponse(t *testing.T) {
 	t.Run("StringMethod_NilReceiver", func(t *testing.T) {
 		t.Parallel()
 		var obj *PolymarketWalletResponse
+		result := obj.String()
+		assert.Equal(t, "<nil>", result, "String() should return <nil> for nil receiver")
+	})
+}
+
+func TestStringSportsMatchingLookup(t *testing.T) {
+	t.Run("StringMethod", func(t *testing.T) {
+		t.Parallel()
+		obj := &SportsMatchingLookup{}
+		result := obj.String()
+		assert.NotEmpty(t, result, "String() should return a non-empty representation")
+	})
+
+	t.Run("StringMethod_NilReceiver", func(t *testing.T) {
+		t.Parallel()
+		var obj *SportsMatchingLookup
 		result := obj.String()
 		assert.Equal(t, "<nil>", result, "String() should return <nil> for nil receiver")
 	})
@@ -16696,6 +16788,29 @@ func TestExtraPropertiesPolymarketWalletResponse(t *testing.T) {
 	t.Run("GetExtraProperties_NilReceiver", func(t *testing.T) {
 		t.Parallel()
 		var obj *PolymarketWalletResponse
+		extraProps := obj.GetExtraProperties()
+		assert.Nil(t, extraProps, "nil receiver should return nil without panicking")
+	})
+}
+
+func TestExtraPropertiesSportsMatchingLookup(t *testing.T) {
+	t.Run("GetExtraProperties", func(t *testing.T) {
+		t.Parallel()
+		obj := &SportsMatchingLookup{}
+		// Should not panic when calling GetExtraProperties()
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("GetExtraProperties() panicked: %v", r)
+			}
+		}()
+		extraProps := obj.GetExtraProperties()
+		// Result can be nil or an empty/non-empty map
+		_ = extraProps
+	})
+
+	t.Run("GetExtraProperties_NilReceiver", func(t *testing.T) {
+		t.Parallel()
+		var obj *SportsMatchingLookup
 		extraProps := obj.GetExtraProperties()
 		assert.Nil(t, extraProps, "nil receiver should return nil without panicking")
 	})
