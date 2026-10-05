@@ -27,7 +27,7 @@ type GetBinanceCryptoPricesRequest struct {
 	EndTime *int64 `json:"-" url:"end_time,omitempty"`
 	// Maximum number of prices to return. Defaults to 100 when a time range is present. Values above 100 are silently clamped to 100. Without a time range, this parameter is ignored — the endpoint always returns the single latest price.
 	Limit *int `json:"-" url:"limit,omitempty"`
-	// Base64-encoded cursor from a previous response to fetch the next page of results.
+	// Base64-encoded cursor from a previous response to fetch the next (older) page of results. It carries the `start_time` of the request that issued it, so the next page stays inside the range whether or not you send `start_time` again; sending a different `start_time` with it is a `400`. `end_time` is ignored when a cursor is sent.
 	PaginationKey *string `json:"-" url:"pagination_key,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
@@ -273,17 +273,19 @@ type GetSportsMatchingMarketsRequest struct {
 	//
 	// Venues settle and delist a game's markets at different times, so the endpoint filters on the game's own date (its scheduled start, and never earlier than the date its `event_id` ends in) rather than on an upstream status. Nothing is reported as settled that the venue has not settled; these events are simply not *current*, which is what the default page is for. A postponed game takes its new date, so its event stays current until the makeup game.
 	//
-	// For a game that has started, `true` also returns the fullest mapping the game had: the version from before its first venue settled, rather than the venues still listing it.
+	// A game that has started is served with the fullest mapping it had — the version from before its first venue settled and delisted it — rather than only the venues still listing it. That holds in the default population too, so today's finished games stay listed with every venue until they are past-dated; with `true` it holds for older games as well. Games archived before 2026-10-04 21:26 UTC kept only the venues that still listed them when they left (usually two), and age out of the 30-day archive by 2026-11-04; a lookup by another venue's identifier finds nothing for them.
 	//
 	// Because it selects the population, a lookup (`?event_id=` or `?source_id=`) for a past-dated event answers `200` with the identifier listed in `lookups` with no events, unless this is `true`.
 	IncludeSettled *bool `json:"-" url:"include_settled,omitempty"`
 	// Player-prop admission policy. It requires `include_submarkets` to be `true`, which it is by default in lookup mode; with `include_submarkets=false` it is a 400. Matched case-insensitively. `strict` (the default) includes only groups of at least two distinct providers with verified player/game/stat/threshold/side identity and a completely reviewed equivalent settlement profile. `same_prop` retains exact prop identity but also admits different or unverified settlement rules, identified by `settlement_equivalence` and `rule_comparisons`. Unknown rules never prove equivalence. Applies in list and lookup mode, including `include_settled`; cursors cannot be reused between policies. Does not change game-line matching or the default moneyline projection. Historical snapshots without verified player identity do not expose props.
 	PlayerPropMatch *GetSportsMatchingMarketsRequestPlayerPropMatch `json:"-" url:"player_prop_match,omitempty"`
 	// When `true`, each event lists every matched submarket (spreads, totals, period lines and player props) instead of only its full-game moneyline, and events matched only on those submarkets are included too. When `false`, an event appears only when its full-game moneyline is matched, so `submarkets` is never empty. Defaults to `false` for a list page, which stays small, and to `true` for a lookup (`event_id` or `source_id`), which returns the events it finds in full: a spread ticker shows its spread. Every submarket has the same shape, so code written against the moneyline reads the rest unchanged. This is an identity mapping only; fetch current status, quotes, and liquidity from the referenced market resources. Explicit `player_prop_match` requires this to be `true`.
+	//
+	// Such pages are large: on 2026-10-04 a 50-event page with every submarket was about 880 KB (190 KB gzipped), and a 20-event `player_prop_match=same_prop` page about 3 MB. Send `Accept-Encoding: gzip` and a smaller `limit` when you need them.
 	IncludeSubmarkets *bool `json:"-" url:"include_submarkets,omitempty"`
 	// Canonical event key(s) to look up directly (for example, `nba-okc-sas-2026-10-20`), matched case-insensitively. Repeat the parameter for several events (do not comma-join them), and combine it freely with `source_id`, up to 100 unique identifiers in all. Lookup mode — pagination parameters are ignored. A venue's own ID here (a Kalshi ticker, a numeric ID, an SX Bet `L…` fixture, an `0x` hash, a ULID or a `{provider}:{id}` composite) is a `400` telling you to send it as `source_id`, and so is an empty value. So is a value that matches no canonical event but is a venue's identifier, most often a Polymarket slug: a night game's slug carries the UTC date (`nfl-tb-dal-2026-10-09` for the canonical `nfl-tb-dal-2026-10-08`), and Polymarket spells some teams differently (`cal` for Calgary, `la` for the Rams).
 	EventID []*string `json:"-" url:"event_id,omitempty"`
-	// Venue identifier(s) to look up, as `{provider}:{id}`: any `market_id`, `market_slug` or `event_id` that a `data[].submarkets[].source_markets[]` entry publishes, prefixed with that entry's `provider`. On Polymarket, Predict and AlphaArcade an outcome token (`outcomes[].outcome_id`) works too, because those tokens identify one market, and on Polymarket so does a market's `conditionId`, the ID wallet positions carry. Elsewhere outcome IDs are side names such as `yes` that repeat in every market: Kalshi's and Pred's `yes`/`no` and SX Bet's `outcomeOne`/`outcomeTwo` are a `400` that points to `market_id`. For example `kalshi:KXNBAGAME-26OCT20OKCSAS` (an event ticker), `kalshi:KXNBAGAME-26OCT20OKCSAS-OKC` (a market ticker), `sxbet:L19766755` (a fixture), or Pred's `pred:<parent_market_id>:<child_market_id>` pair. Only the text before the first colon is the provider, and it must be one of `kalshi`, `polymarket`, `predict`, `sxbet`, `alpha-arcade`, `prophetx` or `pred`; anything else is a `400` naming the value. Matching is case-insensitive. `lookups` reports every identifier under its spelling as sent (whitespace around the provider and ID trimmed), with the canonical events it found. Repeat the parameter for several identifiers, across providers (a comma-joined list or an empty value is a `400`); combined with `event_id`, up to 100 unique identifiers in all. Lookup mode — pagination parameters are ignored. A lookup finds the event an identifier belongs to and, by default, returns it in full, so the submarket the identifier names is in it unless `include_submarkets=false`. A player prop finds its game under any `player_prop_match` policy, while the prop itself appears only when the policy admits it.
+	// Venue identifier(s) to look up, as `{provider}:{id}`: any `market_id`, `market_slug` or `event_id` that a `data[].submarkets[].source_markets[]` entry publishes, prefixed with that entry's `provider`. On Polymarket, Predict and AlphaArcade an outcome token (`outcomes[].outcome_id`) works too, because those tokens identify one market, and on Polymarket so does a market's `conditionId`, the ID wallet positions carry. Elsewhere outcome IDs are side names such as `yes` that repeat in every market: Kalshi's and Pred's `yes`/`no` and SX Bet's `outcomeOne`/`outcomeTwo` are a `400` that points to `market_id`. For example `kalshi:KXNBAGAME-26OCT20OKCSAS` (an event ticker), `kalshi:KXNBAGAME-26OCT20OKCSAS-OKC` (a market ticker), `sxbet:L19766755` (a fixture), or Pred's `pred:<parent_market_id>:<child_market_id>` pair. Only the text before the first colon is the provider, and it must be one of `kalshi`, `polymarket`, `predict`, `sxbet`, `alpha-arcade`, `prophetx` or `pred`; anything else is a `400` naming the value. Matching is case-insensitive. `lookups` reports every identifier under its spelling as sent (whitespace around the provider and ID trimmed), with the canonical events it found. Repeat the parameter for several identifiers, across providers (a comma-joined list or an empty value is a `400`); combined with `event_id`, up to 100 unique identifiers in all. Lookup mode — pagination parameters are ignored. A lookup finds the event an identifier belongs to and, by default, returns it in full, so the submarket the identifier names is in it unless `include_submarkets=false`. A player prop finds its game under any `player_prop_match` policy when the game has another matched submarket, while the prop itself appears only when the policy admits it; a game matched only on props the policy excludes is not returned.
 	SourceID []*string `json:"-" url:"source_id,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
@@ -406,17 +408,20 @@ func (l *ListPolymarketWalletPositionsRequest) SetCursor(cursor *string) {
 //
 // `candidates` lists exactly the platforms the identifier resolved on, in a stable order, and every entry is a legal `?platform=` value. Retry the same identifier with `?platform={candidate}`, or with the composite `{platform}:{id}` form, and the lookup is deterministic. Clients that fan out over identifiers should handle 409 by re-issuing with the platform they already know from the listing that produced the id — every list and matching response that emits an identifier also emits its platform.
 var (
-	ambiguousIdentifierErrorFieldError      = big.NewInt(1 << 0)
+	ambiguousIdentifierErrorFieldCode       = big.NewInt(1 << 0)
 	ambiguousIdentifierErrorFieldMessage    = big.NewInt(1 << 1)
-	ambiguousIdentifierErrorFieldCandidates = big.NewInt(1 << 2)
-	ambiguousIdentifierErrorFieldStatusCode = big.NewInt(1 << 3)
+	ambiguousIdentifierErrorFieldParam      = big.NewInt(1 << 2)
+	ambiguousIdentifierErrorFieldCandidates = big.NewInt(1 << 3)
+	ambiguousIdentifierErrorFieldStatusCode = big.NewInt(1 << 4)
 )
 
 type AmbiguousIdentifierError struct {
-	// Short machine-stable reason, e.g. `ambiguous market_id`.
-	Error string `json:"error" url:"error"`
+	// Always `ambiguous_identifier`.
+	Code string `json:"code" url:"code"`
 	// Human-readable detail naming the identifier, the platforms it resolved on, and how to disambiguate.
-	Message *string `json:"message,omitempty" url:"message,omitempty"`
+	Message string `json:"message" url:"message"`
+	// The parameter holding the identifier, `market_id` or `event_id`.
+	Param *string `json:"param,omitempty" url:"param,omitempty"`
 	// The platforms this identifier resolved on. Each value is accepted verbatim by the `platform` query parameter.
 	Candidates []string `json:"candidates" url:"candidates"`
 	StatusCode int      `json:"status_code" url:"status_code"`
@@ -428,18 +433,25 @@ type AmbiguousIdentifierError struct {
 	rawJSON         json.RawMessage
 }
 
-func (a *AmbiguousIdentifierError) GetError() string {
+func (a *AmbiguousIdentifierError) GetCode() string {
 	if a == nil {
 		return ""
 	}
-	return a.Error
+	return a.Code
 }
 
-func (a *AmbiguousIdentifierError) GetMessage() *string {
+func (a *AmbiguousIdentifierError) GetMessage() string {
+	if a == nil {
+		return ""
+	}
+	return a.Message
+}
+
+func (a *AmbiguousIdentifierError) GetParam() *string {
 	if a == nil {
 		return nil
 	}
-	return a.Message
+	return a.Param
 }
 
 func (a *AmbiguousIdentifierError) GetCandidates() []string {
@@ -470,18 +482,25 @@ func (a *AmbiguousIdentifierError) require(field *big.Int) {
 	a.explicitFields.Or(a.explicitFields, field)
 }
 
-// SetError sets the Error field and marks it as non-optional;
+// SetCode sets the Code field and marks it as non-optional;
 // this prevents an empty or null value for this field from being omitted during serialization.
-func (a *AmbiguousIdentifierError) SetError(error_ string) {
-	a.Error = error_
-	a.require(ambiguousIdentifierErrorFieldError)
+func (a *AmbiguousIdentifierError) SetCode(code string) {
+	a.Code = code
+	a.require(ambiguousIdentifierErrorFieldCode)
 }
 
 // SetMessage sets the Message field and marks it as non-optional;
 // this prevents an empty or null value for this field from being omitted during serialization.
-func (a *AmbiguousIdentifierError) SetMessage(message *string) {
+func (a *AmbiguousIdentifierError) SetMessage(message string) {
 	a.Message = message
 	a.require(ambiguousIdentifierErrorFieldMessage)
+}
+
+// SetParam sets the Param field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (a *AmbiguousIdentifierError) SetParam(param *string) {
+	a.Param = param
+	a.require(ambiguousIdentifierErrorFieldParam)
 }
 
 // SetCandidates sets the Candidates field and marks it as non-optional;
@@ -2255,17 +2274,18 @@ func (c *CryptoPricesResponse) String() string {
 	return fmt.Sprintf("%#v", c)
 }
 
+// One problem with one parameter value.
 var (
-	errorResponseFieldError      = big.NewInt(1 << 0)
-	errorResponseFieldMessage    = big.NewInt(1 << 1)
-	errorResponseFieldStatusCode = big.NewInt(1 << 2)
+	errorParamProblemFieldParam   = big.NewInt(1 << 0)
+	errorParamProblemFieldValue   = big.NewInt(1 << 1)
+	errorParamProblemFieldMessage = big.NewInt(1 << 2)
 )
 
-type ErrorResponse struct {
-	Error string `json:"error" url:"error"`
-	// Additional detail about the error. May be present, including on some validation errors.
-	Message    *string `json:"message,omitempty" url:"message,omitempty"`
-	StatusCode int     `json:"status_code" url:"status_code"`
+type ErrorParamProblem struct {
+	Param string `json:"param" url:"param"`
+	// The value as sent, truncated if long; empty for an empty value.
+	Value   string `json:"value" url:"value"`
+	Message string `json:"message" url:"message"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
 	explicitFields *big.Int `json:"-" url:"-"`
@@ -2274,16 +2294,142 @@ type ErrorResponse struct {
 	rawJSON         json.RawMessage
 }
 
-func (e *ErrorResponse) GetError() string {
+func (e *ErrorParamProblem) GetParam() string {
 	if e == nil {
 		return ""
 	}
-	return e.Error
+	return e.Param
 }
 
-func (e *ErrorResponse) GetMessage() *string {
+func (e *ErrorParamProblem) GetValue() string {
+	if e == nil {
+		return ""
+	}
+	return e.Value
+}
+
+func (e *ErrorParamProblem) GetMessage() string {
+	if e == nil {
+		return ""
+	}
+	return e.Message
+}
+
+func (e *ErrorParamProblem) GetExtraProperties() map[string]interface{} {
 	if e == nil {
 		return nil
+	}
+	return e.extraProperties
+}
+
+func (e *ErrorParamProblem) require(field *big.Int) {
+	if e.explicitFields == nil {
+		e.explicitFields = big.NewInt(0)
+	}
+	e.explicitFields.Or(e.explicitFields, field)
+}
+
+// SetParam sets the Param field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (e *ErrorParamProblem) SetParam(param string) {
+	e.Param = param
+	e.require(errorParamProblemFieldParam)
+}
+
+// SetValue sets the Value field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (e *ErrorParamProblem) SetValue(value string) {
+	e.Value = value
+	e.require(errorParamProblemFieldValue)
+}
+
+// SetMessage sets the Message field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (e *ErrorParamProblem) SetMessage(message string) {
+	e.Message = message
+	e.require(errorParamProblemFieldMessage)
+}
+
+func (e *ErrorParamProblem) UnmarshalJSON(data []byte) error {
+	type unmarshaler ErrorParamProblem
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*e = ErrorParamProblem(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *e)
+	if err != nil {
+		return err
+	}
+	e.extraProperties = extraProperties
+	e.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (e *ErrorParamProblem) MarshalJSON() ([]byte, error) {
+	type embed ErrorParamProblem
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*e),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, e.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (e *ErrorParamProblem) String() string {
+	if e == nil {
+		return "<nil>"
+	}
+	if len(e.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(e.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(e); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", e)
+}
+
+// The body of every error this API returns. Branch on `code`, which is stable; show `message`, which is written for people and may change. A `409` adds `candidates` (see `AmbiguousIdentifierError`) and a `402` adds the billing members of `PaymentRequiredError`.
+var (
+	errorResponseFieldCode       = big.NewInt(1 << 0)
+	errorResponseFieldMessage    = big.NewInt(1 << 1)
+	errorResponseFieldStatusCode = big.NewInt(1 << 2)
+	errorResponseFieldParam      = big.NewInt(1 << 3)
+	errorResponseFieldErrors     = big.NewInt(1 << 4)
+)
+
+type ErrorResponse struct {
+	// Stable machine-readable reason. New codes may be added; a code is never renamed or reused. `400`: `unknown_parameter` (the endpoint does not read that query parameter), `invalid_parameter` (a value is malformed, empty, out of range, sent more than once, or contradicts another parameter), `missing_parameter`, `invalid_cursor` (a cursor or `pagination_key` that is malformed, stale, or from another endpoint or filter set: start again without it), `invalid_identifier` (a `market_id` or `event_id` that cannot exist on the platform it resolves to, or whose `{provider}:` prefix names no provider), `upstream_rejected` (the venue rejected the request). `401`: `missing_api_key`, `invalid_api_key`. `402`: `payment_required`. `403`: `forbidden`. `404`: `route_not_found` (no route matches the path), `market_not_found`, `event_not_found`, `profile_not_found`. `405`: `method_not_allowed`. `409`: `ambiguous_identifier`. `429`: `rate_limited` (the per-minute limit; honour `Retry-After`), `usage_limit_exceeded` (an allowance that does not refill within the minute), `upstream_rate_limited` (the venue's limit). `502`: `upstream_unavailable`. `503`: `service_unavailable`.
+	Code string `json:"code" url:"code"`
+	// What went wrong and how to fix it, for people. It quotes the offending value where there is one.
+	Message string `json:"message" url:"message"`
+	// The HTTP status code, repeated for logs that keep only the body.
+	StatusCode int `json:"status_code" url:"status_code"`
+	// The query or path parameter the error concerns, when there is one (`provider`, `source_id`, `market_id`, …).
+	Param *string `json:"param,omitempty" url:"param,omitempty"`
+	// Every problem, when a request has more than one: a lookup batch with several bad identifiers, or several malformed parameters. `message` describes the first; each entry here names its own parameter and value.
+	Errors []*ErrorParamProblem `json:"errors,omitempty" url:"errors,omitempty"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (e *ErrorResponse) GetCode() string {
+	if e == nil {
+		return ""
+	}
+	return e.Code
+}
+
+func (e *ErrorResponse) GetMessage() string {
+	if e == nil {
+		return ""
 	}
 	return e.Message
 }
@@ -2293,6 +2439,20 @@ func (e *ErrorResponse) GetStatusCode() int {
 		return 0
 	}
 	return e.StatusCode
+}
+
+func (e *ErrorResponse) GetParam() *string {
+	if e == nil {
+		return nil
+	}
+	return e.Param
+}
+
+func (e *ErrorResponse) GetErrors() []*ErrorParamProblem {
+	if e == nil {
+		return nil
+	}
+	return e.Errors
 }
 
 func (e *ErrorResponse) GetExtraProperties() map[string]interface{} {
@@ -2309,16 +2469,16 @@ func (e *ErrorResponse) require(field *big.Int) {
 	e.explicitFields.Or(e.explicitFields, field)
 }
 
-// SetError sets the Error field and marks it as non-optional;
+// SetCode sets the Code field and marks it as non-optional;
 // this prevents an empty or null value for this field from being omitted during serialization.
-func (e *ErrorResponse) SetError(error_ string) {
-	e.Error = error_
-	e.require(errorResponseFieldError)
+func (e *ErrorResponse) SetCode(code string) {
+	e.Code = code
+	e.require(errorResponseFieldCode)
 }
 
 // SetMessage sets the Message field and marks it as non-optional;
 // this prevents an empty or null value for this field from being omitted during serialization.
-func (e *ErrorResponse) SetMessage(message *string) {
+func (e *ErrorResponse) SetMessage(message string) {
 	e.Message = message
 	e.require(errorResponseFieldMessage)
 }
@@ -2328,6 +2488,20 @@ func (e *ErrorResponse) SetMessage(message *string) {
 func (e *ErrorResponse) SetStatusCode(statusCode int) {
 	e.StatusCode = statusCode
 	e.require(errorResponseFieldStatusCode)
+}
+
+// SetParam sets the Param field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (e *ErrorResponse) SetParam(param *string) {
+	e.Param = param
+	e.require(errorResponseFieldParam)
+}
+
+// SetErrors sets the Errors field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (e *ErrorResponse) SetErrors(errors []*ErrorParamProblem) {
+	e.Errors = errors
+	e.require(errorResponseFieldErrors)
 }
 
 func (e *ErrorResponse) UnmarshalJSON(data []byte) error {
@@ -3319,7 +3493,7 @@ var (
 type MarketDetailOutcome struct {
 	// Outcome label as the platform reports it. Kalshi binary markets normalize to `Yes`/`No`; Polymarket parses the stringified outcomes array (also typically `Yes`/`No`); Predict reports per-outcome names; SX Bet uses outcome-one/outcome-two names (e.g. team labels with spreads applied); Hyperliquid uses the outcome `sideSpecs` names.
 	Name string `json:"name" url:"name"`
-	// Stable per-platform key for this outcome: Kalshi `yes`/`no`, Polymarket CLOB token id, Predict on-chain id, SX Bet `outcomeOne`/`outcomeTwo`, Hyperliquid coin encoding (`#<10*outcome+side>`). The join key for future per-outcome sub-resources (order-book depth).
+	// Stable per-platform key for this outcome: Kalshi, Limitless and Pred `yes`/`no`; Polymarket CLOB token id; Predict on-chain id; SX Bet `outcomeOne`/`outcomeTwo`; Hyperliquid coin encoding (`#<10*outcome+side>`); ProphetX's market-scoped selection id (`4`, `5`); AlphaArcade the CLOB token id of the Polymarket market it mirrors. On a market that groups several options (see `outcomes`) it is the option's composite market id, such as `alpha-arcade:01K0HQE3CEM2T2RDRWSCJ3V647`. It is the id `/v1/matching-markets/sports` publishes for the same side, and the join key for future per-outcome sub-resources (order-book depth). Omitted only where the venue publishes no key for a side: the two sides of an AlphaArcade market that mirrors no Polymarket market (21 of 993 two-sided AlphaArcade markets on 2026-10-04, none of them sports).
 	OutcomeID *string `json:"outcome_id,omitempty" url:"outcome_id,omitempty"`
 	// Current implied probability of this outcome in 0–1 — the headline field, equal to the implied probability on every supported platform. Derivation cascade: mid of bid/ask when two-sided → the single available side → last trade → platform mark (Polymarket `outcomePrices`, which preserves 0/1 resolution marks on settled markets; AlphaArcade's catalog midpoint). Because the cascade differs by what each platform exposes, `price` is a DISPLAY number — when comparing across platforms or sizing trades, prefer `bid`/`ask` directly where present. Null when no quote of any kind exists.
 	//
@@ -3529,7 +3703,7 @@ var (
 type MarketDetailPricing struct {
 	// How completely — and how honestly — the pricing tier hydrated. It answers two questions in this precedence order: did every outcome get a price, and is any of those prices backed by a book you could actually cross.
 	//
-	// `live` — every outcome carries a price AND at least one outcome has a two-sided book the venue itself treats as quoted. **This is the only value that licenses reading `price` as a tradeable level.**
+	// `live` — the market is `open`, every outcome carries a price, AND at least one outcome has a two-sided book the venue itself treats as quoted. **This is the only value that licenses reading `price` as a tradeable level.** A `closed` or `settled` market is never `live`, whatever its record still quotes: it takes no orders.
 	//
 	// `indicative` — every outcome carries a price, but no outcome has such a book behind it. The prices are marks, one side of a book with nothing facing it, or a two-sided book wider than the venue's own published spread threshold for that market. Concretely: an AlphaArcade market whose order book is empty, where the catalog midpoint is the only price left standing; a Predict market quoted 0.01 / 0.99, whose 0.5 midpoint is arithmetic rather than a market (Predict publishes a per-market `spreadThreshold` and this server honours it); a settled Polymarket market whose 1/0 `outcomePrices` are resolution marks; or a book with one resting order and nothing on the other side. `price` is still populated and still the venue's own number — treat it as roughly where the market is thought to be, never as a level you can trade or arbitrage against. **Filter or flag `indicative` before computing cross-venue edges**: an `indicative` 0.5 next to a `live` 0.735 elsewhere is not a 23¢ opportunity, it is one venue with no book.
 	//
@@ -3541,7 +3715,7 @@ type MarketDetailPricing struct {
 	Availability MarketDetailPricingAvailability `json:"availability" url:"availability"`
 	// Self-describing unit declaration for all price fields. Single canonical scale today; new values would be added alongside (never replacing) this one.
 	Scale MarketDetailPricingScale `json:"scale" url:"scale"`
-	// Where the quotes came from. `market_record` — embedded in the same single-market record as the identity fetch (Kalshi, Polymarket, Predict). `orderbook` — required one bounded second fetch against the platform's order-book surface (SX Bet `/orderbook-v3/snapshot`, Hyperliquid `l2Book`).
+	// Where the quotes came from. `market_record` — embedded in the same record as the identity fetch: Kalshi, Polymarket and Predict, and the group views of Limitless and Pred, which read no order book. `orderbook` — the platform's order book, in a bounded second fetch where it is a separate route: SX Bet (`/orderbook-v3/snapshot`), Hyperliquid (`l2Book`), AlphaArcade, Limitless, Pred and ProphetX. A failed book read keeps `orderbook` and reports `availability: unavailable` or the record's marks.
 	Source MarketDetailPricingSource `json:"source" url:"source"`
 	// The upstream timestamp on this platform's own clock, as RFC3339. When the two sides carry independent stamps this is the OLDER of them — a conservative floor that never over-claims freshness. Null when the record carries no timestamp at all (Predict, AlphaArcade, and SX Bet).
 	//
@@ -3788,7 +3962,7 @@ func (m MarketDetailPricingAsOfKind) Ptr() *MarketDetailPricingAsOfKind {
 
 // How completely — and how honestly — the pricing tier hydrated. It answers two questions in this precedence order: did every outcome get a price, and is any of those prices backed by a book you could actually cross.
 //
-// `live` — every outcome carries a price AND at least one outcome has a two-sided book the venue itself treats as quoted. **This is the only value that licenses reading `price` as a tradeable level.**
+// `live` — the market is `open`, every outcome carries a price, AND at least one outcome has a two-sided book the venue itself treats as quoted. **This is the only value that licenses reading `price` as a tradeable level.** A `closed` or `settled` market is never `live`, whatever its record still quotes: it takes no orders.
 //
 // `indicative` — every outcome carries a price, but no outcome has such a book behind it. The prices are marks, one side of a book with nothing facing it, or a two-sided book wider than the venue's own published spread threshold for that market. Concretely: an AlphaArcade market whose order book is empty, where the catalog midpoint is the only price left standing; a Predict market quoted 0.01 / 0.99, whose 0.5 midpoint is arithmetic rather than a market (Predict publishes a per-market `spreadThreshold` and this server honours it); a settled Polymarket market whose 1/0 `outcomePrices` are resolution marks; or a book with one resting order and nothing on the other side. `price` is still populated and still the venue's own number — treat it as roughly where the market is thought to be, never as a level you can trade or arbitrage against. **Filter or flag `indicative` before computing cross-venue edges**: an `indicative` 0.5 next to a `live` 0.735 elsewhere is not a 23¢ opportunity, it is one venue with no book.
 //
@@ -3848,7 +4022,7 @@ func (m MarketDetailPricingScale) Ptr() *MarketDetailPricingScale {
 	return &m
 }
 
-// Where the quotes came from. `market_record` — embedded in the same single-market record as the identity fetch (Kalshi, Polymarket, Predict). `orderbook` — required one bounded second fetch against the platform's order-book surface (SX Bet `/orderbook-v3/snapshot`, Hyperliquid `l2Book`).
+// Where the quotes came from. `market_record` — embedded in the same record as the identity fetch: Kalshi, Polymarket and Predict, and the group views of Limitless and Pred, which read no order book. `orderbook` — the platform's order book, in a bounded second fetch where it is a separate route: SX Bet (`/orderbook-v3/snapshot`), Hyperliquid (`l2Book`), AlphaArcade, Limitless, Pred and ProphetX. A failed book read keeps `orderbook` and reports `availability: unavailable` or the record's marks.
 type MarketDetailPricingSource string
 
 const (
@@ -3898,9 +4072,13 @@ type MarketDetailResponse struct {
 	ProviderID string `json:"provider_id" url:"provider_id"`
 	// Human-readable market title. Each platform exposes a slightly different field — Kalshi `title`, Polymarket `question`, Predict `title`, SX Bet composed from outcome labels (team-pair fallback) so a game's moneyline, spread, and total markets stay distinguishable, and Hyperliquid composed from outcome/question metadata.
 	Title string `json:"title" url:"title"`
-	// Normalized lifecycle status. Mapping per platform: Kalshi `active` → open · `closed`/`determined` → closed · `settled`/`finalized` → settled. Polymarket `archived` → settled · `closed && !archived` → closed · otherwise → open. Predict `tradingStatus=OPEN` → open · `CLOSED && !RESOLVED` → closed · `status=RESOLVED` → settled. SX Bet `ACTIVE` → open · otherwise closed. Hyperliquid named outcomes listed in `settledNamedOutcomes` → settled · otherwise open. Unknown upstream values default to closed.
+	// Normalized lifecycle status: `open` takes orders, `closed` has stopped trading without a final result, and `settled` has the venue's published result. Only an `open` market can report `pricing.availability: live`. Mapping per platform: Kalshi `active` → open · `settled`/`finalized` → settled · anything else (`closed`, `determined`) → closed. Polymarket `closed` with UMA resolution status `resolved` → settled · any other `closed` market (a resolution proposal pending, or a pre-2023 market with no UMA status) → closed · otherwise open. Predict `status=RESOLVED` → settled · `tradingStatus=OPEN` → open · otherwise closed. SX Bet: a reported result (`reportedDate`, a void included) → settled · otherwise `ACTIVE` → open · otherwise closed; SX Bet leaves some settled markets `ACTIVE`, so its `status` alone never decides settlement. Hyperliquid: an outcome listed in its question's `settledNamedOutcomes` → settled · otherwise open. AlphaArcade `isResolved` → settled · otherwise open. ProphetX `active` → open · otherwise closed; ProphetX serves only upcoming and live events, so a ProphetX market never reads `settled` — once its game is over the market id answers `404`. Limitless `FUNDED` / `FUNDED_FLAGGED` → open · `RESOLVED` → settled · `LOCKED`, `DRAFT` and anything else → closed. Pred `active` → open · `resolved` / `redeemed` → settled · anything else → closed. Unknown upstream values map to closed.
 	Status MarketDetailResponseStatus `json:"status" url:"status"`
-	// Outcomes with per-outcome quotes. ORDERING GUARANTEE: `outcomes[0]` is the platform's primary/headline outcome — Kalshi `Yes`, Polymarket's first outcome token (its `bestBid`/`bestAsk` side), Predict `indexSet=1`, SX Bet `outcomeOne`, Hyperliquid's first `sideSpec`. Render `outcomes[0].price` as the headline probability; do NOT search for an outcome named "Yes" (names are free-text on Predict/SX Bet/Hyperliquid). Every supported platform models per-market outcomes as a 2-element list in practice (multi-outcome events are modeled as multiple binary markets nested under one event/category); the per-outcome quote shape handles binary and any future multi-outcome record identically with no special-casing.
+	// Outcomes with per-outcome quotes, in the venue's order.
+	//
+	// A two-sided market lists both sides, and `outcomes[0]` is the platform's primary/headline outcome: Kalshi `Yes`, Polymarket's first outcome token (its `bestBid`/`bestAsk` side), Predict `indexSet=1`, SX Bet `outcomeOne`, Hyperliquid's first `sideSpec`, ProphetX's first selection, and `Yes` on AlphaArcade, Limitless and Pred. Render `outcomes[0].price` as the headline probability; do NOT search for an outcome named "Yes" (names are free-text on Predict, SX Bet, Hyperliquid and ProphetX).
+	//
+	// A market that groups several options lists one outcome per option: an AlphaArcade multi-choice market, a Limitless group, and a Pred parent. Each outcome is that option's YES, and its `outcome_id` is the option's own composite market id, which this endpoint resolves. A group has no headline outcome, and it can list dozens of outcomes (21 on AlphaArcade's 2028 presidential market), so never assume two.
 	Outcomes    []*MarketDetailOutcome   `json:"outcomes" url:"outcomes"`
 	Pricing     *MarketDetailPricing     `json:"pricing" url:"pricing"`
 	TradingFees *MarketDetailTradingFees `json:"trading_fees" url:"trading_fees"`
@@ -4220,7 +4398,7 @@ func (m MarketDetailResponseProvider) Ptr() *MarketDetailResponseProvider {
 	return &m
 }
 
-// Normalized lifecycle status. Mapping per platform: Kalshi `active` → open · `closed`/`determined` → closed · `settled`/`finalized` → settled. Polymarket `archived` → settled · `closed && !archived` → closed · otherwise → open. Predict `tradingStatus=OPEN` → open · `CLOSED && !RESOLVED` → closed · `status=RESOLVED` → settled. SX Bet `ACTIVE` → open · otherwise closed. Hyperliquid named outcomes listed in `settledNamedOutcomes` → settled · otherwise open. Unknown upstream values default to closed.
+// Normalized lifecycle status: `open` takes orders, `closed` has stopped trading without a final result, and `settled` has the venue's published result. Only an `open` market can report `pricing.availability: live`. Mapping per platform: Kalshi `active` → open · `settled`/`finalized` → settled · anything else (`closed`, `determined`) → closed. Polymarket `closed` with UMA resolution status `resolved` → settled · any other `closed` market (a resolution proposal pending, or a pre-2023 market with no UMA status) → closed · otherwise open. Predict `status=RESOLVED` → settled · `tradingStatus=OPEN` → open · otherwise closed. SX Bet: a reported result (`reportedDate`, a void included) → settled · otherwise `ACTIVE` → open · otherwise closed; SX Bet leaves some settled markets `ACTIVE`, so its `status` alone never decides settlement. Hyperliquid: an outcome listed in its question's `settledNamedOutcomes` → settled · otherwise open. AlphaArcade `isResolved` → settled · otherwise open. ProphetX `active` → open · otherwise closed; ProphetX serves only upcoming and live events, so a ProphetX market never reads `settled` — once its game is over the market id answers `404`. Limitless `FUNDED` / `FUNDED_FLAGGED` → open · `RESOLVED` → settled · `LOCKED`, `DRAFT` and anything else → closed. Pred `active` → open · `resolved` / `redeemed` → settled · anything else → closed. Unknown upstream values map to closed.
 type MarketDetailResponseStatus string
 
 const (
@@ -5051,7 +5229,7 @@ func (p PaymentRequiredErrorAction) Ptr() *PaymentRequiredErrorAction {
 
 // Error body returned with HTTP 402. The `action` discriminator lets clients route to the correct recovery flow: `upgrade_plan` means the caller is on a lower tier than the endpoint requires, or the Free monthly allowance is exhausted; `resolve_payment` means the caller had a paid subscription that entered a payment-recovery state (past_due/unpaid/paused/incomplete) and the backend has already downgraded them to Free — the fix is in the billing portal, not a new purchase. `required_tier` / `current_tier` are always populated; `included_requests_per_month` and `current_period_requests` are only set when a Free caller hits the monthly allowance.
 var (
-	paymentRequiredErrorBodyFieldError                    = big.NewInt(1 << 0)
+	paymentRequiredErrorBodyFieldCode                     = big.NewInt(1 << 0)
 	paymentRequiredErrorBodyFieldMessage                  = big.NewInt(1 << 1)
 	paymentRequiredErrorBodyFieldStatusCode               = big.NewInt(1 << 2)
 	paymentRequiredErrorBodyFieldAction                   = big.NewInt(1 << 3)
@@ -5062,14 +5240,15 @@ var (
 )
 
 type PaymentRequiredErrorBody struct {
-	Error string `json:"error" url:"error"`
-	// Additional detail about the error.
-	Message    *string                    `json:"message,omitempty" url:"message,omitempty"`
+	// Always `payment_required`.
+	Code string `json:"code" url:"code"`
+	// What the caller needs to do, for people.
+	Message    string                     `json:"message" url:"message"`
 	StatusCode int                        `json:"status_code" url:"status_code"`
 	Action     PaymentRequiredErrorAction `json:"action" url:"action"`
-	// Billing tier that would satisfy the gate (e.g. `starter`, `pro`, `business`, `enterprise`).
+	// Billing tier that would satisfy the gate: `starter`, `pro` or `enterprise`, the `billing_tier` of a plan in `GET /v1/plans` (the Business plan's tier is `enterprise`).
 	RequiredTier string `json:"required_tier" url:"required_tier"`
-	// Billing tier currently associated with the caller.
+	// Billing tier currently associated with the caller: `free`, `starter`, `pro` or `enterprise`.
 	CurrentTier string `json:"current_tier" url:"current_tier"`
 	// Monthly Free-tier allowance. Present only when the 402 is caused by the Free cap.
 	IncludedRequestsPerMonth *int64 `json:"included_requests_per_month,omitempty" url:"included_requests_per_month,omitempty"`
@@ -5083,16 +5262,16 @@ type PaymentRequiredErrorBody struct {
 	rawJSON         json.RawMessage
 }
 
-func (p *PaymentRequiredErrorBody) GetError() string {
+func (p *PaymentRequiredErrorBody) GetCode() string {
 	if p == nil {
 		return ""
 	}
-	return p.Error
+	return p.Code
 }
 
-func (p *PaymentRequiredErrorBody) GetMessage() *string {
+func (p *PaymentRequiredErrorBody) GetMessage() string {
 	if p == nil {
-		return nil
+		return ""
 	}
 	return p.Message
 }
@@ -5153,16 +5332,16 @@ func (p *PaymentRequiredErrorBody) require(field *big.Int) {
 	p.explicitFields.Or(p.explicitFields, field)
 }
 
-// SetError sets the Error field and marks it as non-optional;
+// SetCode sets the Code field and marks it as non-optional;
 // this prevents an empty or null value for this field from being omitted during serialization.
-func (p *PaymentRequiredErrorBody) SetError(error_ string) {
-	p.Error = error_
-	p.require(paymentRequiredErrorBodyFieldError)
+func (p *PaymentRequiredErrorBody) SetCode(code string) {
+	p.Code = code
+	p.require(paymentRequiredErrorBodyFieldCode)
 }
 
 // SetMessage sets the Message field and marks it as non-optional;
 // this prevents an empty or null value for this field from being omitted during serialization.
-func (p *PaymentRequiredErrorBody) SetMessage(message *string) {
+func (p *PaymentRequiredErrorBody) SetMessage(message string) {
 	p.Message = message
 	p.require(paymentRequiredErrorBodyFieldMessage)
 }
@@ -6365,7 +6544,7 @@ var (
 )
 
 type SportsMatchingLookup struct {
-	// The `event_id`s of the canonical events in `data` that hold the identifier, matched case-insensitively. Usually one; several only when venues reuse an identifier; none when no event in the selected population holds it: the market is matched by no other venue, the game is past-dated (see `include_settled`), its full-game moneyline is unmatched under `include_submarkets=false`, or the identifier is unknown.
+	// The `event_id`s of the canonical events in `data` that hold the identifier, matched case-insensitively. Usually one; several only when venues reuse an identifier; none when no event in the selected population holds it: the market is matched by no other venue, the game is past-dated (see `include_settled`), its full-game moneyline is unmatched under `include_submarkets=false`, the game's only matches are player props the `player_prop_match` policy excludes (try `same_prop`), or the identifier is unknown.
 	EventIDs []string `json:"event_ids" url:"event_ids"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted

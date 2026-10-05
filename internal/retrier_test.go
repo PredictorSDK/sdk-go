@@ -393,11 +393,96 @@ func TestPredictorSDKRateLimitResetDelayNeverExceedsMaximum(t *testing.T) {
 		fmt.Sprintf("%d", time.Now().Add(2*maxRetryDelay).Unix()),
 		fmt.Sprintf("%d", time.Now().Add(2*maxRetryDelay).UnixMilli()),
 	} {
-		response := &http.Response{Header: make(http.Header)}
+		response := &http.Response{StatusCode: http.StatusTooManyRequests, Header: make(http.Header)}
 		response.Header.Set("X-RateLimit-Reset", reset)
 
 		delay, err := (&Retrier{}).retryDelay(response, 0)
 		require.NoError(t, err)
+		assert.Greater(t, delay, maxRetryDelay/2)
 		assert.LessOrEqual(t, delay, maxRetryDelay)
 	}
+}
+
+// TestPredictorSDKRateLimitResetPacesOnlyA429: X-RateLimit-Reset times the
+// rate-limit window, and the API sends it on every authenticated response, so
+// a 5xx backs off from one second instead of waiting for the window.
+func TestPredictorSDKRateLimitResetPacesOnlyA429(t *testing.T) {
+	t.Parallel()
+
+	reset := fmt.Sprintf("%d", time.Now().Add(50*time.Second).Unix())
+	for _, status := range []int{http.StatusRequestTimeout, http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable} {
+		response := &http.Response{StatusCode: status, Header: make(http.Header)}
+		response.Header.Set("X-RateLimit-Reset", reset)
+
+		delay, err := (&Retrier{}).retryDelay(response, 0)
+		require.NoError(t, err)
+		assert.LessOrEqual(t, delay, 1100*time.Millisecond, "status %d", status)
+	}
+
+	limited := &http.Response{StatusCode: http.StatusTooManyRequests, Header: make(http.Header)}
+	limited.Header.Set("X-RateLimit-Reset", reset)
+	delay, err := (&Retrier{}).retryDelay(limited, 0)
+	require.NoError(t, err)
+	assert.Greater(t, delay, 45*time.Second)
+}
+
+// TestPredictorSDKLastAttemptReturnsWithoutWaiting: two attempts wait once,
+// between them, not again after the second.
+func TestPredictorSDKLastAttemptReturnsWithoutWaiting(t *testing.T) {
+	t.Parallel()
+
+	var requests int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.Header().Set("Retry-After", "1")
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	defer server.Close()
+
+	caller := NewCaller(&CallerParams{Client: server.Client()})
+	var response *InternalTestResponse
+	started := time.Now()
+	_, err := caller.Call(context.Background(), &CallParams{
+		URL:                server.URL,
+		Method:             http.MethodGet,
+		Request:            &InternalTestRequest{},
+		Response:           &response,
+		MaxAttempts:        2,
+		ResponseIsOptional: true,
+	})
+	elapsed := time.Since(started)
+
+	require.Error(t, err)
+	assert.Equal(t, 2, requests)
+	assert.GreaterOrEqual(t, elapsed, 900*time.Millisecond)
+	assert.Less(t, elapsed, 1800*time.Millisecond)
+}
+
+// TestPredictorSDKContextEndsTheBackoff: a context that ends during a backoff
+// returns its error then, not when the backoff would have finished.
+func TestPredictorSDKContextEndsTheBackoff(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Retry-After", "30")
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	caller := NewCaller(&CallerParams{Client: server.Client()})
+	var response *InternalTestResponse
+	started := time.Now()
+	_, err := caller.Call(ctx, &CallParams{
+		URL:                server.URL,
+		Method:             http.MethodGet,
+		Request:            &InternalTestRequest{},
+		Response:           &response,
+		MaxAttempts:        3,
+		ResponseIsOptional: true,
+	})
+
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.Less(t, time.Since(started), 2*time.Second)
 }

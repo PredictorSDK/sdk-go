@@ -138,16 +138,30 @@ func (r *Retrier) run(
 	if r.shouldRetry(response) {
 		defer func() { _ = response.Body.Close() }()
 
+		body, err := decompressedResponseBody(response)
+		if err != nil {
+			return nil, err
+		}
+		responseError := decodeError(response, body, errorDecoder)
+
+		// The last attempt returns its error at once: waiting first would
+		// only delay the same answer.
+		if retryAttempt+1 >= maxRetryAttempts {
+			return nil, responseError
+		}
+
 		delay, err := r.retryDelay(response, retryAttempt)
 		if err != nil {
 			return nil, err
 		}
 
-		time.Sleep(delay)
-
-		body, err := decompressedResponseBody(response)
-		if err != nil {
-			return nil, err
+		// Wait out the delay unless the caller's context ends first.
+		timer := time.NewTimer(delay)
+		select {
+		case <-request.Context().Done():
+			timer.Stop()
+			return nil, request.Context().Err()
+		case <-timer.C:
 		}
 
 		return r.run(
@@ -156,7 +170,7 @@ func (r *Retrier) run(
 			errorDecoder,
 			maxRetryAttempts,
 			retryAttempt+1,
-			decodeError(response, body, errorDecoder),
+			responseError,
 		)
 	}
 
@@ -199,8 +213,9 @@ func (r *Retrier) retryDelay(response *http.Response, retryAttempt uint) (time.D
 		}
 	}
 
-	// Then check for industry-standard X-RateLimit-Reset header, applying positive jitter
-	if rateLimitReset := response.Header.Get("X-RateLimit-Reset"); rateLimitReset != "" {
+	// Then check for industry-standard X-RateLimit-Reset header, applying positive jitter.
+	// It times the rate-limit window, so it paces a 429 only.
+	if rateLimitReset := response.Header.Get("X-RateLimit-Reset"); rateLimitReset != "" && response.StatusCode == http.StatusTooManyRequests {
 		if resetTimestamp, err := strconv.ParseInt(rateLimitReset, 10, 64); err == nil {
 			// Accept the conventional seconds epoch and the legacy Unkey millisecond epoch.
 			resetTime := time.Unix(resetTimestamp, 0)
