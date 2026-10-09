@@ -73,18 +73,18 @@ func (r *RawClient) GetPlans(
 	}, nil
 }
 
-func (r *RawClient) GetSportsMatchingMarkets(
+func (r *RawClient) LookupSportsMatchingMarkets(
 	ctx context.Context,
-	request *predictorsdk.GetSportsMatchingMarketsRequest,
+	request *predictorsdk.LookupSportsMatchingMarketsRequest,
 	opts ...option.RequestOption,
-) (*core.Response[*predictorsdk.SportsMatchingResponse], error) {
+) (*core.Response[*predictorsdk.SportsMatchingLookupResponse], error) {
 	options := core.NewRequestOptions(opts...)
 	baseURL := internal.ResolveBaseURL(
 		options.BaseURL,
 		r.baseURL,
 		"https://api.predictorsdk.com",
 	)
-	endpointURL := baseURL + "/v1/matching-markets/sports"
+	endpointURL := baseURL + "/v1/matching-markets/sports/lookup"
 	queryParams, err := internal.QueryValues(request)
 	if err != nil {
 		return nil, err
@@ -96,7 +96,7 @@ func (r *RawClient) GetSportsMatchingMarkets(
 		r.options.ToHeader(),
 		options.ToHeader(),
 	)
-	var response *predictorsdk.SportsMatchingResponse
+	var response *predictorsdk.SportsMatchingLookupResponse
 	raw, err := r.caller.Call(
 		ctx,
 		&internal.CallParams{
@@ -115,56 +115,7 @@ func (r *RawClient) GetSportsMatchingMarkets(
 	if err != nil {
 		return nil, err
 	}
-	return &core.Response[*predictorsdk.SportsMatchingResponse]{
-		StatusCode: raw.StatusCode,
-		Header:     raw.Header,
-		Body:       response,
-	}, nil
-}
-
-func (r *RawClient) GetMarkets(
-	ctx context.Context,
-	request *predictorsdk.GetMarketsRequest,
-	opts ...option.RequestOption,
-) (*core.Response[*predictorsdk.MarketsListResponse], error) {
-	options := core.NewRequestOptions(opts...)
-	baseURL := internal.ResolveBaseURL(
-		options.BaseURL,
-		r.baseURL,
-		"https://api.predictorsdk.com",
-	)
-	endpointURL := baseURL + "/v1/markets"
-	queryParams, err := internal.QueryValues(request)
-	if err != nil {
-		return nil, err
-	}
-	if len(queryParams) > 0 {
-		endpointURL += "?" + queryParams.Encode()
-	}
-	headers := internal.MergeHeaders(
-		r.options.ToHeader(),
-		options.ToHeader(),
-	)
-	var response *predictorsdk.MarketsListResponse
-	raw, err := r.caller.Call(
-		ctx,
-		&internal.CallParams{
-			URL:             endpointURL,
-			Method:          http.MethodGet,
-			Headers:         headers,
-			MaxAttempts:     options.MaxAttempts,
-			DisableRetries:  options.DisableRetries,
-			BodyProperties:  options.BodyProperties,
-			QueryParameters: options.QueryParameters,
-			Client:          options.HTTPClient,
-			Response:        &response,
-			ErrorDecoder:    internal.NewErrorDecoder(predictorsdk.ErrorCodes),
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-	return &core.Response[*predictorsdk.MarketsListResponse]{
+	return &core.Response[*predictorsdk.SportsMatchingLookupResponse]{
 		StatusCode: raw.StatusCode,
 		Header:     raw.Header,
 		Body:       response,
@@ -264,55 +215,6 @@ func (r *RawClient) GetMarket(
 	}, nil
 }
 
-func (r *RawClient) GetBinanceCryptoPrices(
-	ctx context.Context,
-	request *predictorsdk.GetBinanceCryptoPricesRequest,
-	opts ...option.RequestOption,
-) (*core.Response[*predictorsdk.CryptoPricesResponse], error) {
-	options := core.NewRequestOptions(opts...)
-	baseURL := internal.ResolveBaseURL(
-		options.BaseURL,
-		r.baseURL,
-		"https://api.predictorsdk.com",
-	)
-	endpointURL := baseURL + "/v1/crypto-prices/binance"
-	queryParams, err := internal.QueryValues(request)
-	if err != nil {
-		return nil, err
-	}
-	if len(queryParams) > 0 {
-		endpointURL += "?" + queryParams.Encode()
-	}
-	headers := internal.MergeHeaders(
-		r.options.ToHeader(),
-		options.ToHeader(),
-	)
-	var response *predictorsdk.CryptoPricesResponse
-	raw, err := r.caller.Call(
-		ctx,
-		&internal.CallParams{
-			URL:             endpointURL,
-			Method:          http.MethodGet,
-			Headers:         headers,
-			MaxAttempts:     options.MaxAttempts,
-			DisableRetries:  options.DisableRetries,
-			BodyProperties:  options.BodyProperties,
-			QueryParameters: options.QueryParameters,
-			Client:          options.HTTPClient,
-			Response:        &response,
-			ErrorDecoder:    internal.NewErrorDecoder(predictorsdk.ErrorCodes),
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-	return &core.Response[*predictorsdk.CryptoPricesResponse]{
-		StatusCode: raw.StatusCode,
-		Header:     raw.Header,
-		Body:       response,
-	}, nil
-}
-
 func (r *RawClient) GetPolymarketWallet(
 	ctx context.Context,
 	request *predictorsdk.GetPolymarketWalletRequest,
@@ -356,55 +258,6 @@ func (r *RawClient) GetPolymarketWallet(
 		return nil, err
 	}
 	return &core.Response[*predictorsdk.PolymarketWalletResponse]{
-		StatusCode: raw.StatusCode,
-		Header:     raw.Header,
-		Body:       response,
-	}, nil
-}
-
-func (r *RawClient) ListPolymarketWalletPositions(
-	ctx context.Context,
-	request *predictorsdk.ListPolymarketWalletPositionsRequest,
-	opts ...option.RequestOption,
-) (*core.Response[*predictorsdk.PolymarketPositionsResponse], error) {
-	options := core.NewRequestOptions(opts...)
-	baseURL := internal.ResolveBaseURL(
-		options.BaseURL,
-		r.baseURL,
-		"https://api.predictorsdk.com",
-	)
-	endpointURL := baseURL + "/v1/polymarket/wallet/positions"
-	queryParams, err := internal.QueryValues(request)
-	if err != nil {
-		return nil, err
-	}
-	if len(queryParams) > 0 {
-		endpointURL += "?" + queryParams.Encode()
-	}
-	headers := internal.MergeHeaders(
-		r.options.ToHeader(),
-		options.ToHeader(),
-	)
-	var response *predictorsdk.PolymarketPositionsResponse
-	raw, err := r.caller.Call(
-		ctx,
-		&internal.CallParams{
-			URL:             endpointURL,
-			Method:          http.MethodGet,
-			Headers:         headers,
-			MaxAttempts:     options.MaxAttempts,
-			DisableRetries:  options.DisableRetries,
-			BodyProperties:  options.BodyProperties,
-			QueryParameters: options.QueryParameters,
-			Client:          options.HTTPClient,
-			Response:        &response,
-			ErrorDecoder:    internal.NewErrorDecoder(predictorsdk.ErrorCodes),
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-	return &core.Response[*predictorsdk.PolymarketPositionsResponse]{
 		StatusCode: raw.StatusCode,
 		Header:     raw.Header,
 		Body:       response,

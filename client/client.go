@@ -4,6 +4,7 @@ package client
 
 import (
 	context "context"
+	http "net/http"
 
 	predictorsdk "github.com/PredictorSDK/sdk-go"
 	core "github.com/PredictorSDK/sdk-go/core"
@@ -56,13 +57,15 @@ func (c *Client) GetPlans(
 	return response.Body, nil
 }
 
-// Find cross-platform matches for sports events. Coverage is NBA, WNBA, NHL, MLB, and NFL; `data[].league` names the league and is the first segment of the canonical `event_id`. Every response is a `data` array of canonical events, soonest scheduled start first, with one shape for every venue: each canonical event lists its participants and submarkets, and each submarket lists the venue markets matched to it in `source_markets[]`. Every one of those carries the same references: `provider`, the provider's own parent `event_id` for `GET /v1/events/{event_id}`, its `market_id` for `GET /v1/markets/{market_id}`, and outcome IDs mapped to canonical outcomes. A list page covers events whose full-game moneyline is matched, and each carries only that submarket; `include_submarkets=true` adds every other matched submarket, and events matched only on spreads, totals or props. A lookup returns the events it finds in full.
+// Lists the sports events that more than one venue has matched, soonest scheduled start first, with cursor-based pagination (default `limit=25`, max `100`). Coverage is NBA, WNBA, NHL, MLB, and NFL; `data[].league` names the league and is the first segment of the canonical `event_id`. Every event has one shape for every venue: it lists its participants and submarkets, and each submarket lists the venue markets matched to it in `source_markets[]`. Every one of those carries the same references: `provider`, the provider's own parent `event_id` for `GET /v1/events/{event_id}`, its `market_id` for `GET /v1/markets/{market_id}`, and outcome IDs mapped to canonical outcomes. A page covers events whose full-game moneyline is matched, and each carries only that submarket; `include_submarkets=true` adds every other matched submarket, and events matched only on spreads, totals or props.
 //
-// Without lookup parameters the endpoint lists every currently matched event with cursor-based pagination (default `limit=25`, max `100`); games whose date has passed are excluded unless you ask for them with `include_settled=true`. To look events up directly, pass canonical keys as `event_id`, and a venue market's `market_id`, `market_slug` or `event_id` (or, on Polymarket, Predict and AlphaArcade, an outcome token; on Polymarket, also a `conditionId`) as `source_id={provider}:{id}`. Lookups skip pagination: each event found is in `data` once, and `lookups` lists every identifier sent with the events it found.
+// Each event says when it is scheduled. `scheduled_date` is the game's calendar day in America/New_York and is always present; `scheduled_start` is its start time in UTC when a venue published one, and `null` when the venues published only a date.
+//
+// Games whose date has passed are excluded unless you ask for them with `include_settled=true`. Narrow the list with `league`, `scheduled_date` and `participant`: each is a membership filter on the same matched set, they compose, and `pagination.total` counts the filtered set rather than every event. To look events up by an identifier you already hold, a canonical `event_id` or a venue's own market, slug, event, outcome token or `conditionId`, use `GET /v1/matching-markets/sports/lookup`: it answers in one call, in full, and says what each identifier found, which a page cannot.
 //
 // Player props use strict settlement-equivalent matching by default. Set `include_submarkets=true&player_prop_match=same_prop` to compare roster-verified props with the same player, game, statistic, full-game period, and threshold even when settlement rules differ or remain unverified. Each player prop includes a nine-dimension rule matrix. This policy applies only to player props, not game lines; a same-prop match is not a guarantee of identical payouts or a perfect hedge.
 //
-// Matching runs continuously in the background and this endpoint reads the stored result, so every response carries `snapshot.observed_at`: how old the venue data behind it is. Check it before treating an event a response does not contain as unmatched — a lookup that finds nothing in a snapshot that stopped updating looks exactly like one that finds nothing in a current one.
+// Matching runs continuously in the background and this endpoint reads the stored result, so every response carries `snapshot.observed_at`: how old the venue data behind it is. Check it before treating an event a response does not contain as unmatched — an empty page from a snapshot that stopped updating looks exactly like one from a current snapshot.
 //
 // Example:
 //
@@ -75,8 +78,92 @@ func (c *Client) GetSportsMatchingMarkets(
 	ctx context.Context,
 	request *predictorsdk.GetSportsMatchingMarketsRequest,
 	opts ...option.RequestOption,
-) (*predictorsdk.SportsMatchingResponse, error) {
-	response, err := c.WithRawResponse.GetSportsMatchingMarkets(
+) (*core.Page[*string, *predictorsdk.CanonicalSportsEvent, *predictorsdk.SportsMatchingListResponse], error) {
+	options := core.NewRequestOptions(opts...)
+	baseURL := internal.ResolveBaseURL(
+		options.BaseURL,
+		c.baseURL,
+		"https://api.predictorsdk.com",
+	)
+	endpointURL := baseURL + "/v1/matching-markets/sports"
+	queryParams, err := internal.QueryValues(request)
+	if err != nil {
+		return nil, err
+	}
+	headers := internal.MergeHeaders(
+		c.options.ToHeader(),
+		options.ToHeader(),
+	)
+	prepareCall := func(pageRequest *core.PageRequest[*string]) *internal.CallParams {
+		if pageRequest.Cursor != nil {
+			queryParams.Set("cursor", *pageRequest.Cursor)
+		}
+		nextURL := endpointURL
+		if len(queryParams) > 0 {
+			nextURL += "?" + queryParams.Encode()
+		}
+		return &internal.CallParams{
+			URL:             nextURL,
+			Method:          http.MethodGet,
+			Headers:         headers,
+			MaxAttempts:     options.MaxAttempts,
+			DisableRetries:  options.DisableRetries,
+			BodyProperties:  options.BodyProperties,
+			QueryParameters: options.QueryParameters,
+			Client:          options.HTTPClient,
+			Response:        pageRequest.Response,
+			ErrorDecoder:    internal.NewErrorDecoder(predictorsdk.ErrorCodes),
+		}
+	}
+	readPageResponse := func(response *predictorsdk.SportsMatchingListResponse) *core.PageResponse[*string, *predictorsdk.CanonicalSportsEvent, *predictorsdk.SportsMatchingListResponse] {
+		var zeroValue *string
+		var next *string
+		if response.Pagination != nil {
+			next = response.Pagination.NextCursor
+		}
+		results := response.GetData()
+		return &core.PageResponse[*string, *predictorsdk.CanonicalSportsEvent, *predictorsdk.SportsMatchingListResponse]{
+			Results:  results,
+			Response: response,
+			Next:     next,
+			Done:     next == zeroValue,
+		}
+	}
+	pager := internal.NewCursorPager(
+		c.caller,
+		prepareCall,
+		readPageResponse,
+	)
+	var cursor *string
+	if request != nil {
+		cursor = request.Cursor
+	}
+	return pager.GetPage(ctx, cursor)
+}
+
+// Finds the matched sports events that hold identifiers you already have, in one unpaginated call: a canonical event key as `event_id`, and any identifier a venue publishes (a market's `market_id`, `market_slug` or `event_id`; on Polymarket, Predict and AlphaArcade an outcome token; on Polymarket also a `conditionId`) as `source_id={provider}:{id}`. Send at least one, and up to 100 unique identifiers across both parameters.
+//
+// Each event found is in `data` once, in the shape `GET /v1/matching-markets/sports` lists (with its `scheduled_start` and `scheduled_date`), however many identifiers found it. `lookups` lists every identifier you sent under its spelling as sent, with the `event_id`s it found, or none: that is how a miss is told from a hit without comparing your inputs to the response. An identifier that finds nothing is a `200`, not a `404`.
+//
+// A lookup returns each event in full: every matched submarket, so a spread ticker's answer contains the spread it names. Send `include_submarkets=false` for only each event's full-game moneyline. It reads the same population as the list, so a game whose date has passed, or that a venue cancelled, is not found unless `include_settled=true`.
+//
+// Player props use strict settlement-equivalent matching by default; `player_prop_match=same_prop` compares roster-verified props with the same player, game, statistic, full-game period, and threshold even when settlement rules differ or remain unverified. A prop's own identifier finds its game under either policy when the game has another matched submarket, while the prop itself appears only when the policy admits it.
+//
+// Matching runs continuously in the background and this endpoint reads the stored result, so every response carries `snapshot.observed_at`: how old the venue data behind it is. Check it before treating an identifier that found nothing as unmatched — a lookup that finds nothing in a snapshot that stopped updating looks exactly like one that finds nothing in a current one.
+//
+// Example:
+//
+//	request := &predictorsdk.LookupSportsMatchingMarketsRequest{}
+//	client.LookupSportsMatchingMarkets(
+//	    context.TODO(),
+//	    request,
+//	)
+func (c *Client) LookupSportsMatchingMarkets(
+	ctx context.Context,
+	request *predictorsdk.LookupSportsMatchingMarketsRequest,
+	opts ...option.RequestOption,
+) (*predictorsdk.SportsMatchingLookupResponse, error) {
+	response, err := c.WithRawResponse.LookupSportsMatchingMarkets(
 		ctx,
 		request,
 		opts...,
@@ -108,16 +195,67 @@ func (c *Client) GetMarkets(
 	ctx context.Context,
 	request *predictorsdk.GetMarketsRequest,
 	opts ...option.RequestOption,
-) (*predictorsdk.MarketsListResponse, error) {
-	response, err := c.WithRawResponse.GetMarkets(
-		ctx,
-		request,
-		opts...,
+) (*core.Page[*string, *predictorsdk.UnifiedMarket, *predictorsdk.MarketsListResponse], error) {
+	options := core.NewRequestOptions(opts...)
+	baseURL := internal.ResolveBaseURL(
+		options.BaseURL,
+		c.baseURL,
+		"https://api.predictorsdk.com",
 	)
+	endpointURL := baseURL + "/v1/markets"
+	queryParams, err := internal.QueryValues(request)
 	if err != nil {
 		return nil, err
 	}
-	return response.Body, nil
+	headers := internal.MergeHeaders(
+		c.options.ToHeader(),
+		options.ToHeader(),
+	)
+	prepareCall := func(pageRequest *core.PageRequest[*string]) *internal.CallParams {
+		if pageRequest.Cursor != nil {
+			queryParams.Set("cursor", *pageRequest.Cursor)
+		}
+		nextURL := endpointURL
+		if len(queryParams) > 0 {
+			nextURL += "?" + queryParams.Encode()
+		}
+		return &internal.CallParams{
+			URL:             nextURL,
+			Method:          http.MethodGet,
+			Headers:         headers,
+			MaxAttempts:     options.MaxAttempts,
+			DisableRetries:  options.DisableRetries,
+			BodyProperties:  options.BodyProperties,
+			QueryParameters: options.QueryParameters,
+			Client:          options.HTTPClient,
+			Response:        pageRequest.Response,
+			ErrorDecoder:    internal.NewErrorDecoder(predictorsdk.ErrorCodes),
+		}
+	}
+	readPageResponse := func(response *predictorsdk.MarketsListResponse) *core.PageResponse[*string, *predictorsdk.UnifiedMarket, *predictorsdk.MarketsListResponse] {
+		var zeroValue *string
+		var next *string
+		if response.Pagination != nil {
+			next = response.Pagination.NextCursor
+		}
+		results := response.GetData()
+		return &core.PageResponse[*string, *predictorsdk.UnifiedMarket, *predictorsdk.MarketsListResponse]{
+			Results:  results,
+			Response: response,
+			Next:     next,
+			Done:     next == zeroValue,
+		}
+	}
+	pager := internal.NewCursorPager(
+		c.caller,
+		prepareCall,
+		readPageResponse,
+	)
+	var cursor *string
+	if request != nil {
+		cursor = request.Cursor
+	}
+	return pager.GetPage(ctx, cursor)
 }
 
 // Returns the canonical top-level categories that can be used to filter unified market discovery with `GET /v1/markets?category=...`. Categories are PredictorSDK-normalized buckets, not provider-native tags. Sports is one category among many; sport/league facets may be added later as deeper filters without changing this top-level list.
@@ -141,11 +279,11 @@ func (c *Client) GetCategories(
 	return response.Body, nil
 }
 
-// Returns one market from any of the nine supported platforms (Kalshi, Polymarket, Predict, SX Bet, Hyperliquid, AlphaArcade, ProphetX, Limitless, Pred). The `market_id` is either the composite form returned by `GET /v1/markets` (`{provider}:{native_id}`, e.g. `kalshi:KXNBA-27-SAS`) or the platform-native identifier. Composite IDs dispatch unambiguously by prefix. Native IDs are routed by format inference: Kalshi tickers match the all-caps-with-hyphens shape (`KX…-…`); SX Bet hashes match `0x` + 64 hex characters.
+// Returns one market from any of the nine supported providers (Kalshi, Polymarket, Predict, SX Bet, Hyperliquid, AlphaArcade, ProphetX, Limitless, Pred). The `market_id` is either the composite form returned by `GET /v1/markets` (`{provider}:{native_id}`, e.g. `kalshi:KXNBA-27-SAS`) or the provider-native identifier. Composite IDs dispatch unambiguously by prefix. Native IDs are routed by format inference: Kalshi tickers match the all-caps-with-hyphens shape (`KX…-…`); SX Bet hashes match `0x` + 64 hex characters.
 //
-// **A bare numeric id or kebab-case slug does not name its platform.** Polymarket and Predict share both shapes, so when `?platform=` is omitted the service probes every candidate and answers only if exactly one of them holds that identifier. If two do, the identifier names two different real markets and the request fails with `409` listing both — it does not pick one. Retry with `?platform=` or the composite form. Polymarket also resolves a market by its `conditionId`, the id Polymarket wallet positions carry (`polymarket:0x…`, or `?platform=polymarket`); a bare `0x` + 64 hex id is read as an SX Bet hash. Hyperliquid integer outcome ids collide with Polymarket/Predict numeric ids and are deliberately not inferred — route them via the composite form (`hyperliquid:<id>`) or `?platform=hyperliquid` (alias `hl`). AlphaArcade market ids are ULIDs (26-char Crockford base32, e.g. `01K0HQE3CEM2T2RDRWSCJ3V647`); like Hyperliquid they are not inferred in v1 — route them via the composite form (`alpha-arcade:<ulid>`) or `?platform=alpha-arcade` (alias `aa`). ProphetX market ids are `<event_id>:<market_id>` pairs (e.g. `1700008782:219` — the market id is a per-sport TYPE id repeated on every event of that sport, 219 being Moneyline on every NFL game, so the event half is the identity); like Hyperliquid they are not inferred in v1 — route them via the composite form (`prophetx:1700008782:219`) or `?platform=prophetx` (aliases `prophet-x`, `px`). That pair resolves whichever line the venue currently flags favourite, which moves; a third part names one line, favourite or not (`<event_id>:<market_id>:<line>`, e.g. `1700008887:1700054914:34.5`), and a line the venue no longer lists answers `404`. Matched ProphetX player props use that form. Limitless market ids are kebab-case slugs (e.g. `england-vs-sri-lanka-1789383376774`); like Hyperliquid they are not inferred in v1 — the shape collides with Polymarket/Predict slugs — route them via the composite form (`limitless:<slug>`) or `?platform=limitless`. Pred market ids are `<parent_market_id>:<child_market_id>` pairs of `0x` + 64-hex ids (e.g. `pred:0xaa7f…3bf5:0xaa7f…3bf5`); like Hyperliquid they are not inferred in v1 — the halves collide textually with SX Bet market hashes — route them via the composite form or `?platform=pred`. A bare `pred:<parent>` addresses the parent as a group (one outcome per child selection, marked from each child's record: its declared result once settled, otherwise no price, since no book is read); the pair addresses one binary child market, quoted from its order book while it trades and marked with its declared result once settled.
+// **A bare numeric id or kebab-case slug does not name its provider.** Polymarket and Predict share both shapes, so when `?provider=` is omitted the service probes every candidate and answers only if exactly one of them holds that identifier. If two do, the identifier names two different real markets and the request fails with `409` listing both — it does not pick one. Retry with `?provider=` or the composite form. Polymarket also resolves a market by its `conditionId`, the id Polymarket wallet positions carry (`polymarket:0x…`, or `?provider=polymarket`); a bare `0x` + 64 hex id is read as an SX Bet hash. Hyperliquid integer outcome ids collide with Polymarket/Predict numeric ids and are deliberately not inferred — route them via the composite form (`hyperliquid:<id>`) or `?provider=hyperliquid` (alias `hl`). AlphaArcade market ids are ULIDs (26-char Crockford base32, e.g. `01K0HQE3CEM2T2RDRWSCJ3V647`); like Hyperliquid they are not inferred in v1 — route them via the composite form (`alpha-arcade:<ulid>`) or `?provider=alpha-arcade` (alias `aa`). ProphetX market ids are `<event_id>:<market_id>` pairs (e.g. `1700008812:219` — the market id is a per-sport TYPE id repeated on every event of that sport, 219 being Moneyline on every NFL game, so the event half is the identity); like Hyperliquid they are not inferred in v1 — route them via the composite form (`prophetx:1700008812:219`) or `?provider=prophetx` (aliases `prophet-x`, `px`). That pair resolves whichever line the venue currently flags favourite, which moves; a third part names one line, favourite or not (`<event_id>:<market_id>:<line>`, e.g. `1700008812:1700009030:69.5`), and a line the venue no longer lists answers `404`. Matched ProphetX player props use that form. Limitless market ids are kebab-case slugs (e.g. `england-vs-sri-lanka-1789383376774`); like Hyperliquid they are not inferred in v1 — the shape collides with Polymarket/Predict slugs — route them via the composite form (`limitless:<slug>`) or `?provider=limitless`. Pred market ids are `<parent_market_id>:<child_market_id>` pairs of `0x` + 64-hex ids (e.g. `pred:0xaa7f…3bf5:0xaa7f…3bf5`); like Hyperliquid they are not inferred in v1 — the halves collide textually with SX Bet market hashes — route them via the composite form or `?provider=pred`. A bare `pred:<parent>` addresses the parent as a group (one outcome per child selection, marked from each child's record: its declared result once settled, otherwise no price, since no book is read); the pair addresses one binary child market, quoted from its order book while it trades and marked with its declared result once settled.
 //
-// **If you already know the platform, always say so.** Every listing that hands you an identifier also hands you its platform, so the composite form — which `GET /v1/markets` returns natively in `data[].id` — or `?platform={row.platform}` costs nothing, skips the probe, and cannot 409. It is also strictly more available: the probe has to reach both candidates to prove there is no collision, so it fails when either is having an outage, while a named platform only depends on that one.
+// **If you already know the provider, always say so.** Every listing that hands you an identifier also hands you its provider, so the composite form — which `GET /v1/markets` returns natively in `data[].id` — or `?provider={row.provider}` costs nothing, skips the probe, and cannot 409. It is also strictly more available: the probe has to reach both candidates to prove there is no collision, so it fails when either is having an outage, while a named provider only depends on that one.
 //
 // Identity fields (id/provider/provider_id/title/status/ outcomes[].name) are strict-universal: every platform's single-market endpoint exposes them natively without a second fetch. close timestamps and parent event ids remain omitted (not nullable) — Predict's close time lives on the parent category and Polymarket's market record carries no event id.
 //
@@ -182,7 +320,7 @@ func (c *Client) GetMarket(
 	return response.Body, nil
 }
 
-// Returns per-second price data for a Binance trading pair. When called without a time range, returns the latest price. With `start_time` and/or `end_time`, returns historical per-second prices newest first: each page is the `limit` newest seconds at or before `end_time` (or the current second), never older than `start_time`. A range longer than `limit` continues through `pagination_key`, and walking every page returns every second of the range exactly once. Unknown or invalid symbols return `200` with `{"prices":[]}` and omit `total`.
+// Returns per-second price data for a Binance trading pair in the paginated envelope every list route uses: `data` holds the prices and `pagination` the page. When called without a time range, returns the latest price (one item, `has_more: false`). With `start_time` and/or `end_time`, returns historical per-second prices newest first: each page is the `limit` newest seconds at or before `end_time` (or the current second), never older than `start_time`. A range longer than `limit` continues through `pagination.next_cursor`, which you send back as `cursor`, and walking every page returns every second of the range exactly once. `pagination.total` is always `null`: Binance does not count a range and this route does not walk one to find out. Unknown or invalid symbols return `200` with an empty `data` array and `has_more: false`. The envelope replaced `{prices, pagination_key, total}` on 2026-10-09; the old request parameter `pagination_key` now answers `400` naming `cursor`.
 //
 // Example:
 //
@@ -197,16 +335,67 @@ func (c *Client) GetBinanceCryptoPrices(
 	ctx context.Context,
 	request *predictorsdk.GetBinanceCryptoPricesRequest,
 	opts ...option.RequestOption,
-) (*predictorsdk.CryptoPricesResponse, error) {
-	response, err := c.WithRawResponse.GetBinanceCryptoPrices(
-		ctx,
-		request,
-		opts...,
+) (*core.Page[*string, *predictorsdk.CryptoPriceItem, *predictorsdk.CryptoPricesResponse], error) {
+	options := core.NewRequestOptions(opts...)
+	baseURL := internal.ResolveBaseURL(
+		options.BaseURL,
+		c.baseURL,
+		"https://api.predictorsdk.com",
 	)
+	endpointURL := baseURL + "/v1/crypto-prices/binance"
+	queryParams, err := internal.QueryValues(request)
 	if err != nil {
 		return nil, err
 	}
-	return response.Body, nil
+	headers := internal.MergeHeaders(
+		c.options.ToHeader(),
+		options.ToHeader(),
+	)
+	prepareCall := func(pageRequest *core.PageRequest[*string]) *internal.CallParams {
+		if pageRequest.Cursor != nil {
+			queryParams.Set("cursor", *pageRequest.Cursor)
+		}
+		nextURL := endpointURL
+		if len(queryParams) > 0 {
+			nextURL += "?" + queryParams.Encode()
+		}
+		return &internal.CallParams{
+			URL:             nextURL,
+			Method:          http.MethodGet,
+			Headers:         headers,
+			MaxAttempts:     options.MaxAttempts,
+			DisableRetries:  options.DisableRetries,
+			BodyProperties:  options.BodyProperties,
+			QueryParameters: options.QueryParameters,
+			Client:          options.HTTPClient,
+			Response:        pageRequest.Response,
+			ErrorDecoder:    internal.NewErrorDecoder(predictorsdk.ErrorCodes),
+		}
+	}
+	readPageResponse := func(response *predictorsdk.CryptoPricesResponse) *core.PageResponse[*string, *predictorsdk.CryptoPriceItem, *predictorsdk.CryptoPricesResponse] {
+		var zeroValue *string
+		var next *string
+		if response.Pagination != nil {
+			next = response.Pagination.NextCursor
+		}
+		results := response.GetData()
+		return &core.PageResponse[*string, *predictorsdk.CryptoPriceItem, *predictorsdk.CryptoPricesResponse]{
+			Results:  results,
+			Response: response,
+			Next:     next,
+			Done:     next == zeroValue,
+		}
+	}
+	pager := internal.NewCursorPager(
+		c.caller,
+		prepareCall,
+		readPageResponse,
+	)
+	var cursor *string
+	if request != nil {
+		cursor = request.Cursor
+	}
+	return pager.GetPage(ctx, cursor)
 }
 
 // Returns the public profile (image and display name) for a Polymarket wallet. Accepts either a wallet `address` (proxy or signer EOA) or a Polymarket `username`. Exactly one of the two must be supplied — passing both returns `400`.
@@ -246,7 +435,7 @@ func (c *Client) GetPolymarketWallet(
 //
 // v1 surfaces a minimal field set so the endpoint scaffolding can be verified end-to-end: `condition_id` (which market), `outcome` (which side), and `shares` (how much). Title/slug, avg/current price, PnL (`cash_pnl`, `realized_pnl`), `redeemable`/`mergeable` flags, and event metadata will be added in follow-ups.
 //
-// `total` in the pagination block is always `0` because the upstream Data API does not return a total count; rely on `has_more` + `next_cursor` to paginate.
+// `pagination.total` is always `null` because the upstream Data API does not return a total count and this route does not walk the pages to compute one (it published `0` until 2026-10-09, which read as an empty wallet beside a page of positions); `0` only ever means an empty result on the routes that count. Rely on `has_more` + `next_cursor` to paginate.
 //
 // **EOA inputs are not auto-resolved on this endpoint.** Unlike `/v1/polymarket/wallet`, this endpoint does not perform the EOA→proxy CREATE2 resolution. Callers with a signer EOA should call `/v1/polymarket/wallet` first to resolve the proxy, then pass the returned `address`. Passing an EOA directly will return an empty `data` array.
 //
@@ -265,27 +454,78 @@ func (c *Client) ListPolymarketWalletPositions(
 	ctx context.Context,
 	request *predictorsdk.ListPolymarketWalletPositionsRequest,
 	opts ...option.RequestOption,
-) (*predictorsdk.PolymarketPositionsResponse, error) {
-	response, err := c.WithRawResponse.ListPolymarketWalletPositions(
-		ctx,
-		request,
-		opts...,
+) (*core.Page[*string, *predictorsdk.PolymarketPosition, *predictorsdk.PolymarketPositionsResponse], error) {
+	options := core.NewRequestOptions(opts...)
+	baseURL := internal.ResolveBaseURL(
+		options.BaseURL,
+		c.baseURL,
+		"https://api.predictorsdk.com",
 	)
+	endpointURL := baseURL + "/v1/polymarket/wallet/positions"
+	queryParams, err := internal.QueryValues(request)
 	if err != nil {
 		return nil, err
 	}
-	return response.Body, nil
+	headers := internal.MergeHeaders(
+		c.options.ToHeader(),
+		options.ToHeader(),
+	)
+	prepareCall := func(pageRequest *core.PageRequest[*string]) *internal.CallParams {
+		if pageRequest.Cursor != nil {
+			queryParams.Set("cursor", *pageRequest.Cursor)
+		}
+		nextURL := endpointURL
+		if len(queryParams) > 0 {
+			nextURL += "?" + queryParams.Encode()
+		}
+		return &internal.CallParams{
+			URL:             nextURL,
+			Method:          http.MethodGet,
+			Headers:         headers,
+			MaxAttempts:     options.MaxAttempts,
+			DisableRetries:  options.DisableRetries,
+			BodyProperties:  options.BodyProperties,
+			QueryParameters: options.QueryParameters,
+			Client:          options.HTTPClient,
+			Response:        pageRequest.Response,
+			ErrorDecoder:    internal.NewErrorDecoder(predictorsdk.ErrorCodes),
+		}
+	}
+	readPageResponse := func(response *predictorsdk.PolymarketPositionsResponse) *core.PageResponse[*string, *predictorsdk.PolymarketPosition, *predictorsdk.PolymarketPositionsResponse] {
+		var zeroValue *string
+		var next *string
+		if response.Pagination != nil {
+			next = response.Pagination.NextCursor
+		}
+		results := response.GetData()
+		return &core.PageResponse[*string, *predictorsdk.PolymarketPosition, *predictorsdk.PolymarketPositionsResponse]{
+			Results:  results,
+			Response: response,
+			Next:     next,
+			Done:     next == zeroValue,
+		}
+	}
+	pager := internal.NewCursorPager(
+		c.caller,
+		prepareCall,
+		readPageResponse,
+	)
+	var cursor *string
+	if request != nil {
+		cursor = request.Cursor
+	}
+	return pager.GetPage(ctx, cursor)
 }
 
-// Returns a single event and the markets nested under it on the identified platform. The `event_id` is the platform's native identifier — a Kalshi `event_ticker`, a Polymarket event slug, an SX Bet `eventId`, a Predict market identifier, a Hyperliquid question/outcome integer id, an AlphaArcade market ULID, or a Pred parent market id. The `platform` is inferred from the ID format when unambiguous (`KX…` → Kalshi, `L\d+` → SX Bet). The composite form returned by `GET /v1/markets` (`{provider}:{native_id}`, e.g. `predict:1607914`) also dispatches unambiguously by prefix.
+// Returns a single event and the markets nested under it on the identified provider. The `event_id` is the provider's native identifier — a Kalshi `event_ticker`, a Polymarket event slug, an SX Bet `eventId`, a Predict market identifier, a Hyperliquid question/outcome integer id, an AlphaArcade market ULID, or a Pred parent market id. The `provider` is inferred from the ID format when unambiguous (`KX…` → Kalshi, `L\d+` → SX Bet). The composite form returned by `GET /v1/markets` (`{provider}:{native_id}`, e.g. `predict:1607914`) also dispatches unambiguously by prefix.
 //
-// **A bare numeric id or kebab-case slug does not name its platform.** Polymarket and Predict share both shapes, so when `?platform=` is omitted the service probes every candidate and answers only if exactly one of them holds that identifier. If two do, the identifier names two different real events and the request fails with `409` listing both — it does not pick one. Retry with `?platform=` or the composite form. Hyperliquid integer ids also collide with those numerics and require `?platform=hyperliquid` (alias `hl`). AlphaArcade ULIDs are not inferred in v1 either — require `?platform=alpha-arcade` (alias `aa`). ProphetX event ids are bare positive integers that collide with Polymarket/Predict numerics — require `?platform=prophetx` (aliases `prophet-x`, `px`) or the composite form (`prophetx:1700008782`). Limitless event ids are kebab-case slugs that collide with Polymarket/Predict slugs — require `?platform=limitless` or the composite form (`limitless:england-vs-sri-lanka-1789383376774`). Pred event ids are parent market ids (`0x` + 64 hex) that collide textually with SX Bet market hashes — require `?platform=pred` or the composite form (`pred:0x…`). An AlphaArcade multi-choice market resolves to an event whose nested markets are its options; a binary market (or a single option id) resolves to a single-market event.
+// **A bare numeric id or kebab-case slug does not name its provider.** Polymarket and Predict share both shapes, so when `?provider=` is omitted the service probes every candidate and answers only if exactly one of them holds that identifier. If two do, the identifier names two different real events and the request fails with `409` listing both — it does not pick one. Retry with `?provider=` or the composite form. Hyperliquid integer ids also collide with those numerics and require `?provider=hyperliquid` (alias `hl`). AlphaArcade ULIDs are not inferred in v1 either — require `?provider=alpha-arcade` (alias `aa`). ProphetX event ids are bare positive integers that collide with Polymarket/Predict numerics — require `?provider=prophetx` (aliases `prophet-x`, `px`) or the composite form (`prophetx:1700008812`). Limitless event ids are kebab-case slugs that collide with Polymarket/Predict slugs — require `?provider=limitless` or the composite form (`limitless:england-vs-sri-lanka-1789383376774`). Pred event ids are parent market ids (`0x` + 64 hex) that collide textually with SX Bet market hashes — require `?provider=pred` or the composite form (`pred:0x…`). An AlphaArcade multi-choice market resolves to an event whose nested markets are its options; a binary market (or a single option id) resolves to a single-market event.
 //
-// **If you already know the platform, always say so.** Every listing that hands you an identifier also hands you its platform, so `?platform={row.platform}` (or the composite form) costs nothing, skips the probe, and cannot 409. It is also strictly more available: the probe has to reach both candidates to prove there is no collision, so it fails when either is having an outage, while a named platform only depends on that one.
+// **If you already know the provider, always say so.** Every listing that hands you an identifier also hands you its provider, so `?provider={row.provider}` (or the composite form) costs nothing, skips the probe, and cannot 409. It is also strictly more available: the probe has to reach both candidates to prove there is no collision, so it fails when either is having an outage, while a named provider only depends on that one.
 //
-// Response is minimal in v0: each market is returned with its platform-native `market_id` and a human-readable `title`. Send it to `GET /v1/markets/{market_id}` with this response's `platform` as `?platform=` (or as the composite `{platform}:{market_id}`). Pricing, volume, status, and timestamps are intentionally deferred — they'll be added as additive fields to `EventMarket` in a later release. The endpoint mirrors the `/v1/markets` rollout pattern (titles first, fields later).
+// Response is minimal in v0: each market is returned with its provider-native `market_id` and a human-readable `title`. Send it to `GET /v1/markets/{market_id}` with this response's `provider` as `?provider=` (or as the composite `{provider}:{market_id}`). Pricing, volume, status, and timestamps are intentionally deferred — they'll be added as additive fields to `EventMarket` in a later release. The endpoint mirrors the `/v1/markets` rollout pattern (titles first, fields later).
 //
-// **Kalshi sibling fanout.** A single Kalshi sports game lives across multiple event tickers that share a game suffix — e.g. `KXMLBGAME-26AUG272145AZSF` holds the moneyline, `KXMLBF5TOTAL-26AUG272145AZSF` holds the first-five-innings totals, and so on. When the supplied event_ticker belongs to a sport in the sibling registry (MLB, NBA, NFL, NHL, WNBA today), this endpoint fans out across known sibling series in parallel and merges their markets into one response. Siblings that don't exist for a particular game silently drop. Siblings that error are reported under `fanout.siblings_missing`; the primary event still returns 200 in that case. Only the primary fetch failing produces a 4xx/5xx — partial fanouts never fail the request.
+// **Kalshi sibling fanout.** A single Kalshi sports game lives across multiple event tickers that share a game suffix — e.g. `KXMLBGAME-26OCT152000MILLAD` holds the moneyline, `KXMLBF5TOTAL-26OCT152000MILLAD` holds the first-five-innings totals, and so on. When the supplied event_ticker belongs to a sport in the sibling registry (MLB, NBA, NFL, NHL, WNBA today), this endpoint fans out across known sibling series in parallel and merges their markets into one response. Siblings that don't exist for a particular game silently drop. Siblings that error are reported under `fanout.siblings_missing`; the primary event still returns 200 in that case. Only the primary fetch failing produces a 4xx/5xx — partial fanouts never fail the request.
 //
 // **Polymarket** events already nest the moneyline plus all spread/totals/game-level prop markets under a single event slug, so no fanout is performed. **SX Bet** fixtures similarly bundle game lines per `eventId`. **Predict** currently treats `event_id` as a market identifier and wraps the single market as a 1-element event response, since the upstream `event` concept on Predict is closer to a category than to a multi-market container. **Hyperliquid** maps a question id to its named outcome markets, or wraps a standalone outcome id as a single-market event.
 //

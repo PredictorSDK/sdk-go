@@ -11,24 +11,24 @@ import (
 )
 
 var (
-	getBinanceCryptoPricesRequestFieldCurrency      = big.NewInt(1 << 0)
-	getBinanceCryptoPricesRequestFieldStartTime     = big.NewInt(1 << 1)
-	getBinanceCryptoPricesRequestFieldEndTime       = big.NewInt(1 << 2)
-	getBinanceCryptoPricesRequestFieldLimit         = big.NewInt(1 << 3)
-	getBinanceCryptoPricesRequestFieldPaginationKey = big.NewInt(1 << 4)
+	getBinanceCryptoPricesRequestFieldCurrency  = big.NewInt(1 << 0)
+	getBinanceCryptoPricesRequestFieldStartTime = big.NewInt(1 << 1)
+	getBinanceCryptoPricesRequestFieldEndTime   = big.NewInt(1 << 2)
+	getBinanceCryptoPricesRequestFieldLimit     = big.NewInt(1 << 3)
+	getBinanceCryptoPricesRequestFieldCursor    = big.NewInt(1 << 4)
 )
 
 type GetBinanceCryptoPricesRequest struct {
-	// Binance trading pair (e.g. `btcusdt`, `ethusdt`, `solusdt`). Must contain only alphanumeric characters (no hyphens, underscores, or other separators). Uppercase is accepted and automatically lowercased (e.g. `BTCUSDT` → `btcusdt`). Must be a valid Binance symbol; unknown symbols return `200` with an empty `prices` array.
+	// Binance trading pair (e.g. `btcusdt`, `ethusdt`, `solusdt`). Must contain only alphanumeric characters (no hyphens, underscores, or other separators). Uppercase is accepted and automatically lowercased (e.g. `BTCUSDT` → `btcusdt`). Must be a valid Binance symbol; unknown symbols return `200` with an empty `data` array.
 	Currency string `json:"-" url:"currency"`
 	// Start of the time range as a Unix timestamp in milliseconds (inclusive). Negative values are clamped to 0.
 	StartTime *int64 `json:"-" url:"start_time,omitempty"`
 	// End of the time range as a Unix timestamp in milliseconds (inclusive). Negative values are clamped to 0.
 	EndTime *int64 `json:"-" url:"end_time,omitempty"`
-	// Maximum number of prices to return. Defaults to 100 when a time range is present. Values above 100 are silently clamped to 100. Without a time range, this parameter is ignored — the endpoint always returns the single latest price.
+	// Maximum number of prices per page, 1 to 100; a larger value is a `400` (it was silently clamped to 100 until 2026-10-09). Defaults to 100 when a time range is present. Without a time range, this parameter is still validated but otherwise ignored: the endpoint always returns the single latest price, and `pagination.limit` reports `1`.
 	Limit *int `json:"-" url:"limit,omitempty"`
-	// Base64-encoded cursor from a previous response to fetch the next (older) page of results. It carries the `start_time` of the request that issued it, so the next page stays inside the range whether or not you send `start_time` again; sending a different `start_time` with it is a `400`. `end_time` is ignored when a cursor is sent.
-	PaginationKey *string `json:"-" url:"pagination_key,omitempty"`
+	// The `pagination.next_cursor` of a previous response, sent unchanged, to fetch the next (older) page of results. It carries the `start_time` of the request that issued it, so the next page stays inside the range whether or not you send `start_time` again; sending a different `start_time` with it is a `400`. `end_time` is ignored when a cursor is sent. It was named `pagination_key` until 2026-10-09; that name now answers `400` naming this one.
+	Cursor *string `json:"-" url:"cursor,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
 	explicitFields *big.Int `json:"-" url:"-"`
@@ -69,27 +69,27 @@ func (g *GetBinanceCryptoPricesRequest) SetLimit(limit *int) {
 	g.require(getBinanceCryptoPricesRequestFieldLimit)
 }
 
-// SetPaginationKey sets the PaginationKey field and marks it as non-optional;
+// SetCursor sets the Cursor field and marks it as non-optional;
 // this prevents an empty or null value for this field from being omitted during serialization.
-func (g *GetBinanceCryptoPricesRequest) SetPaginationKey(paginationKey *string) {
-	g.PaginationKey = paginationKey
-	g.require(getBinanceCryptoPricesRequestFieldPaginationKey)
+func (g *GetBinanceCryptoPricesRequest) SetCursor(cursor *string) {
+	g.Cursor = cursor
+	g.require(getBinanceCryptoPricesRequestFieldCursor)
 }
 
 var (
 	getEventRequestFieldEventID  = big.NewInt(1 << 0)
-	getEventRequestFieldPlatform = big.NewInt(1 << 1)
+	getEventRequestFieldProvider = big.NewInt(1 << 1)
 )
 
 type GetEventRequest struct {
-	// Platform-native event identifier. Examples per platform: Kalshi event ticker (`KXNBAGAME-26OCT20OKCSAS`), Polymarket event slug (`nfl-pit-ne-2026-09-20`), SX Bet event id (`L19766755`), Predict market id (`1607914`), Hyperliquid question or outcome integer id (requires `?platform=hyperliquid` since integer ids aren't inferred), Pred parent market id (`0x…64hex`, requires `?platform=pred` since the shape collides with SX Bet market hashes). The composite `{provider}:{native_id}` form (e.g. `predict:1607914`) is accepted here too and dispatches without probing.
+	// Provider-native event identifier. Examples per provider: Kalshi event ticker (`KXNBAGAME-26OCT20OKCSAS`), Polymarket event slug (`nfl-pit-ne-2026-09-20`), SX Bet event id (`L19766755`), Predict market id (`1607914`), Hyperliquid question or outcome integer id (requires `?provider=hyperliquid` since integer ids aren't inferred), Pred parent market id (`0x…64hex`, requires `?provider=pred` since the shape collides with SX Bet market hashes). The composite `{provider}:{native_id}` form (e.g. `predict:1607914`) is accepted here too and dispatches without probing.
 	//
-	// **A bare numeric id or slug is not unique across platforms.** Polymarket and Predict both use these shapes and their id spaces overlap, so sending one without a platform can fail with `409` (see that response). Pass `?platform=` — every source market in `GET /v1/matching-markets/sports` carries the `provider` that goes with its `event_id`.
+	// **A bare numeric id or slug is not unique across providers.** Polymarket and Predict both use these shapes and their id spaces overlap, so sending one without a provider can fail with `409` (see that response). Pass `?provider=` — every source market in `GET /v1/matching-markets/sports` carries the `provider` that goes with its `event_id`.
 	//
 	// **Sports identifiers expire.** Game tickers and slugs are delisted once an event settles, and Hyperliquid ids roll over daily. Take current ones from `GET /v1/matching-markets/sports` (every source market carries its provider's `event_id`) rather than copying one out of this reference.
 	EventID string `json:"-" url:"-"`
-	// Optional platform override. When omitted, inferred from the `event_id` format: `KX…` → Kalshi, `L\d+` → SX Bet. Numeric IDs and kebab-case slugs are shared shape between Polymarket and Predict; in that case the service probes both and returns `409` rather than guessing if the identifier resolves on both. Hyperliquid question/outcome integer ids collide with these numerics and are not inferred — pass `?platform=hyperliquid` (alias `hl`). Pred parent ids share the `0x…64hex` shape with SX Bet market hashes and are not inferred either — pass `?platform=pred`. Passing `platform` explicitly skips the probe entirely and is the recommended call whenever you know it. Supplying a value that contradicts a composite `{provider}:` prefix is a `400`.
-	Platform *GetEventRequestPlatform `json:"-" url:"platform,omitempty"`
+	// Optional provider override, spelled like the `provider` field of this response and every other one (it was `platform` until 2026-10-09; `?platform=` now answers `400` naming this parameter). When omitted, inferred from the `event_id` format: `KX…` → Kalshi, `L\d+` → SX Bet. Numeric IDs and kebab-case slugs are shared shape between Polymarket and Predict; in that case the service probes both and returns `409` rather than guessing if the identifier resolves on both. Hyperliquid question/outcome integer ids collide with these numerics and are not inferred — pass `?provider=hyperliquid` (alias `hl`). Pred parent ids share the `0x…64hex` shape with SX Bet market hashes and are not inferred either — pass `?provider=pred`. Passing `provider` explicitly skips the probe entirely and is the recommended call whenever you know it. Supplying a value that contradicts a composite `{provider}:` prefix is a `400`.
+	Provider *GetEventRequestProvider `json:"-" url:"provider,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
 	explicitFields *big.Int `json:"-" url:"-"`
@@ -109,27 +109,27 @@ func (g *GetEventRequest) SetEventID(eventID string) {
 	g.require(getEventRequestFieldEventID)
 }
 
-// SetPlatform sets the Platform field and marks it as non-optional;
+// SetProvider sets the Provider field and marks it as non-optional;
 // this prevents an empty or null value for this field from being omitted during serialization.
-func (g *GetEventRequest) SetPlatform(platform *GetEventRequestPlatform) {
-	g.Platform = platform
-	g.require(getEventRequestFieldPlatform)
+func (g *GetEventRequest) SetProvider(provider *GetEventRequestProvider) {
+	g.Provider = provider
+	g.require(getEventRequestFieldProvider)
 }
 
 var (
 	getMarketRequestFieldMarketID = big.NewInt(1 << 0)
-	getMarketRequestFieldPlatform = big.NewInt(1 << 1)
+	getMarketRequestFieldProvider = big.NewInt(1 << 1)
 )
 
 type GetMarketRequest struct {
-	// Composite (`{provider}:{native_id}`) or platform-native market identifier. Examples per platform: Kalshi market ticker (`KXNBA-27-SAS`), Polymarket numeric id or slug (`540817` or `nfl-pit-ne-2026-09-20`), Predict market id (`356635`), SX Bet `marketHash` (`0x…64hex`), Hyperliquid outcome id (use the composite `hyperliquid:<outcome-id>` or `?platform=hyperliquid` — bare integer ids aren't inferred).
+	// Composite (`{provider}:{native_id}`) or provider-native market identifier. Examples per provider: Kalshi market ticker (`KXNBA-27-SAS`), Polymarket numeric id or slug (`540817` or `nfl-pit-ne-2026-09-20`), Predict market id (`356635`), SX Bet `marketHash` (`0x…64hex`), Hyperliquid outcome id (use the composite `hyperliquid:<outcome-id>` or `?provider=hyperliquid` — bare integer ids aren't inferred).
 	//
-	// **A bare numeric id or slug is not unique across platforms.** Polymarket and Predict both use these shapes and their id spaces overlap, so sending one without a platform can fail with `409` (see that response). Prefer the composite form — it is what `GET /v1/markets` returns in `data[].id` — or pass `?platform=`.
+	// **A bare numeric id or slug is not unique across providers.** Polymarket and Predict both use these shapes and their id spaces overlap, so sending one without a provider can fail with `409` (see that response). Prefer the composite form — it is what `GET /v1/markets` returns in `data[].id` — or pass `?provider=`.
 	//
 	// **Sports identifiers expire.** Kalshi game tickers, Polymarket game slugs, and Hyperliquid outcome ids are recycled or delisted as events settle — Hyperliquid's live catalog is a handful of daily-recurring outcomes, so any specific integer id there is valid for roughly a day. Take current ids from `GET /v1/markets` or `GET /v1/matching-markets/sports` rather than copying one out of this reference. Long-dated markets (Kalshi season futures, multi-year AlphaArcade questions) and settled Polymarket/Predict/SX Bet ids stay resolvable.
 	MarketID string `json:"-" url:"-"`
-	// Optional platform override. When omitted, inferred from the composite prefix or from the native ID format (`KX…` → Kalshi, `0x…64hex` → SX Bet — Pred ids share that shape and are never inferred; use `pred:…` or `?platform=pred`). Numeric IDs and kebab-case slugs are shared shape between Polymarket and Predict; in that case the service probes both and returns `409` rather than guessing if the identifier resolves on both. Hyperliquid integer ids collide with these numerics and are not inferred — use the composite `hyperliquid:<id>` or `?platform=hyperliquid` (alias `hl`). AlphaArcade ULIDs and Limitless slugs are not inferred either — use the composite form (`alpha-arcade:<ulid>`, `limitless:<slug>`) or the matching `?platform=` value. Pred pairs (`pred:<parent>:<child>`) are likewise composite/`?platform=` only. Passing `platform` explicitly skips the probe entirely and is the recommended call whenever you know it. When the override contradicts a composite prefix (e.g. `kalshi:X` with `?platform=polymarket`), the request returns 400.
-	Platform *GetMarketRequestPlatform `json:"-" url:"platform,omitempty"`
+	// Optional provider override, spelled like the `provider` field on `GET /v1/markets` rows and every other response (it was `platform` until 2026-10-09; `?platform=` now answers `400` naming this parameter). When omitted, inferred from the composite prefix or from the native ID format (`KX…` → Kalshi, `0x…64hex` → SX Bet — Pred ids share that shape and are never inferred; use `pred:…` or `?provider=pred`). Numeric IDs and kebab-case slugs are shared shape between Polymarket and Predict; in that case the service probes both and returns `409` rather than guessing if the identifier resolves on both. Hyperliquid integer ids collide with these numerics and are not inferred — use the composite `hyperliquid:<id>` or `?provider=hyperliquid` (alias `hl`). AlphaArcade ULIDs and Limitless slugs are not inferred either — use the composite form (`alpha-arcade:<ulid>`, `limitless:<slug>`) or the matching `?provider=` value. Pred pairs (`pred:<parent>:<child>`) are likewise composite/`?provider=` only. Passing `provider` explicitly skips the probe entirely and is the recommended call whenever you know it. When the override contradicts a composite prefix (e.g. `kalshi:X` with `?provider=polymarket`), the request returns 400.
+	Provider *GetMarketRequestProvider `json:"-" url:"provider,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
 	explicitFields *big.Int `json:"-" url:"-"`
@@ -149,11 +149,11 @@ func (g *GetMarketRequest) SetMarketID(marketID string) {
 	g.require(getMarketRequestFieldMarketID)
 }
 
-// SetPlatform sets the Platform field and marks it as non-optional;
+// SetProvider sets the Provider field and marks it as non-optional;
 // this prevents an empty or null value for this field from being omitted during serialization.
-func (g *GetMarketRequest) SetPlatform(platform *GetMarketRequestPlatform) {
-	g.Platform = platform
-	g.require(getMarketRequestFieldPlatform)
+func (g *GetMarketRequest) SetProvider(provider *GetMarketRequestProvider) {
+	g.Provider = provider
+	g.require(getMarketRequestFieldProvider)
 }
 
 var (
@@ -176,7 +176,7 @@ type GetMarketsRequest struct {
 	//
 	// `pagination.total` counts only the selected provider's rows, and cursors are bound to the filter that created them: replay a `next_cursor` with the same `provider` value, or start again from the first page.
 	//
-	// This is a catalog membership filter, and it is spelled `provider` because that is the field it selects on. It is unrelated to the `platform` override on `GET /v1/markets/{market_id}` and `GET /v1/events/{event_id}`, which names the venue an identifier should be resolved against rather than filtering a list.
+	// This is a catalog membership filter, and it is spelled `provider` because that is the field it selects on. The same name is the override on `GET /v1/markets/{market_id}` and `GET /v1/events/{event_id}`, where it names the provider an identifier should be resolved against rather than filtering a list.
 	Provider *GetMarketsRequestProvider `json:"-" url:"provider,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
@@ -257,36 +257,43 @@ func (g *GetPolymarketWalletRequest) SetUsername(username *string) {
 var (
 	getSportsMatchingMarketsRequestFieldLimit             = big.NewInt(1 << 0)
 	getSportsMatchingMarketsRequestFieldCursor            = big.NewInt(1 << 1)
-	getSportsMatchingMarketsRequestFieldIncludeSettled    = big.NewInt(1 << 2)
-	getSportsMatchingMarketsRequestFieldPlayerPropMatch   = big.NewInt(1 << 3)
-	getSportsMatchingMarketsRequestFieldIncludeSubmarkets = big.NewInt(1 << 4)
-	getSportsMatchingMarketsRequestFieldEventID           = big.NewInt(1 << 5)
-	getSportsMatchingMarketsRequestFieldSourceID          = big.NewInt(1 << 6)
+	getSportsMatchingMarketsRequestFieldLeague            = big.NewInt(1 << 2)
+	getSportsMatchingMarketsRequestFieldScheduledDate     = big.NewInt(1 << 3)
+	getSportsMatchingMarketsRequestFieldParticipant       = big.NewInt(1 << 4)
+	getSportsMatchingMarketsRequestFieldIncludeSettled    = big.NewInt(1 << 5)
+	getSportsMatchingMarketsRequestFieldPlayerPropMatch   = big.NewInt(1 << 6)
+	getSportsMatchingMarketsRequestFieldIncludeSubmarkets = big.NewInt(1 << 7)
 )
 
 type GetSportsMatchingMarketsRequest struct {
-	// Maximum number of matched events to return per page. Range 1–100, default 25. Ignored in lookup mode, when `event_id` or `source_id` is supplied.
+	// Maximum number of matched events to return per page. Range 1–100, default 25.
 	Limit *int `json:"-" url:"limit,omitempty"`
-	// Opaque cursor from a previous response's `pagination.next_cursor` (`nextCursor` in TypeScript, `NextCursor` in Go). Must be used with the same filter set — a cursor from `include_settled=true` cannot be replayed against `include_settled=false` and will return `400`.
+	// Opaque cursor from a previous response's `pagination.next_cursor` (`nextCursor` in TypeScript, `NextCursor` in Go). Must be used with the same filter set — a cursor from `include_settled=true` cannot be replayed against `include_settled=false`, and a cursor from one `league`, `scheduled_date` or `participant` cannot be replayed under another; either returns `400`.
 	Cursor *string `json:"-" url:"cursor,omitempty"`
-	// Selects which events this request draws from, in list mode and in lookup mode alike. Defaults to `false`: only events whose scheduled start has not certainly passed — today's games, plus a one-day grace so a late start that runs past midnight Eastern is never dropped mid-play. Set it to `true` to also get events whose game date is further in the past, including ones a venue still lists as open.
+	// Restrict the list to one league, matched against each event's own `league` value. Without it every league is listed.
+	//
+	// Only the leagues listed here are accepted, case-insensitively. Any other value returns `400` listing them — an unrecognized filter is never ignored, because a silently dropped filter returns a full page that looks filtered.
+	//
+	// `pagination.total` counts only that league's events, and cursors are bound to the filter that created them: replay a `next_cursor` with the same filters, or start again from the first page.
+	League *GetSportsMatchingMarketsRequestLeague `json:"-" url:"league,omitempty"`
+	// Restrict the list to the games on one calendar day, as `YYYY-MM-DD` in America/New_York: the `scheduled_date` each event publishes. That is the day its `event_id` ends in, or later for a postponed game. A game that starts at 8:30 PM Eastern on the 20th is on the 20th, although its `scheduled_start` is on the 21st in UTC.
+	//
+	// The default population is today's games plus a one-day grace (see `include_settled`), so a date further in the past matches nothing unless `include_settled=true`, which also reads the days of the settled archive. Any value that is not a calendar date in that form returns `400`. `pagination.total` counts only that day's events, and cursors are bound to the filter.
+	ScheduledDate *time.Time `json:"-" url:"scheduled_date,omitempty" format:"date"`
+	// Restrict the list to events that have a participant with this `key` (`participants[].key`, such as `okc`), matched case-insensitively. Participant keys are unique only within a league: `la` is the Rams in the NFL and the Sparks in the WNBA, so pair this with `league` unless you want both. Send one key; a comma-joined value is a `400`. `pagination.total` counts only the matching events, and cursors are bound to the filter.
+	Participant *string `json:"-" url:"participant,omitempty"`
+	// Selects which events this request draws from. Defaults to `false`: the current games, meaning events whose scheduled start has not certainly passed — today's games, plus a one-day grace so a late start that runs past midnight Eastern is never dropped mid-play. Set it to `true` to also get the settled archive: events that left the live matching run, usually because the venues settled or delisted them, kept for 30 days. That adds games whose date is further in the past, including ones a venue still lists as open, and games a venue cancelled, which can be future-dated: Polymarket resolves a game that was never played 50-50, as it did a postseason game its series never needed, before its scheduled day. The default population leaves a cancelled game out, so `false` never lists a game that was not played.
 	//
 	// Venues settle and delist a game's markets at different times, so the endpoint filters on the game's own date (its scheduled start, and never earlier than the date its `event_id` ends in) rather than on an upstream status. Nothing is reported as settled that the venue has not settled; these events are simply not *current*, which is what the default page is for. A postponed game takes its new date, so its event stays current until the makeup game.
 	//
-	// A game that has started is served with the fullest mapping it had — the version from before its first venue settled and delisted it — rather than only the venues still listing it. That holds in the default population too, so today's finished games stay listed with every venue until they are past-dated; with `true` it holds for older games as well. Games archived before 2026-10-04 21:26 UTC kept only the venues that still listed them when they left (usually two), and age out of the 30-day archive by 2026-11-04; a lookup by another venue's identifier finds nothing for them.
-	//
-	// Because it selects the population, a lookup (`?event_id=` or `?source_id=`) for a past-dated event answers `200` with the identifier listed in `lookups` with no events, unless this is `true`.
+	// A game that has started is served with the fullest mapping it had — the version from before its first venue settled and delisted it — rather than only the venues still listing it. That holds in the default population too, so today's finished games stay listed with every venue until they are past-dated; with `true` it holds for older games as well. Games archived before 2026-10-04 21:26 UTC kept only the venues that still listed them when they left (usually two), and age out of the 30-day archive by 2026-11-04.
 	IncludeSettled *bool `json:"-" url:"include_settled,omitempty"`
-	// Player-prop admission policy. It requires `include_submarkets` to be `true`, which it is by default in lookup mode; with `include_submarkets=false` it is a 400. Matched case-insensitively. `strict` (the default) includes only groups of at least two distinct providers with verified player/game/stat/threshold/side identity and a completely reviewed equivalent settlement profile. `same_prop` retains exact prop identity but also admits different or unverified settlement rules, identified by `settlement_equivalence` and `rule_comparisons`. Unknown rules never prove equivalence. Applies in list and lookup mode, including `include_settled`; cursors cannot be reused between policies. Does not change game-line matching or the default moneyline projection. Historical snapshots without verified player identity do not expose props.
+	// Player-prop admission policy. It requires `include_submarkets=true`; with `include_submarkets=false`, which is the default on a page, it is a 400. Matched case-insensitively. `strict` (the default) includes only groups of at least two distinct providers with verified player/game/stat/threshold/side identity and a completely reviewed equivalent settlement profile. `same_prop` retains exact prop identity but also admits different or unverified settlement rules, identified by `settlement_equivalence` and `rule_comparisons`. Unknown rules never prove equivalence. Applies with `include_settled`; cursors cannot be reused between policies. Does not change game-line matching or the default moneyline projection. Historical snapshots without verified player identity do not expose props.
 	PlayerPropMatch *GetSportsMatchingMarketsRequestPlayerPropMatch `json:"-" url:"player_prop_match,omitempty"`
-	// When `true`, each event lists every matched submarket (spreads, totals, period lines and player props) instead of only its full-game moneyline, and events matched only on those submarkets are included too. When `false`, an event appears only when its full-game moneyline is matched, so `submarkets` is never empty. Defaults to `false` for a list page, which stays small, and to `true` for a lookup (`event_id` or `source_id`), which returns the events it finds in full: a spread ticker shows its spread. Every submarket has the same shape, so code written against the moneyline reads the rest unchanged. This is an identity mapping only; fetch current status, quotes, and liquidity from the referenced market resources. Explicit `player_prop_match` requires this to be `true`.
+	// When `true`, each event lists every matched submarket (spreads, totals, period lines and player props) instead of only its full-game moneyline, and events matched only on those submarkets are included too. When `false`, an event appears only when its full-game moneyline is matched, so `submarkets` is never empty. Defaults to `false`, which keeps a page small. Every submarket has the same shape, so code written against the moneyline reads the rest unchanged. This is an identity mapping only; fetch current status, quotes, and liquidity from the referenced market resources. Explicit `player_prop_match` requires this to be `true`.
 	//
 	// Such pages are large: on 2026-10-04 a 50-event page with every submarket was about 880 KB (190 KB gzipped), and a 20-event `player_prop_match=same_prop` page about 3 MB. Send `Accept-Encoding: gzip` and a smaller `limit` when you need them.
 	IncludeSubmarkets *bool `json:"-" url:"include_submarkets,omitempty"`
-	// Canonical event key(s) to look up directly (for example, `nba-okc-sas-2026-10-20`), matched case-insensitively. Repeat the parameter for several events (do not comma-join them), and combine it freely with `source_id`, up to 100 unique identifiers in all. Lookup mode — pagination parameters are ignored. A venue's own ID here (a Kalshi ticker, a numeric ID, an SX Bet `L…` fixture, an `0x` hash, a ULID or a `{provider}:{id}` composite) is a `400` telling you to send it as `source_id`, and so is an empty value. So is a value that matches no canonical event but is a venue's identifier, most often a Polymarket slug: a night game's slug carries the UTC date (`nfl-tb-dal-2026-10-09` for the canonical `nfl-tb-dal-2026-10-08`), and Polymarket spells some teams differently (`cal` for Calgary, `la` for the Rams).
-	EventID []*string `json:"-" url:"event_id,omitempty"`
-	// Venue identifier(s) to look up, as `{provider}:{id}`: any `market_id`, `market_slug` or `event_id` that a `data[].submarkets[].source_markets[]` entry publishes, prefixed with that entry's `provider`. On Polymarket, Predict and AlphaArcade an outcome token (`outcomes[].outcome_id`) works too, because those tokens identify one market, and on Polymarket so does a market's `conditionId`, the ID wallet positions carry. Elsewhere outcome IDs are side names such as `yes` that repeat in every market: Kalshi's and Pred's `yes`/`no` and SX Bet's `outcomeOne`/`outcomeTwo` are a `400` that points to `market_id`. For example `kalshi:KXNBAGAME-26OCT20OKCSAS` (an event ticker), `kalshi:KXNBAGAME-26OCT20OKCSAS-OKC` (a market ticker), `sxbet:L19766755` (a fixture), or Pred's `pred:<parent_market_id>:<child_market_id>` pair. Only the text before the first colon is the provider, and it must be one of `kalshi`, `polymarket`, `predict`, `sxbet`, `alpha-arcade`, `prophetx` or `pred`; anything else is a `400` naming the value. Matching is case-insensitive. `lookups` reports every identifier under its spelling as sent (whitespace around the provider and ID trimmed), with the canonical events it found. Repeat the parameter for several identifiers, across providers (a comma-joined list or an empty value is a `400`); combined with `event_id`, up to 100 unique identifiers in all. Lookup mode — pagination parameters are ignored. A lookup finds the event an identifier belongs to and, by default, returns it in full, so the submarket the identifier names is in it unless `include_submarkets=false`. A player prop finds its game under any `player_prop_match` policy when the game has another matched submarket, while the prop itself appears only when the policy admits it; a game matched only on props the policy excludes is not returned.
-	SourceID []*string `json:"-" url:"source_id,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
 	explicitFields *big.Int `json:"-" url:"-"`
@@ -313,6 +320,27 @@ func (g *GetSportsMatchingMarketsRequest) SetCursor(cursor *string) {
 	g.require(getSportsMatchingMarketsRequestFieldCursor)
 }
 
+// SetLeague sets the League field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (g *GetSportsMatchingMarketsRequest) SetLeague(league *GetSportsMatchingMarketsRequestLeague) {
+	g.League = league
+	g.require(getSportsMatchingMarketsRequestFieldLeague)
+}
+
+// SetScheduledDate sets the ScheduledDate field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (g *GetSportsMatchingMarketsRequest) SetScheduledDate(scheduledDate *time.Time) {
+	g.ScheduledDate = scheduledDate
+	g.require(getSportsMatchingMarketsRequestFieldScheduledDate)
+}
+
+// SetParticipant sets the Participant field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (g *GetSportsMatchingMarketsRequest) SetParticipant(participant *string) {
+	g.Participant = participant
+	g.require(getSportsMatchingMarketsRequestFieldParticipant)
+}
+
 // SetIncludeSettled sets the IncludeSettled field and marks it as non-optional;
 // this prevents an empty or null value for this field from being omitted during serialization.
 func (g *GetSportsMatchingMarketsRequest) SetIncludeSettled(includeSettled *bool) {
@@ -332,20 +360,6 @@ func (g *GetSportsMatchingMarketsRequest) SetPlayerPropMatch(playerPropMatch *Ge
 func (g *GetSportsMatchingMarketsRequest) SetIncludeSubmarkets(includeSubmarkets *bool) {
 	g.IncludeSubmarkets = includeSubmarkets
 	g.require(getSportsMatchingMarketsRequestFieldIncludeSubmarkets)
-}
-
-// SetEventID sets the EventID field and marks it as non-optional;
-// this prevents an empty or null value for this field from being omitted during serialization.
-func (g *GetSportsMatchingMarketsRequest) SetEventID(eventID []*string) {
-	g.EventID = eventID
-	g.require(getSportsMatchingMarketsRequestFieldEventID)
-}
-
-// SetSourceID sets the SourceID field and marks it as non-optional;
-// this prevents an empty or null value for this field from being omitted during serialization.
-func (g *GetSportsMatchingMarketsRequest) SetSourceID(sourceID []*string) {
-	g.SourceID = sourceID
-	g.require(getSportsMatchingMarketsRequestFieldSourceID)
 }
 
 var (
@@ -404,9 +418,77 @@ func (l *ListPolymarketWalletPositionsRequest) SetCursor(cursor *string) {
 	l.require(listPolymarketWalletPositionsRequestFieldCursor)
 }
 
-// Error body returned with HTTP 409. The identifier you sent is well-formed but not unique: it names a real resource on more than one platform, and nothing in the request says which one you meant. Polymarket and Predict share both the bare-numeric and kebab-case identifier shapes and their id spaces genuinely overlap, so this is a routine outcome rather than an edge case — measured 2026-08-25, 53 of 93 Predict market ids drawn from `GET /v1/matching-markets/sports` also resolved on Polymarket.
+var (
+	lookupSportsMatchingMarketsRequestFieldEventID           = big.NewInt(1 << 0)
+	lookupSportsMatchingMarketsRequestFieldSourceID          = big.NewInt(1 << 1)
+	lookupSportsMatchingMarketsRequestFieldIncludeSettled    = big.NewInt(1 << 2)
+	lookupSportsMatchingMarketsRequestFieldPlayerPropMatch   = big.NewInt(1 << 3)
+	lookupSportsMatchingMarketsRequestFieldIncludeSubmarkets = big.NewInt(1 << 4)
+)
+
+type LookupSportsMatchingMarketsRequest struct {
+	// Canonical event key(s) to look up (for example, `nba-okc-sas-2026-10-20`), matched case-insensitively. Repeat the parameter for several events (do not comma-join them), and combine it freely with `source_id`, up to 100 unique identifiers in all. At least one `event_id` or `source_id` is required. A venue's own ID here (a Kalshi ticker, a numeric ID, an SX Bet `L…` fixture, an `0x` hash, a ULID or a `{provider}:{id}` composite) is a `400` telling you to send it as `source_id`, and so is an empty value. So is a value that matches no canonical event but is a venue's identifier, most often a Polymarket slug: a night game's slug carries the UTC date (`nfl-sea-den-2026-10-16` for the canonical `nfl-sea-den-2026-10-15`), and Polymarket spells some teams differently (`cal` for Calgary, `la` for the Rams).
+	EventID []*string `json:"-" url:"event_id,omitempty"`
+	// Venue identifier(s) to look up, as `{provider}:{id}`: any `market_id`, `market_slug` or `event_id` that a `data[].submarkets[].source_markets[]` entry publishes, prefixed with that entry's `provider`. On Polymarket, Predict and AlphaArcade an outcome token (`outcomes[].outcome_id`) works too, because those tokens identify one market, and on Polymarket so does a market's `conditionId`, the ID wallet positions carry. Elsewhere outcome IDs are side names such as `yes` that repeat in every market: Kalshi's and Pred's `yes`/`no` and SX Bet's `outcomeOne`/`outcomeTwo` are a `400` that points to `market_id`. For example `kalshi:KXNBAGAME-26OCT20OKCSAS` (an event ticker), `kalshi:KXNBAGAME-26OCT20OKCSAS-OKC` (a market ticker), `sxbet:L19766755` (a fixture), or Pred's `pred:<parent_market_id>:<child_market_id>` pair. Only the text before the first colon is the provider, and it must be one of `kalshi`, `polymarket`, `predict`, `sxbet`, `alpha-arcade`, `prophetx` or `pred`; anything else is a `400` naming the value. Matching is case-insensitive. `lookups` reports every identifier under its spelling as sent (whitespace around the provider and ID trimmed), with the canonical events it found. Repeat the parameter for several identifiers, across providers (a comma-joined list or an empty value is a `400`); combined with `event_id`, up to 100 unique identifiers in all. At least one `event_id` or `source_id` is required. A lookup finds the event an identifier belongs to and, by default, returns it in full, so the submarket the identifier names is in it unless `include_submarkets=false`. A player prop finds its game under any `player_prop_match` policy when the game has another matched submarket, while the prop itself appears only when the policy admits it; a game matched only on props the policy excludes is not returned.
+	SourceID []*string `json:"-" url:"source_id,omitempty"`
+	// Selects which events the lookup searches. Defaults to `false`: only events whose scheduled start has not certainly passed — today's games, plus a one-day grace so a late start that runs past midnight Eastern is never dropped mid-play. Set it to `true` to also search the settled archive: events that left the live matching run, usually because the venues settled or delisted them. That adds games whose date is further in the past, including ones a venue still lists as open, and games a venue cancelled, which can be future-dated; the default leaves a cancelled game out.
+	//
+	// Because it selects the population, a lookup for a past-dated or cancelled game answers `200` with the identifier listed in `lookups` with no events, unless this is `true`. A game that has started is served with the fullest mapping it had, as on the list: a lookup by another venue's identifier finds nothing for games archived before 2026-10-04 21:26 UTC, which kept only the venues that still listed them and age out of the 30-day archive by 2026-11-04.
+	IncludeSettled *bool `json:"-" url:"include_settled,omitempty"`
+	// Player-prop admission policy. It requires `include_submarkets` to be `true`, which it is by default on a lookup; with `include_submarkets=false` it is a 400. Matched case-insensitively. `strict` (the default) includes only groups of at least two distinct providers with verified player/game/stat/threshold/side identity and a completely reviewed equivalent settlement profile. `same_prop` retains exact prop identity but also admits different or unverified settlement rules, identified by `settlement_equivalence` and `rule_comparisons`. Unknown rules never prove equivalence. Applies with `include_settled`. Does not change game-line matching. Historical snapshots without verified player identity do not expose props.
+	PlayerPropMatch *LookupSportsMatchingMarketsRequestPlayerPropMatch `json:"-" url:"player_prop_match,omitempty"`
+	// When `true`, each event lists every matched submarket (spreads, totals, period lines and player props); when `false`, only its full-game moneyline, and an event appears only when that is matched. Defaults to `true` on a lookup, which returns the events it finds in full: a spread ticker shows its spread. Every submarket has the same shape, so code written against the moneyline reads the rest unchanged. This is an identity mapping only; fetch current status, quotes, and liquidity from the referenced market resources. Explicit `player_prop_match` requires this to be `true`.
+	IncludeSubmarkets *bool `json:"-" url:"include_submarkets,omitempty"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+}
+
+func (l *LookupSportsMatchingMarketsRequest) require(field *big.Int) {
+	if l.explicitFields == nil {
+		l.explicitFields = big.NewInt(0)
+	}
+	l.explicitFields.Or(l.explicitFields, field)
+}
+
+// SetEventID sets the EventID field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (l *LookupSportsMatchingMarketsRequest) SetEventID(eventID []*string) {
+	l.EventID = eventID
+	l.require(lookupSportsMatchingMarketsRequestFieldEventID)
+}
+
+// SetSourceID sets the SourceID field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (l *LookupSportsMatchingMarketsRequest) SetSourceID(sourceID []*string) {
+	l.SourceID = sourceID
+	l.require(lookupSportsMatchingMarketsRequestFieldSourceID)
+}
+
+// SetIncludeSettled sets the IncludeSettled field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (l *LookupSportsMatchingMarketsRequest) SetIncludeSettled(includeSettled *bool) {
+	l.IncludeSettled = includeSettled
+	l.require(lookupSportsMatchingMarketsRequestFieldIncludeSettled)
+}
+
+// SetPlayerPropMatch sets the PlayerPropMatch field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (l *LookupSportsMatchingMarketsRequest) SetPlayerPropMatch(playerPropMatch *LookupSportsMatchingMarketsRequestPlayerPropMatch) {
+	l.PlayerPropMatch = playerPropMatch
+	l.require(lookupSportsMatchingMarketsRequestFieldPlayerPropMatch)
+}
+
+// SetIncludeSubmarkets sets the IncludeSubmarkets field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (l *LookupSportsMatchingMarketsRequest) SetIncludeSubmarkets(includeSubmarkets *bool) {
+	l.IncludeSubmarkets = includeSubmarkets
+	l.require(lookupSportsMatchingMarketsRequestFieldIncludeSubmarkets)
+}
+
+// Error body returned with HTTP 409. The identifier you sent is well-formed but not unique: it names a real resource on more than one provider, and nothing in the request says which one you meant. Polymarket and Predict share both the bare-numeric and kebab-case identifier shapes and their id spaces genuinely overlap, so this is a routine outcome rather than an edge case — measured 2026-08-25, 53 of 93 Predict market ids drawn from `GET /v1/matching-markets/sports` also resolved on Polymarket.
 //
-// `candidates` lists exactly the platforms the identifier resolved on, in a stable order, and every entry is a legal `?platform=` value. Retry the same identifier with `?platform={candidate}`, or with the composite `{platform}:{id}` form, and the lookup is deterministic. Clients that fan out over identifiers should handle 409 by re-issuing with the platform they already know from the listing that produced the id — every list and matching response that emits an identifier also emits its platform.
+// `candidates` lists exactly the providers the identifier resolved on, in a stable order, and every entry is a legal `?provider=` value. Retry the same identifier with `?provider={candidate}`, or with the composite `{provider}:{id}` form, and the lookup is deterministic. Clients that fan out over identifiers should handle 409 by re-issuing with the provider they already know from the listing that produced the id — every list and matching response that emits an identifier also emits its provider.
 var (
 	ambiguousIdentifierErrorFieldCode       = big.NewInt(1 << 0)
 	ambiguousIdentifierErrorFieldMessage    = big.NewInt(1 << 1)
@@ -418,11 +500,11 @@ var (
 type AmbiguousIdentifierError struct {
 	// Always `ambiguous_identifier`.
 	Code string `json:"code" url:"code"`
-	// Human-readable detail naming the identifier, the platforms it resolved on, and how to disambiguate.
+	// Human-readable detail naming the identifier, the providers it resolved on, and how to disambiguate.
 	Message string `json:"message" url:"message"`
 	// The parameter holding the identifier, `market_id` or `event_id`.
 	Param *string `json:"param,omitempty" url:"param,omitempty"`
-	// The platforms this identifier resolved on. Each value is accepted verbatim by the `platform` query parameter.
+	// The providers this identifier resolved on. Each value is accepted verbatim by the `provider` query parameter.
 	Candidates []string `json:"candidates" url:"candidates"`
 	StatusCode int      `json:"status_code" url:"status_code"`
 
@@ -560,12 +642,14 @@ func (a *AmbiguousIdentifierError) String() string {
 }
 
 var (
-	canonicalSportsEventFieldEventID      = big.NewInt(1 << 0)
-	canonicalSportsEventFieldSport        = big.NewInt(1 << 1)
-	canonicalSportsEventFieldLeague       = big.NewInt(1 << 2)
-	canonicalSportsEventFieldTitle        = big.NewInt(1 << 3)
-	canonicalSportsEventFieldParticipants = big.NewInt(1 << 4)
-	canonicalSportsEventFieldSubmarkets   = big.NewInt(1 << 5)
+	canonicalSportsEventFieldEventID        = big.NewInt(1 << 0)
+	canonicalSportsEventFieldSport          = big.NewInt(1 << 1)
+	canonicalSportsEventFieldLeague         = big.NewInt(1 << 2)
+	canonicalSportsEventFieldTitle          = big.NewInt(1 << 3)
+	canonicalSportsEventFieldScheduledStart = big.NewInt(1 << 4)
+	canonicalSportsEventFieldScheduledDate  = big.NewInt(1 << 5)
+	canonicalSportsEventFieldParticipants   = big.NewInt(1 << 6)
+	canonicalSportsEventFieldSubmarkets     = big.NewInt(1 << 7)
 )
 
 type CanonicalSportsEvent struct {
@@ -574,10 +658,16 @@ type CanonicalSportsEvent struct {
 	// Canonical sport slug. `basketball`, `hockey`, `baseball`, or `football` today.
 	Sport string `json:"sport" url:"sport"`
 	// Canonical league slug. Cross-platform matching covers `nba`, `wnba`, `nhl`, `mlb`, and `nfl` today. The value is the first segment of `event_id`, so `nba-okc-sas-2026-10-20` is an NBA game. Treat this as an open set — leagues are added without a breaking change.
-	League       string                        `json:"league" url:"league"`
-	Title        string                        `json:"title" url:"title"`
-	Participants []*CanonicalSportsParticipant `json:"participants" url:"participants"`
-	Submarkets   []*CanonicalSportsSubmarket   `json:"submarkets" url:"submarkets"`
+	League string `json:"league" url:"league"`
+	Title  string `json:"title" url:"title"`
+	// When the game starts, in UTC at millisecond precision, when a venue published an exact start time for it; `null` otherwise. Venues often publish only the game's date (Kalshi's tickers carry a date and no time), and a venue's "time to be announced" placeholder is not a start, so a game whose venues say nothing more is `null` here and `scheduled_date` still names its day. Games matched before start times were recorded read `null` too, including archived games for up to 30 days after that change. `null` means "no exact start is known", never a guess at one.
+	//
+	// This is schedule identity, not a status: it does not say whether the game has started, ended or been postponed. When venues disagree about the start, the earliest exact one is published. A postponed game takes its new start when the venues publish it.
+	ScheduledStart *time.Time `json:"scheduled_start,omitempty" url:"scheduled_start,omitempty"`
+	// The game's calendar day in America/New_York, as `YYYY-MM-DD`. Always present, even when `scheduled_start` is `null`. It is the day the game's start falls on in Eastern time, and never earlier than the day the `event_id` ends in, which is how a game whose start is unknown is still dated. A game that starts at 8:30 PM Eastern on the 20th is on the 20th, although its `scheduled_start` is on the 21st in UTC. It is the value the `scheduled_date` filter on `GET /v1/matching-markets/sports` matches, and the day the default list retires the game by.
+	ScheduledDate time.Time                     `json:"scheduled_date" url:"scheduled_date" format:"date"`
+	Participants  []*CanonicalSportsParticipant `json:"participants" url:"participants"`
+	Submarkets    []*CanonicalSportsSubmarket   `json:"submarkets" url:"submarkets"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
 	explicitFields *big.Int `json:"-" url:"-"`
@@ -612,6 +702,20 @@ func (c *CanonicalSportsEvent) GetTitle() string {
 		return ""
 	}
 	return c.Title
+}
+
+func (c *CanonicalSportsEvent) GetScheduledStart() *time.Time {
+	if c == nil {
+		return nil
+	}
+	return c.ScheduledStart
+}
+
+func (c *CanonicalSportsEvent) GetScheduledDate() time.Time {
+	if c == nil {
+		return time.Time{}
+	}
+	return c.ScheduledDate
 }
 
 func (c *CanonicalSportsEvent) GetParticipants() []*CanonicalSportsParticipant {
@@ -670,6 +774,20 @@ func (c *CanonicalSportsEvent) SetTitle(title string) {
 	c.require(canonicalSportsEventFieldTitle)
 }
 
+// SetScheduledStart sets the ScheduledStart field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsEvent) SetScheduledStart(scheduledStart *time.Time) {
+	c.ScheduledStart = scheduledStart
+	c.require(canonicalSportsEventFieldScheduledStart)
+}
+
+// SetScheduledDate sets the ScheduledDate field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (c *CanonicalSportsEvent) SetScheduledDate(scheduledDate time.Time) {
+	c.ScheduledDate = scheduledDate
+	c.require(canonicalSportsEventFieldScheduledDate)
+}
+
 // SetParticipants sets the Participants field and marks it as non-optional;
 // this prevents an empty or null value for this field from being omitted during serialization.
 func (c *CanonicalSportsEvent) SetParticipants(participants []*CanonicalSportsParticipant) {
@@ -685,12 +803,20 @@ func (c *CanonicalSportsEvent) SetSubmarkets(submarkets []*CanonicalSportsSubmar
 }
 
 func (c *CanonicalSportsEvent) UnmarshalJSON(data []byte) error {
-	type unmarshaler CanonicalSportsEvent
-	var value unmarshaler
-	if err := json.Unmarshal(data, &value); err != nil {
+	type embed CanonicalSportsEvent
+	var unmarshaler = struct {
+		embed
+		ScheduledStart *internal.DateTime `json:"scheduled_start,omitempty"`
+		ScheduledDate  *internal.Date     `json:"scheduled_date"`
+	}{
+		embed: embed(*c),
+	}
+	if err := json.Unmarshal(data, &unmarshaler); err != nil {
 		return err
 	}
-	*c = CanonicalSportsEvent(value)
+	*c = CanonicalSportsEvent(unmarshaler.embed)
+	c.ScheduledStart = unmarshaler.ScheduledStart.TimePtr()
+	c.ScheduledDate = unmarshaler.ScheduledDate.Time()
 	extraProperties, err := internal.ExtractExtraProperties(data, *c)
 	if err != nil {
 		return err
@@ -704,8 +830,12 @@ func (c *CanonicalSportsEvent) MarshalJSON() ([]byte, error) {
 	type embed CanonicalSportsEvent
 	var marshaler = struct {
 		embed
+		ScheduledStart *internal.DateTime `json:"scheduled_start,omitempty"`
+		ScheduledDate  *internal.Date     `json:"scheduled_date"`
 	}{
-		embed: embed(*c),
+		embed:          embed(*c),
+		ScheduledStart: internal.NewOptionalDateTime(c.ScheduledStart),
+		ScheduledDate:  internal.NewDate(c.ScheduledDate),
 	}
 	explicitMarshaler := internal.HandleExplicitFields(marshaler, c.explicitFields)
 	return json.Marshal(explicitMarshaler)
@@ -1060,7 +1190,7 @@ func (c *CanonicalSportsRules) String() string {
 	return fmt.Sprintf("%#v", c)
 }
 
-// One venue market matched to a canonical submarket. Every provider uses the same fields: `provider`; the provider's parent `event_id`, for `GET /v1/events/{event_id}`; the market's own `market_id`, for `GET /v1/markets/{market_id}`; and outcomes whose `outcome_id`s are the ones market detail returns, each mapped to a canonical outcome. Send either ID with this market's `provider`, as the composite `{provider}:{id}` or as the `platform` query parameter: a bare Predict ID can also name a Polymarket market, and AlphaArcade, ProphetX and Pred IDs are never inferred. Any of `event_id`, `market_id` or `market_slug`, prefixed with `provider`, finds this event again through `source_id`.
+// One venue market matched to a canonical submarket. Every provider uses the same fields: `provider`; the provider's parent `event_id`, for `GET /v1/events/{event_id}`; the market's own `market_id`, for `GET /v1/markets/{market_id}`; and outcomes whose `outcome_id`s are the ones market detail returns, each mapped to a canonical outcome. Send either ID with this market's `provider`, as the composite `{provider}:{id}` or as the `provider` query parameter: a bare Predict ID can also name a Polymarket market, and AlphaArcade, ProphetX and Pred IDs are never inferred. Any of `event_id`, `market_id` or `market_slug`, prefixed with `provider`, finds this event again through `source_id`.
 var (
 	canonicalSportsSourceMarketFieldProvider   = big.NewInt(1 << 0)
 	canonicalSportsSourceMarketFieldEventID    = big.NewInt(1 << 1)
@@ -2157,17 +2287,15 @@ func (c *CryptoPriceItem) String() string {
 }
 
 var (
-	cryptoPricesResponseFieldPrices        = big.NewInt(1 << 0)
-	cryptoPricesResponseFieldPaginationKey = big.NewInt(1 << 1)
-	cryptoPricesResponseFieldTotal         = big.NewInt(1 << 2)
+	cryptoPricesResponseFieldData       = big.NewInt(1 << 0)
+	cryptoPricesResponseFieldPagination = big.NewInt(1 << 1)
 )
 
 type CryptoPricesResponse struct {
-	Prices []*CryptoPriceItem `json:"prices" url:"prices"`
-	// Base64-encoded cursor for fetching the next page. Absent when there are no more results.
-	PaginationKey *string `json:"pagination_key,omitempty" url:"pagination_key,omitempty"`
-	// Number of prices in this response page. Omitted on empty responses for unknown symbols.
-	Total *int `json:"total,omitempty" url:"total,omitempty"`
+	// One page of prices, newest first, one per second. A single item when no time range was sent; `[]` for an unknown symbol.
+	Data []*CryptoPriceItem `json:"data" url:"data"`
+	// Pagination metadata for the current page. `total` is always `null` on this route, and `next_cursor` goes back as `cursor`.
+	Pagination *PaginationBlock `json:"pagination" url:"pagination"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
 	explicitFields *big.Int `json:"-" url:"-"`
@@ -2176,25 +2304,18 @@ type CryptoPricesResponse struct {
 	rawJSON         json.RawMessage
 }
 
-func (c *CryptoPricesResponse) GetPrices() []*CryptoPriceItem {
+func (c *CryptoPricesResponse) GetData() []*CryptoPriceItem {
 	if c == nil {
 		return nil
 	}
-	return c.Prices
+	return c.Data
 }
 
-func (c *CryptoPricesResponse) GetPaginationKey() *string {
+func (c *CryptoPricesResponse) GetPagination() *PaginationBlock {
 	if c == nil {
 		return nil
 	}
-	return c.PaginationKey
-}
-
-func (c *CryptoPricesResponse) GetTotal() *int {
-	if c == nil {
-		return nil
-	}
-	return c.Total
+	return c.Pagination
 }
 
 func (c *CryptoPricesResponse) GetExtraProperties() map[string]interface{} {
@@ -2211,25 +2332,18 @@ func (c *CryptoPricesResponse) require(field *big.Int) {
 	c.explicitFields.Or(c.explicitFields, field)
 }
 
-// SetPrices sets the Prices field and marks it as non-optional;
+// SetData sets the Data field and marks it as non-optional;
 // this prevents an empty or null value for this field from being omitted during serialization.
-func (c *CryptoPricesResponse) SetPrices(prices []*CryptoPriceItem) {
-	c.Prices = prices
-	c.require(cryptoPricesResponseFieldPrices)
+func (c *CryptoPricesResponse) SetData(data []*CryptoPriceItem) {
+	c.Data = data
+	c.require(cryptoPricesResponseFieldData)
 }
 
-// SetPaginationKey sets the PaginationKey field and marks it as non-optional;
+// SetPagination sets the Pagination field and marks it as non-optional;
 // this prevents an empty or null value for this field from being omitted during serialization.
-func (c *CryptoPricesResponse) SetPaginationKey(paginationKey *string) {
-	c.PaginationKey = paginationKey
-	c.require(cryptoPricesResponseFieldPaginationKey)
-}
-
-// SetTotal sets the Total field and marks it as non-optional;
-// this prevents an empty or null value for this field from being omitted during serialization.
-func (c *CryptoPricesResponse) SetTotal(total *int) {
-	c.Total = total
-	c.require(cryptoPricesResponseFieldTotal)
+func (c *CryptoPricesResponse) SetPagination(pagination *PaginationBlock) {
+	c.Pagination = pagination
+	c.require(cryptoPricesResponseFieldPagination)
 }
 
 func (c *CryptoPricesResponse) UnmarshalJSON(data []byte) error {
@@ -2402,7 +2516,7 @@ var (
 )
 
 type ErrorResponse struct {
-	// Stable machine-readable reason. New codes may be added; a code is never renamed or reused. `400`: `unknown_parameter` (the endpoint does not read that query parameter), `invalid_parameter` (a value is malformed, empty, out of range, sent more than once, or contradicts another parameter), `missing_parameter`, `invalid_cursor` (a cursor or `pagination_key` that is malformed, stale, or from another endpoint or filter set: start again without it), `invalid_identifier` (a `market_id` or `event_id` that cannot exist on the platform it resolves to, or whose `{provider}:` prefix names no provider), `upstream_rejected` (the venue rejected the request). `401`: `missing_api_key`, `invalid_api_key`. `402`: `payment_required`. `403`: `forbidden`. `404`: `route_not_found` (no route matches the path), `market_not_found`, `event_not_found`, `profile_not_found`. `405`: `method_not_allowed`. `409`: `ambiguous_identifier`. `429`: `rate_limited` (the per-minute limit; honour `Retry-After`), `usage_limit_exceeded` (an allowance that does not refill within the minute), `upstream_rate_limited` (the venue's limit). `502`: `upstream_unavailable`. `503`: `service_unavailable`.
+	// Stable machine-readable reason. New codes may be added; a code is never renamed or reused. `400`: `unknown_parameter` (the endpoint does not read that query parameter), `invalid_parameter` (a value is malformed, empty, out of range, sent more than once, or contradicts another parameter), `missing_parameter`, `invalid_cursor` (a `cursor` that is malformed, stale, or from another endpoint or filter set: start again without it), `invalid_identifier` (a `market_id` or `event_id` that cannot exist on the provider it resolves to, or whose `{provider}:` prefix names no provider), `upstream_rejected` (the venue rejected the request). `401`: `missing_api_key`, `invalid_api_key`. `402`: `payment_required`. `403`: `forbidden`. `404`: `route_not_found` (no route matches the path), `market_not_found`, `event_not_found`, `profile_not_found`. `405`: `method_not_allowed`. `409`: `ambiguous_identifier`. `429`: `rate_limited` (the per-minute limit; honour `Retry-After`), `usage_limit_exceeded` (an allowance that does not refill within the minute), `upstream_rate_limited` (the venue's limit). `502`: `upstream_unavailable`. `503`: `service_unavailable`.
 	Code string `json:"code" url:"code"`
 	// What went wrong and how to fix it, for people. It quotes the offending value where there is one.
 	Message string `json:"message" url:"message"`
@@ -2671,7 +2785,7 @@ var (
 )
 
 type EventMarket struct {
-	// Platform-native market identifier. Kalshi ticker (`KXMLBGAME-26AUG272145AZSF-AZ`), Polymarket numeric market id, SX Bet `marketHash`, Predict market id, Hyperliquid outcome id, AlphaArcade market ULID, or ProphetX `<event_id>:<market_id>`.
+	// Provider-native market identifier. Kalshi ticker (`KXMLBGAME-26OCT152000MILLAD-MIL`), Polymarket numeric market id, SX Bet `marketHash`, Predict market id, Hyperliquid outcome id, AlphaArcade market ULID, or ProphetX `<event_id>:<market_id>`.
 	MarketID string `json:"market_id" url:"market_id"`
 	// Human-readable market title/question.
 	Title string `json:"title" url:"title"`
@@ -2769,22 +2883,22 @@ func (e *EventMarket) String() string {
 
 var (
 	eventResponseFieldEventID  = big.NewInt(1 << 0)
-	eventResponseFieldPlatform = big.NewInt(1 << 1)
+	eventResponseFieldProvider = big.NewInt(1 << 1)
 	eventResponseFieldTitle    = big.NewInt(1 << 2)
 	eventResponseFieldMarkets  = big.NewInt(1 << 3)
 	eventResponseFieldFanout   = big.NewInt(1 << 4)
 )
 
 type EventResponse struct {
-	// Echo of the platform-native event identifier supplied in the request path.
+	// Echo of the provider-native event identifier supplied in the request path.
 	EventID string `json:"event_id" url:"event_id"`
-	// The platform the event_id was resolved against, either inferred from the ID format or supplied via `?platform=`.
-	Platform EventResponsePlatform `json:"platform" url:"platform"`
-	// Human-readable event title from the platform.
+	// The provider the event_id was resolved against, either inferred from the ID format or supplied via `?provider=`. It is the value to send as `?provider=` to `GET /v1/markets/{market_id}` with a nested market's `market_id` (it was named `platform` until 2026-10-09).
+	Provider EventResponseProvider `json:"provider" url:"provider"`
+	// Human-readable event title from the provider.
 	Title string `json:"title" url:"title"`
-	// Markets nested under this event. Order is platform-native for the primary event, followed by markets from fanout siblings (Kalshi sports) in registry order.
+	// Markets nested under this event. Order is provider-native for the primary event, followed by markets from fanout siblings (Kalshi sports) in registry order.
 	Markets []*EventMarket `json:"markets" url:"markets"`
-	// Present when the response was assembled from multiple upstream events (Kalshi sports sibling fanout). Lists which sibling event tickers were attempted, which contributed markets, and which failed or didn't exist. Absent for non-Kalshi platforms and for Kalshi events whose series is not in the sibling registry.
+	// Present when the response was assembled from multiple upstream events (Kalshi sports sibling fanout). Lists which sibling event tickers were attempted, which contributed markets, and which failed or didn't exist. Absent for non-Kalshi providers and for Kalshi events whose series is not in the sibling registry.
 	Fanout *EventFanout `json:"fanout,omitempty" url:"fanout,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
@@ -2801,11 +2915,11 @@ func (e *EventResponse) GetEventID() string {
 	return e.EventID
 }
 
-func (e *EventResponse) GetPlatform() EventResponsePlatform {
+func (e *EventResponse) GetProvider() EventResponseProvider {
 	if e == nil {
 		return ""
 	}
-	return e.Platform
+	return e.Provider
 }
 
 func (e *EventResponse) GetTitle() string {
@@ -2850,11 +2964,11 @@ func (e *EventResponse) SetEventID(eventID string) {
 	e.require(eventResponseFieldEventID)
 }
 
-// SetPlatform sets the Platform field and marks it as non-optional;
+// SetProvider sets the Provider field and marks it as non-optional;
 // this prevents an empty or null value for this field from being omitted during serialization.
-func (e *EventResponse) SetPlatform(platform EventResponsePlatform) {
-	e.Platform = platform
-	e.require(eventResponseFieldPlatform)
+func (e *EventResponse) SetProvider(provider EventResponseProvider) {
+	e.Provider = provider
+	e.require(eventResponseFieldProvider)
 }
 
 // SetTitle sets the Title field and marks it as non-optional;
@@ -2920,133 +3034,133 @@ func (e *EventResponse) String() string {
 	return fmt.Sprintf("%#v", e)
 }
 
-// The platform the event_id was resolved against, either inferred from the ID format or supplied via `?platform=`.
-type EventResponsePlatform string
+// The provider the event_id was resolved against, either inferred from the ID format or supplied via `?provider=`. It is the value to send as `?provider=` to `GET /v1/markets/{market_id}` with a nested market's `market_id` (it was named `platform` until 2026-10-09).
+type EventResponseProvider string
 
 const (
-	EventResponsePlatformKalshi      EventResponsePlatform = "kalshi"
-	EventResponsePlatformPolymarket  EventResponsePlatform = "polymarket"
-	EventResponsePlatformPredict     EventResponsePlatform = "predict"
-	EventResponsePlatformSxbet       EventResponsePlatform = "sxbet"
-	EventResponsePlatformHyperliquid EventResponsePlatform = "hyperliquid"
-	EventResponsePlatformAlphaArcade EventResponsePlatform = "alpha-arcade"
-	EventResponsePlatformProphetx    EventResponsePlatform = "prophetx"
-	EventResponsePlatformLimitless   EventResponsePlatform = "limitless"
-	EventResponsePlatformPred        EventResponsePlatform = "pred"
+	EventResponseProviderKalshi      EventResponseProvider = "kalshi"
+	EventResponseProviderPolymarket  EventResponseProvider = "polymarket"
+	EventResponseProviderPredict     EventResponseProvider = "predict"
+	EventResponseProviderSxbet       EventResponseProvider = "sxbet"
+	EventResponseProviderHyperliquid EventResponseProvider = "hyperliquid"
+	EventResponseProviderAlphaArcade EventResponseProvider = "alpha-arcade"
+	EventResponseProviderProphetx    EventResponseProvider = "prophetx"
+	EventResponseProviderLimitless   EventResponseProvider = "limitless"
+	EventResponseProviderPred        EventResponseProvider = "pred"
 )
 
-func NewEventResponsePlatformFromString(s string) (EventResponsePlatform, error) {
+func NewEventResponseProviderFromString(s string) (EventResponseProvider, error) {
 	switch s {
 	case "kalshi":
-		return EventResponsePlatformKalshi, nil
+		return EventResponseProviderKalshi, nil
 	case "polymarket":
-		return EventResponsePlatformPolymarket, nil
+		return EventResponseProviderPolymarket, nil
 	case "predict":
-		return EventResponsePlatformPredict, nil
+		return EventResponseProviderPredict, nil
 	case "sxbet":
-		return EventResponsePlatformSxbet, nil
+		return EventResponseProviderSxbet, nil
 	case "hyperliquid":
-		return EventResponsePlatformHyperliquid, nil
+		return EventResponseProviderHyperliquid, nil
 	case "alpha-arcade":
-		return EventResponsePlatformAlphaArcade, nil
+		return EventResponseProviderAlphaArcade, nil
 	case "prophetx":
-		return EventResponsePlatformProphetx, nil
+		return EventResponseProviderProphetx, nil
 	case "limitless":
-		return EventResponsePlatformLimitless, nil
+		return EventResponseProviderLimitless, nil
 	case "pred":
-		return EventResponsePlatformPred, nil
+		return EventResponseProviderPred, nil
 	}
-	var t EventResponsePlatform
+	var t EventResponseProvider
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
 }
 
-func (e EventResponsePlatform) Ptr() *EventResponsePlatform {
+func (e EventResponseProvider) Ptr() *EventResponseProvider {
 	return &e
 }
 
-type GetEventRequestPlatform string
+type GetEventRequestProvider string
 
 const (
-	GetEventRequestPlatformKalshi      GetEventRequestPlatform = "kalshi"
-	GetEventRequestPlatformPolymarket  GetEventRequestPlatform = "polymarket"
-	GetEventRequestPlatformPredict     GetEventRequestPlatform = "predict"
-	GetEventRequestPlatformSxbet       GetEventRequestPlatform = "sxbet"
-	GetEventRequestPlatformHyperliquid GetEventRequestPlatform = "hyperliquid"
-	GetEventRequestPlatformAlphaArcade GetEventRequestPlatform = "alpha-arcade"
-	GetEventRequestPlatformProphetx    GetEventRequestPlatform = "prophetx"
-	GetEventRequestPlatformLimitless   GetEventRequestPlatform = "limitless"
-	GetEventRequestPlatformPred        GetEventRequestPlatform = "pred"
+	GetEventRequestProviderKalshi      GetEventRequestProvider = "kalshi"
+	GetEventRequestProviderPolymarket  GetEventRequestProvider = "polymarket"
+	GetEventRequestProviderPredict     GetEventRequestProvider = "predict"
+	GetEventRequestProviderSxbet       GetEventRequestProvider = "sxbet"
+	GetEventRequestProviderHyperliquid GetEventRequestProvider = "hyperliquid"
+	GetEventRequestProviderAlphaArcade GetEventRequestProvider = "alpha-arcade"
+	GetEventRequestProviderProphetx    GetEventRequestProvider = "prophetx"
+	GetEventRequestProviderLimitless   GetEventRequestProvider = "limitless"
+	GetEventRequestProviderPred        GetEventRequestProvider = "pred"
 )
 
-func NewGetEventRequestPlatformFromString(s string) (GetEventRequestPlatform, error) {
+func NewGetEventRequestProviderFromString(s string) (GetEventRequestProvider, error) {
 	switch s {
 	case "kalshi":
-		return GetEventRequestPlatformKalshi, nil
+		return GetEventRequestProviderKalshi, nil
 	case "polymarket":
-		return GetEventRequestPlatformPolymarket, nil
+		return GetEventRequestProviderPolymarket, nil
 	case "predict":
-		return GetEventRequestPlatformPredict, nil
+		return GetEventRequestProviderPredict, nil
 	case "sxbet":
-		return GetEventRequestPlatformSxbet, nil
+		return GetEventRequestProviderSxbet, nil
 	case "hyperliquid":
-		return GetEventRequestPlatformHyperliquid, nil
+		return GetEventRequestProviderHyperliquid, nil
 	case "alpha-arcade":
-		return GetEventRequestPlatformAlphaArcade, nil
+		return GetEventRequestProviderAlphaArcade, nil
 	case "prophetx":
-		return GetEventRequestPlatformProphetx, nil
+		return GetEventRequestProviderProphetx, nil
 	case "limitless":
-		return GetEventRequestPlatformLimitless, nil
+		return GetEventRequestProviderLimitless, nil
 	case "pred":
-		return GetEventRequestPlatformPred, nil
+		return GetEventRequestProviderPred, nil
 	}
-	var t GetEventRequestPlatform
+	var t GetEventRequestProvider
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
 }
 
-func (g GetEventRequestPlatform) Ptr() *GetEventRequestPlatform {
+func (g GetEventRequestProvider) Ptr() *GetEventRequestProvider {
 	return &g
 }
 
-type GetMarketRequestPlatform string
+type GetMarketRequestProvider string
 
 const (
-	GetMarketRequestPlatformKalshi      GetMarketRequestPlatform = "kalshi"
-	GetMarketRequestPlatformPolymarket  GetMarketRequestPlatform = "polymarket"
-	GetMarketRequestPlatformPredict     GetMarketRequestPlatform = "predict"
-	GetMarketRequestPlatformSxbet       GetMarketRequestPlatform = "sxbet"
-	GetMarketRequestPlatformHyperliquid GetMarketRequestPlatform = "hyperliquid"
-	GetMarketRequestPlatformAlphaArcade GetMarketRequestPlatform = "alpha-arcade"
-	GetMarketRequestPlatformProphetx    GetMarketRequestPlatform = "prophetx"
-	GetMarketRequestPlatformLimitless   GetMarketRequestPlatform = "limitless"
-	GetMarketRequestPlatformPred        GetMarketRequestPlatform = "pred"
+	GetMarketRequestProviderKalshi      GetMarketRequestProvider = "kalshi"
+	GetMarketRequestProviderPolymarket  GetMarketRequestProvider = "polymarket"
+	GetMarketRequestProviderPredict     GetMarketRequestProvider = "predict"
+	GetMarketRequestProviderSxbet       GetMarketRequestProvider = "sxbet"
+	GetMarketRequestProviderHyperliquid GetMarketRequestProvider = "hyperliquid"
+	GetMarketRequestProviderAlphaArcade GetMarketRequestProvider = "alpha-arcade"
+	GetMarketRequestProviderProphetx    GetMarketRequestProvider = "prophetx"
+	GetMarketRequestProviderLimitless   GetMarketRequestProvider = "limitless"
+	GetMarketRequestProviderPred        GetMarketRequestProvider = "pred"
 )
 
-func NewGetMarketRequestPlatformFromString(s string) (GetMarketRequestPlatform, error) {
+func NewGetMarketRequestProviderFromString(s string) (GetMarketRequestProvider, error) {
 	switch s {
 	case "kalshi":
-		return GetMarketRequestPlatformKalshi, nil
+		return GetMarketRequestProviderKalshi, nil
 	case "polymarket":
-		return GetMarketRequestPlatformPolymarket, nil
+		return GetMarketRequestProviderPolymarket, nil
 	case "predict":
-		return GetMarketRequestPlatformPredict, nil
+		return GetMarketRequestProviderPredict, nil
 	case "sxbet":
-		return GetMarketRequestPlatformSxbet, nil
+		return GetMarketRequestProviderSxbet, nil
 	case "hyperliquid":
-		return GetMarketRequestPlatformHyperliquid, nil
+		return GetMarketRequestProviderHyperliquid, nil
 	case "alpha-arcade":
-		return GetMarketRequestPlatformAlphaArcade, nil
+		return GetMarketRequestProviderAlphaArcade, nil
 	case "prophetx":
-		return GetMarketRequestPlatformProphetx, nil
+		return GetMarketRequestProviderProphetx, nil
 	case "limitless":
-		return GetMarketRequestPlatformLimitless, nil
+		return GetMarketRequestProviderLimitless, nil
 	case "pred":
-		return GetMarketRequestPlatformPred, nil
+		return GetMarketRequestProviderPred, nil
 	}
-	var t GetMarketRequestPlatform
+	var t GetMarketRequestProvider
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
 }
 
-func (g GetMarketRequestPlatform) Ptr() *GetMarketRequestPlatform {
+func (g GetMarketRequestProvider) Ptr() *GetMarketRequestProvider {
 	return &g
 }
 
@@ -3093,6 +3207,37 @@ func (g GetMarketsRequestProvider) Ptr() *GetMarketsRequestProvider {
 	return &g
 }
 
+type GetSportsMatchingMarketsRequestLeague string
+
+const (
+	GetSportsMatchingMarketsRequestLeagueNba  GetSportsMatchingMarketsRequestLeague = "nba"
+	GetSportsMatchingMarketsRequestLeagueWnba GetSportsMatchingMarketsRequestLeague = "wnba"
+	GetSportsMatchingMarketsRequestLeagueNfl  GetSportsMatchingMarketsRequestLeague = "nfl"
+	GetSportsMatchingMarketsRequestLeagueMlb  GetSportsMatchingMarketsRequestLeague = "mlb"
+	GetSportsMatchingMarketsRequestLeagueNhl  GetSportsMatchingMarketsRequestLeague = "nhl"
+)
+
+func NewGetSportsMatchingMarketsRequestLeagueFromString(s string) (GetSportsMatchingMarketsRequestLeague, error) {
+	switch s {
+	case "nba":
+		return GetSportsMatchingMarketsRequestLeagueNba, nil
+	case "wnba":
+		return GetSportsMatchingMarketsRequestLeagueWnba, nil
+	case "nfl":
+		return GetSportsMatchingMarketsRequestLeagueNfl, nil
+	case "mlb":
+		return GetSportsMatchingMarketsRequestLeagueMlb, nil
+	case "nhl":
+		return GetSportsMatchingMarketsRequestLeagueNhl, nil
+	}
+	var t GetSportsMatchingMarketsRequestLeague
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (g GetSportsMatchingMarketsRequestLeague) Ptr() *GetSportsMatchingMarketsRequestLeague {
+	return &g
+}
+
 type GetSportsMatchingMarketsRequestPlayerPropMatch string
 
 const (
@@ -3113,6 +3258,28 @@ func NewGetSportsMatchingMarketsRequestPlayerPropMatchFromString(s string) (GetS
 
 func (g GetSportsMatchingMarketsRequestPlayerPropMatch) Ptr() *GetSportsMatchingMarketsRequestPlayerPropMatch {
 	return &g
+}
+
+type LookupSportsMatchingMarketsRequestPlayerPropMatch string
+
+const (
+	LookupSportsMatchingMarketsRequestPlayerPropMatchStrict   LookupSportsMatchingMarketsRequestPlayerPropMatch = "strict"
+	LookupSportsMatchingMarketsRequestPlayerPropMatchSameProp LookupSportsMatchingMarketsRequestPlayerPropMatch = "same_prop"
+)
+
+func NewLookupSportsMatchingMarketsRequestPlayerPropMatchFromString(s string) (LookupSportsMatchingMarketsRequestPlayerPropMatch, error) {
+	switch s {
+	case "strict":
+		return LookupSportsMatchingMarketsRequestPlayerPropMatchStrict, nil
+	case "same_prop":
+		return LookupSportsMatchingMarketsRequestPlayerPropMatchSameProp, nil
+	}
+	var t LookupSportsMatchingMarketsRequestPlayerPropMatch
+	return "", fmt.Errorf("%s is not a valid %T", s, t)
+}
+
+func (l LookupSportsMatchingMarketsRequestPlayerPropMatch) Ptr() *LookupSportsMatchingMarketsRequestPlayerPropMatch {
+	return &l
 }
 
 // PredictorSDK-normalized top-level category. This is intentionally broad and stable across providers; provider-native tags are not exposed as canonical categories.
@@ -4068,7 +4235,7 @@ type MarketDetailResponse struct {
 	ID string `json:"id" url:"id"`
 	// Prediction market provider the market_id resolved against.
 	Provider MarketDetailResponseProvider `json:"provider" url:"provider"`
-	// Platform-native market identifier. Kalshi ticker, Polymarket numeric id, Predict numeric id, SX Bet `marketHash`, Hyperliquid outcome id, AlphaArcade market ULID, ProphetX `<event_id>:<market_id>` (resolving the favourite primary-line strike) or `<event_id>:<market_id>:<line>` (that line), or Limitless slug. For Polymarket markets resolved by slug, this is normalized to the numeric id. Hyperliquid integer ids collide with Polymarket/Predict numeric ids, so look them up via the composite id (`hyperliquid:<id>`, as returned by `/v1/markets`) or `?platform=hyperliquid`. Limitless slugs collide with Polymarket/Predict slugs, so look them up via the composite id (`limitless:<slug>`) or `?platform=limitless`. Pred `<parent>:<child>` pairs share the `0x…64hex` shape with SX Bet hashes, so look them up via the composite id (`pred:<parent>:<child>`) or `?platform=pred`; a bare `pred:<parent>` addresses the parent as a group.
+	// Provider-native market identifier. Kalshi ticker, Polymarket numeric id, Predict numeric id, SX Bet `marketHash`, Hyperliquid outcome id, AlphaArcade market ULID, ProphetX `<event_id>:<market_id>` (resolving the favourite primary-line strike) or `<event_id>:<market_id>:<line>` (that line), or Limitless slug. For Polymarket markets resolved by slug, this is normalized to the numeric id. Hyperliquid integer ids collide with Polymarket/Predict numeric ids, so look them up via the composite id (`hyperliquid:<id>`, as returned by `/v1/markets`) or `?provider=hyperliquid`. Limitless slugs collide with Polymarket/Predict slugs, so look them up via the composite id (`limitless:<slug>`) or `?provider=limitless`. Pred `<parent>:<child>` pairs share the `0x…64hex` shape with SX Bet hashes, so look them up via the composite id (`pred:<parent>:<child>`) or `?provider=pred`; a bare `pred:<parent>` addresses the parent as a group.
 	ProviderID string `json:"provider_id" url:"provider_id"`
 	// Human-readable market title. Each platform exposes a slightly different field — Kalshi `title`, Polymarket `question`, Predict `title`, SX Bet composed from outcome labels (team-pair fallback) so a game's moneyline, spread, and total markets stay distinguishable, and Hyperliquid composed from outcome/question metadata.
 	Title string `json:"title" url:"title"`
@@ -5078,8 +5245,8 @@ var (
 type PaginationBlock struct {
 	// Page size this page was served with. It echoes the first-page `limit` query value; for cursor-native passthrough endpoints, a supplied cursor's page size takes precedence on later pages.
 	Limit int `json:"limit" url:"limit"`
-	// Total matching items across all pages, when known. Set to `0` for endpoints whose upstream does not expose a total count — clients should rely on `has_more` and `next_cursor` to paginate in that case.
-	Total int `json:"total" url:"total"`
+	// Total matching items across all pages, when the route can count them. `null` when it cannot: `GET /v1/polymarket/wallet/positions` and `GET /v1/crypto-prices/binance` read upstreams that give no count, and neither route walks a result to find one. `0` therefore only ever means an empty result. Rely on `has_more` and `next_cursor` to paginate, whatever `total` says.
+	Total *int `json:"total,omitempty" url:"total,omitempty"`
 	// Whether additional pages exist beyond this one.
 	HasMore bool `json:"has_more" url:"has_more"`
 	// Opaque cursor for fetching the next page. Pass back via the `cursor` query parameter. Omitted when `has_more` is `false`. Clients must preserve the same filter set when re-using a cursor — mismatches return `400`.
@@ -5099,9 +5266,9 @@ func (p *PaginationBlock) GetLimit() int {
 	return p.Limit
 }
 
-func (p *PaginationBlock) GetTotal() int {
+func (p *PaginationBlock) GetTotal() *int {
 	if p == nil {
-		return 0
+		return nil
 	}
 	return p.Total
 }
@@ -5143,7 +5310,7 @@ func (p *PaginationBlock) SetLimit(limit int) {
 
 // SetTotal sets the Total field and marks it as non-optional;
 // this prevents an empty or null value for this field from being omitted during serialization.
-func (p *PaginationBlock) SetTotal(total int) {
+func (p *PaginationBlock) SetTotal(total *int) {
 	p.Total = total
 	p.require(paginationBlockFieldTotal)
 }
@@ -6538,107 +6705,18 @@ func (p *PolymarketWalletResponse) String() string {
 	return fmt.Sprintf("%#v", p)
 }
 
-// What one lookup identifier found.
 var (
-	sportsMatchingLookupFieldEventIDs = big.NewInt(1 << 0)
+	sportsMatchingListResponseFieldData       = big.NewInt(1 << 0)
+	sportsMatchingListResponseFieldPagination = big.NewInt(1 << 1)
+	sportsMatchingListResponseFieldSnapshot   = big.NewInt(1 << 2)
 )
 
-type SportsMatchingLookup struct {
-	// The `event_id`s of the canonical events in `data` that hold the identifier, matched case-insensitively. Usually one; several only when venues reuse an identifier; none when no event in the selected population holds it: the market is matched by no other venue, the game is past-dated (see `include_settled`), its full-game moneyline is unmatched under `include_submarkets=false`, the game's only matches are player props the `player_prop_match` policy excludes (try `same_prop`), or the identifier is unknown.
-	EventIDs []string `json:"event_ids" url:"event_ids"`
-
-	// Private bitmask of fields set to an explicit value and therefore not to be omitted
-	explicitFields *big.Int `json:"-" url:"-"`
-
-	extraProperties map[string]interface{}
-	rawJSON         json.RawMessage
-}
-
-func (s *SportsMatchingLookup) GetEventIDs() []string {
-	if s == nil {
-		return nil
-	}
-	return s.EventIDs
-}
-
-func (s *SportsMatchingLookup) GetExtraProperties() map[string]interface{} {
-	if s == nil {
-		return nil
-	}
-	return s.extraProperties
-}
-
-func (s *SportsMatchingLookup) require(field *big.Int) {
-	if s.explicitFields == nil {
-		s.explicitFields = big.NewInt(0)
-	}
-	s.explicitFields.Or(s.explicitFields, field)
-}
-
-// SetEventIDs sets the EventIDs field and marks it as non-optional;
-// this prevents an empty or null value for this field from being omitted during serialization.
-func (s *SportsMatchingLookup) SetEventIDs(eventIDs []string) {
-	s.EventIDs = eventIDs
-	s.require(sportsMatchingLookupFieldEventIDs)
-}
-
-func (s *SportsMatchingLookup) UnmarshalJSON(data []byte) error {
-	type unmarshaler SportsMatchingLookup
-	var value unmarshaler
-	if err := json.Unmarshal(data, &value); err != nil {
-		return err
-	}
-	*s = SportsMatchingLookup(value)
-	extraProperties, err := internal.ExtractExtraProperties(data, *s)
-	if err != nil {
-		return err
-	}
-	s.extraProperties = extraProperties
-	s.rawJSON = json.RawMessage(data)
-	return nil
-}
-
-func (s *SportsMatchingLookup) MarshalJSON() ([]byte, error) {
-	type embed SportsMatchingLookup
-	var marshaler = struct {
-		embed
-	}{
-		embed: embed(*s),
-	}
-	explicitMarshaler := internal.HandleExplicitFields(marshaler, s.explicitFields)
-	return json.Marshal(explicitMarshaler)
-}
-
-func (s *SportsMatchingLookup) String() string {
-	if s == nil {
-		return "<nil>"
-	}
-	if len(s.rawJSON) > 0 {
-		if value, err := internal.StringifyJSON(s.rawJSON); err == nil {
-			return value
-		}
-	}
-	if value, err := internal.StringifyJSON(s); err == nil {
-		return value
-	}
-	return fmt.Sprintf("%#v", s)
-}
-
-var (
-	sportsMatchingResponseFieldData       = big.NewInt(1 << 0)
-	sportsMatchingResponseFieldLookups    = big.NewInt(1 << 1)
-	sportsMatchingResponseFieldPagination = big.NewInt(1 << 2)
-	sportsMatchingResponseFieldSnapshot   = big.NewInt(1 << 3)
-)
-
-type SportsMatchingResponse struct {
-	// Matched events, soonest scheduled start first, each once however many lookup identifiers found it. Present on every response, as `[]` when nothing matched.
+type SportsMatchingListResponse struct {
+	// One page of matched events, soonest scheduled start first, each once. Present on every response, as `[]` when nothing matched.
 	Data []*CanonicalSportsEvent `json:"data" url:"data"`
-	// Lookup mode only: every `event_id` and `source_id` sent, under its spelling as sent (whitespace around the provider and ID trimmed), with the canonical events in `data` that hold it. An identifier that found nothing is listed with no events. Absent in list mode.
-	Lookups map[string]*SportsMatchingLookup `json:"lookups,omitempty" url:"lookups,omitempty"`
-	// Pagination metadata for the current page. Present in list mode (no `event_id` or `source_id`). Absent in lookup mode, since the response is bounded by the identifiers requested.
-	Pagination *PaginationBlock `json:"pagination,omitempty" url:"pagination,omitempty"`
-	// Freshness of the matching snapshot this response was read from. Present in list and lookup mode alike. Describes the DATA; `pagination` describes the page.
+	// Pagination metadata for the current page. `total` counts the events that match the request's filters, not every matched event.
+	Pagination *PaginationBlock `json:"pagination" url:"pagination"`
+	// Freshness of the matching snapshot this response was read from. Describes the DATA; `pagination` describes the page.
 	Snapshot *SportsMatchingSnapshot `json:"snapshot" url:"snapshot"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
@@ -6648,42 +6726,35 @@ type SportsMatchingResponse struct {
 	rawJSON         json.RawMessage
 }
 
-func (s *SportsMatchingResponse) GetData() []*CanonicalSportsEvent {
+func (s *SportsMatchingListResponse) GetData() []*CanonicalSportsEvent {
 	if s == nil {
 		return nil
 	}
 	return s.Data
 }
 
-func (s *SportsMatchingResponse) GetLookups() map[string]*SportsMatchingLookup {
-	if s == nil {
-		return nil
-	}
-	return s.Lookups
-}
-
-func (s *SportsMatchingResponse) GetPagination() *PaginationBlock {
+func (s *SportsMatchingListResponse) GetPagination() *PaginationBlock {
 	if s == nil {
 		return nil
 	}
 	return s.Pagination
 }
 
-func (s *SportsMatchingResponse) GetSnapshot() *SportsMatchingSnapshot {
+func (s *SportsMatchingListResponse) GetSnapshot() *SportsMatchingSnapshot {
 	if s == nil {
 		return nil
 	}
 	return s.Snapshot
 }
 
-func (s *SportsMatchingResponse) GetExtraProperties() map[string]interface{} {
+func (s *SportsMatchingListResponse) GetExtraProperties() map[string]interface{} {
 	if s == nil {
 		return nil
 	}
 	return s.extraProperties
 }
 
-func (s *SportsMatchingResponse) require(field *big.Int) {
+func (s *SportsMatchingListResponse) require(field *big.Int) {
 	if s.explicitFields == nil {
 		s.explicitFields = big.NewInt(0)
 	}
@@ -6692,39 +6763,32 @@ func (s *SportsMatchingResponse) require(field *big.Int) {
 
 // SetData sets the Data field and marks it as non-optional;
 // this prevents an empty or null value for this field from being omitted during serialization.
-func (s *SportsMatchingResponse) SetData(data []*CanonicalSportsEvent) {
+func (s *SportsMatchingListResponse) SetData(data []*CanonicalSportsEvent) {
 	s.Data = data
-	s.require(sportsMatchingResponseFieldData)
-}
-
-// SetLookups sets the Lookups field and marks it as non-optional;
-// this prevents an empty or null value for this field from being omitted during serialization.
-func (s *SportsMatchingResponse) SetLookups(lookups map[string]*SportsMatchingLookup) {
-	s.Lookups = lookups
-	s.require(sportsMatchingResponseFieldLookups)
+	s.require(sportsMatchingListResponseFieldData)
 }
 
 // SetPagination sets the Pagination field and marks it as non-optional;
 // this prevents an empty or null value for this field from being omitted during serialization.
-func (s *SportsMatchingResponse) SetPagination(pagination *PaginationBlock) {
+func (s *SportsMatchingListResponse) SetPagination(pagination *PaginationBlock) {
 	s.Pagination = pagination
-	s.require(sportsMatchingResponseFieldPagination)
+	s.require(sportsMatchingListResponseFieldPagination)
 }
 
 // SetSnapshot sets the Snapshot field and marks it as non-optional;
 // this prevents an empty or null value for this field from being omitted during serialization.
-func (s *SportsMatchingResponse) SetSnapshot(snapshot *SportsMatchingSnapshot) {
+func (s *SportsMatchingListResponse) SetSnapshot(snapshot *SportsMatchingSnapshot) {
 	s.Snapshot = snapshot
-	s.require(sportsMatchingResponseFieldSnapshot)
+	s.require(sportsMatchingListResponseFieldSnapshot)
 }
 
-func (s *SportsMatchingResponse) UnmarshalJSON(data []byte) error {
-	type unmarshaler SportsMatchingResponse
+func (s *SportsMatchingListResponse) UnmarshalJSON(data []byte) error {
+	type unmarshaler SportsMatchingListResponse
 	var value unmarshaler
 	if err := json.Unmarshal(data, &value); err != nil {
 		return err
 	}
-	*s = SportsMatchingResponse(value)
+	*s = SportsMatchingListResponse(value)
 	extraProperties, err := internal.ExtractExtraProperties(data, *s)
 	if err != nil {
 		return err
@@ -6734,8 +6798,8 @@ func (s *SportsMatchingResponse) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (s *SportsMatchingResponse) MarshalJSON() ([]byte, error) {
-	type embed SportsMatchingResponse
+func (s *SportsMatchingListResponse) MarshalJSON() ([]byte, error) {
+	type embed SportsMatchingListResponse
 	var marshaler = struct {
 		embed
 	}{
@@ -6745,7 +6809,7 @@ func (s *SportsMatchingResponse) MarshalJSON() ([]byte, error) {
 	return json.Marshal(explicitMarshaler)
 }
 
-func (s *SportsMatchingResponse) String() string {
+func (s *SportsMatchingListResponse) String() string {
 	if s == nil {
 		return "<nil>"
 	}
@@ -6760,13 +6824,218 @@ func (s *SportsMatchingResponse) String() string {
 	return fmt.Sprintf("%#v", s)
 }
 
-// Freshness of the matching snapshot a `GET /v1/matching-markets/sports` response was read from. Matching runs continuously in the background, so an event a response does not contain may be unmatched across venues, or missing from a snapshot that stopped updating. This block tells you whether the snapshot is still updating.
+var (
+	sportsMatchingLookupResponseFieldData     = big.NewInt(1 << 0)
+	sportsMatchingLookupResponseFieldLookups  = big.NewInt(1 << 1)
+	sportsMatchingLookupResponseFieldSnapshot = big.NewInt(1 << 2)
+)
+
+type SportsMatchingLookupResponse struct {
+	// The matched events the identifiers found, soonest scheduled start first, each once however many identifiers found it. Present on every response, as `[]` when nothing matched.
+	Data []*CanonicalSportsEvent `json:"data" url:"data"`
+	// Every `event_id` and `source_id` sent, under its spelling as sent (whitespace around the provider and ID trimmed), with the canonical events in `data` that hold it. An identifier that found nothing is listed with no events.
+	Lookups map[string]*SportsMatchingLookupResult `json:"lookups" url:"lookups"`
+	// Freshness of the matching snapshot this response was read from. Present even when no identifier matched, which is when it matters most.
+	Snapshot *SportsMatchingSnapshot `json:"snapshot" url:"snapshot"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (s *SportsMatchingLookupResponse) GetData() []*CanonicalSportsEvent {
+	if s == nil {
+		return nil
+	}
+	return s.Data
+}
+
+func (s *SportsMatchingLookupResponse) GetLookups() map[string]*SportsMatchingLookupResult {
+	if s == nil {
+		return nil
+	}
+	return s.Lookups
+}
+
+func (s *SportsMatchingLookupResponse) GetSnapshot() *SportsMatchingSnapshot {
+	if s == nil {
+		return nil
+	}
+	return s.Snapshot
+}
+
+func (s *SportsMatchingLookupResponse) GetExtraProperties() map[string]interface{} {
+	if s == nil {
+		return nil
+	}
+	return s.extraProperties
+}
+
+func (s *SportsMatchingLookupResponse) require(field *big.Int) {
+	if s.explicitFields == nil {
+		s.explicitFields = big.NewInt(0)
+	}
+	s.explicitFields.Or(s.explicitFields, field)
+}
+
+// SetData sets the Data field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (s *SportsMatchingLookupResponse) SetData(data []*CanonicalSportsEvent) {
+	s.Data = data
+	s.require(sportsMatchingLookupResponseFieldData)
+}
+
+// SetLookups sets the Lookups field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (s *SportsMatchingLookupResponse) SetLookups(lookups map[string]*SportsMatchingLookupResult) {
+	s.Lookups = lookups
+	s.require(sportsMatchingLookupResponseFieldLookups)
+}
+
+// SetSnapshot sets the Snapshot field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (s *SportsMatchingLookupResponse) SetSnapshot(snapshot *SportsMatchingSnapshot) {
+	s.Snapshot = snapshot
+	s.require(sportsMatchingLookupResponseFieldSnapshot)
+}
+
+func (s *SportsMatchingLookupResponse) UnmarshalJSON(data []byte) error {
+	type unmarshaler SportsMatchingLookupResponse
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*s = SportsMatchingLookupResponse(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *s)
+	if err != nil {
+		return err
+	}
+	s.extraProperties = extraProperties
+	s.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (s *SportsMatchingLookupResponse) MarshalJSON() ([]byte, error) {
+	type embed SportsMatchingLookupResponse
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*s),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, s.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (s *SportsMatchingLookupResponse) String() string {
+	if s == nil {
+		return "<nil>"
+	}
+	if len(s.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(s.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(s); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", s)
+}
+
+// What one lookup identifier found.
+var (
+	sportsMatchingLookupResultFieldEventIDs = big.NewInt(1 << 0)
+)
+
+type SportsMatchingLookupResult struct {
+	// The `event_id`s of the canonical events in `data` that hold the identifier, matched case-insensitively. Usually one; several only when venues reuse an identifier; none when no event in the selected population holds it: the market is matched by no other venue, the game is past-dated or was cancelled (see `include_settled`), its full-game moneyline is unmatched under `include_submarkets=false`, the game's only matches are player props the `player_prop_match` policy excludes (try `same_prop`), or the identifier is unknown.
+	EventIDs []string `json:"event_ids" url:"event_ids"`
+
+	// Private bitmask of fields set to an explicit value and therefore not to be omitted
+	explicitFields *big.Int `json:"-" url:"-"`
+
+	extraProperties map[string]interface{}
+	rawJSON         json.RawMessage
+}
+
+func (s *SportsMatchingLookupResult) GetEventIDs() []string {
+	if s == nil {
+		return nil
+	}
+	return s.EventIDs
+}
+
+func (s *SportsMatchingLookupResult) GetExtraProperties() map[string]interface{} {
+	if s == nil {
+		return nil
+	}
+	return s.extraProperties
+}
+
+func (s *SportsMatchingLookupResult) require(field *big.Int) {
+	if s.explicitFields == nil {
+		s.explicitFields = big.NewInt(0)
+	}
+	s.explicitFields.Or(s.explicitFields, field)
+}
+
+// SetEventIDs sets the EventIDs field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (s *SportsMatchingLookupResult) SetEventIDs(eventIDs []string) {
+	s.EventIDs = eventIDs
+	s.require(sportsMatchingLookupResultFieldEventIDs)
+}
+
+func (s *SportsMatchingLookupResult) UnmarshalJSON(data []byte) error {
+	type unmarshaler SportsMatchingLookupResult
+	var value unmarshaler
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*s = SportsMatchingLookupResult(value)
+	extraProperties, err := internal.ExtractExtraProperties(data, *s)
+	if err != nil {
+		return err
+	}
+	s.extraProperties = extraProperties
+	s.rawJSON = json.RawMessage(data)
+	return nil
+}
+
+func (s *SportsMatchingLookupResult) MarshalJSON() ([]byte, error) {
+	type embed SportsMatchingLookupResult
+	var marshaler = struct {
+		embed
+	}{
+		embed: embed(*s),
+	}
+	explicitMarshaler := internal.HandleExplicitFields(marshaler, s.explicitFields)
+	return json.Marshal(explicitMarshaler)
+}
+
+func (s *SportsMatchingLookupResult) String() string {
+	if s == nil {
+		return "<nil>"
+	}
+	if len(s.rawJSON) > 0 {
+		if value, err := internal.StringifyJSON(s.rawJSON); err == nil {
+			return value
+		}
+	}
+	if value, err := internal.StringifyJSON(s); err == nil {
+		return value
+	}
+	return fmt.Sprintf("%#v", s)
+}
+
+// Freshness of the matching snapshot a `GET /v1/matching-markets/sports` or `GET /v1/matching-markets/sports/lookup` response was read from. Matching runs continuously in the background, so an event a response does not contain may be unmatched across venues, or missing from a snapshot that stopped updating. This block tells you whether the snapshot is still updating.
 var (
 	sportsMatchingSnapshotFieldObservedAt = big.NewInt(1 << 0)
 )
 
 type SportsMatchingSnapshot struct {
-	// When PredictorSDK began the OLDEST venue read behind the matching snapshot this response came from — a conservative freshness floor for every event in that snapshot, in millisecond-precision ISO 8601. Present in list and lookup mode alike, including a lookup that matched nothing, which is when it matters most.
+	// When PredictorSDK began the OLDEST venue read behind the matching snapshot this response came from — a conservative freshness floor for every event in that snapshot, in millisecond-precision ISO 8601. Present on both routes, including a lookup that matched nothing, which is when it matters most.
 	//
 	// **What to expect.** Matching re-reads every venue about every 30 seconds plus the time the read itself takes, and keeps a venue's last good read for at most 10 minutes after that read finished. While matching is healthy this value is therefore never more than about 12 minutes old, and normally under two minutes. Anything older means the snapshot has stopped updating: treat an event the response does not contain as unknown rather than unmatched. The value dates the venue reads the snapshot holds; a venue whose reads keep failing is dropped from it once its last good read is 10 minutes old, so that venue's events can be missing even from a current snapshot.
 	//

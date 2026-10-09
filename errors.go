@@ -31,7 +31,7 @@ func (b *BadGatewayError) Unwrap() error {
 	return b.APIError
 }
 
-// Invalid query parameters: a `source_id` that is not `{provider}:{id}` with a matching provider, or that names a side rather than a market (`kalshi:yes`); a venue's own ID sent as `event_id`, including a Polymarket slug that matches no canonical event; an empty or comma-joined lookup value; more than 100 unique lookup identifiers; a retired parameter (its message names the replacement); a control parameter sent more than once; or an invalid flag, `limit` or `cursor`. The message quotes the offending value.
+// Invalid query parameters: a `league` outside the covered leagues, a `scheduled_date` that is not a calendar date, or an empty filter; a retired parameter (its message names the replacement: `event_id` and `source_id` moved to `GET /v1/matching-markets/sports/lookup`); a parameter sent more than once; an invalid flag, `limit` or `cursor`; or a cursor replayed under a different filter set. The message quotes the offending value.
 type BadRequestError struct {
 	*core.APIError
 	Body *ErrorResponse
@@ -55,7 +55,7 @@ func (b *BadRequestError) Unwrap() error {
 	return b.APIError
 }
 
-// `market_id` is ambiguous: it resolves to a different real market on more than one platform, so no single market can honestly be returned. Retry with `?platform=` naming one of the `candidates`, or use the composite `{platform}:{id}` form. Only bare identifiers whose shape is shared between Polymarket and Predict (numeric ids, kebab-case slugs) can produce this; composite ids, explicit `?platform=`, Kalshi tickers and SX Bet hashes never do.
+// `market_id` is ambiguous: it resolves to a different real market on more than one provider, so no single market can honestly be returned. Retry with `?provider=` naming one of the `candidates`, or use the composite `{provider}:{id}` form. Only bare identifiers whose shape is shared between Polymarket and Predict (numeric ids, kebab-case slugs) can produce this; composite ids, explicit `?provider=`, Kalshi tickers and SX Bet hashes never do.
 type ConflictError struct {
 	*core.APIError
 	Body *AmbiguousIdentifierError
