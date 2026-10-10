@@ -263,6 +263,7 @@ var (
 	getSportsMatchingMarketsRequestFieldIncludeSettled    = big.NewInt(1 << 5)
 	getSportsMatchingMarketsRequestFieldPlayerPropMatch   = big.NewInt(1 << 6)
 	getSportsMatchingMarketsRequestFieldIncludeSubmarkets = big.NewInt(1 << 7)
+	getSportsMatchingMarketsRequestFieldIncludeRules      = big.NewInt(1 << 8)
 )
 
 type GetSportsMatchingMarketsRequest struct {
@@ -294,6 +295,8 @@ type GetSportsMatchingMarketsRequest struct {
 	//
 	// Such pages are large: on 2026-10-04 a 50-event page with every submarket was about 880 KB (190 KB gzipped), and a 20-event `player_prop_match=same_prop` page about 3 MB. Send `Accept-Encoding: gzip` and a smaller `limit` when you need them.
 	IncludeSubmarkets *bool `json:"-" url:"include_submarkets,omitempty"`
+	// When `true`, every moneyline, spread and total also lists `rule_comparisons`: the three rows (`tie`, `overtime` and `push`), each with every source market's value, a description and an evidence link, that sit behind its `settlement_equivalence`. When `false`, the default, a game line carries `settlement_equivalence` alone: the verdict is always there and only the rows are left out. The rows are about 60% of an event's bytes on a busy football slate, so ask for them when you want the evidence. A player prop always carries its own matrix, whatever this is. The flag changes what each event lists and never which events a page returns, so a `cursor` works with either value.
+	IncludeRules *bool `json:"-" url:"include_rules,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
 	explicitFields *big.Int `json:"-" url:"-"`
@@ -362,6 +365,13 @@ func (g *GetSportsMatchingMarketsRequest) SetIncludeSubmarkets(includeSubmarkets
 	g.require(getSportsMatchingMarketsRequestFieldIncludeSubmarkets)
 }
 
+// SetIncludeRules sets the IncludeRules field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (g *GetSportsMatchingMarketsRequest) SetIncludeRules(includeRules *bool) {
+	g.IncludeRules = includeRules
+	g.require(getSportsMatchingMarketsRequestFieldIncludeRules)
+}
+
 var (
 	listPolymarketWalletPositionsRequestFieldAddress  = big.NewInt(1 << 0)
 	listPolymarketWalletPositionsRequestFieldUsername = big.NewInt(1 << 1)
@@ -424,12 +434,13 @@ var (
 	lookupSportsMatchingMarketsRequestFieldIncludeSettled    = big.NewInt(1 << 2)
 	lookupSportsMatchingMarketsRequestFieldPlayerPropMatch   = big.NewInt(1 << 3)
 	lookupSportsMatchingMarketsRequestFieldIncludeSubmarkets = big.NewInt(1 << 4)
+	lookupSportsMatchingMarketsRequestFieldIncludeRules      = big.NewInt(1 << 5)
 )
 
 type LookupSportsMatchingMarketsRequest struct {
 	// Canonical event key(s) to look up (for example, `nba-okc-sas-2026-10-20`), matched case-insensitively. Repeat the parameter for several events (do not comma-join them), and combine it freely with `source_id`, up to 100 unique identifiers in all. At least one `event_id` or `source_id` is required. A venue's own ID here (a Kalshi ticker, a numeric ID, an SX Bet `L…` fixture, an `0x` hash, a ULID or a `{provider}:{id}` composite) is a `400` telling you to send it as `source_id`, and so is an empty value. So is a value that matches no canonical event but is a venue's identifier, most often a Polymarket slug: a night game's slug carries the UTC date (`nfl-sea-den-2026-10-16` for the canonical `nfl-sea-den-2026-10-15`), and Polymarket spells some teams differently (`cal` for Calgary, `la` for the Rams).
 	EventID []*string `json:"-" url:"event_id,omitempty"`
-	// Venue identifier(s) to look up, as `{provider}:{id}`: any `market_id`, `market_slug` or `event_id` that a `data[].submarkets[].source_markets[]` entry publishes, prefixed with that entry's `provider`. On Polymarket, Predict and AlphaArcade an outcome token (`outcomes[].outcome_id`) works too, because those tokens identify one market, and on Polymarket so does a market's `conditionId`, the ID wallet positions carry. Elsewhere outcome IDs are side names such as `yes` that repeat in every market: Kalshi's and Pred's `yes`/`no` and SX Bet's `outcomeOne`/`outcomeTwo` are a `400` that points to `market_id`. For example `kalshi:KXNBAGAME-26OCT20OKCSAS` (an event ticker), `kalshi:KXNBAGAME-26OCT20OKCSAS-OKC` (a market ticker), `sxbet:L19766755` (a fixture), or Pred's `pred:<parent_market_id>:<child_market_id>` pair. Only the text before the first colon is the provider, and it must be one of `kalshi`, `polymarket`, `predict`, `sxbet`, `alpha-arcade`, `prophetx` or `pred`; anything else is a `400` naming the value. Matching is case-insensitive. `lookups` reports every identifier under its spelling as sent (whitespace around the provider and ID trimmed), with the canonical events it found. Repeat the parameter for several identifiers, across providers (a comma-joined list or an empty value is a `400`); combined with `event_id`, up to 100 unique identifiers in all. At least one `event_id` or `source_id` is required. A lookup finds the event an identifier belongs to and, by default, returns it in full, so the submarket the identifier names is in it unless `include_submarkets=false`. A player prop finds its game under any `player_prop_match` policy when the game has another matched submarket, while the prop itself appears only when the policy admits it; a game matched only on props the policy excludes is not returned.
+	// Venue identifier(s) to look up, as `{provider}:{id}`: any `market_id`, `market_slug` or `event_id` that a `data[].submarkets[].source_markets[]` entry publishes, prefixed with that entry's `provider`. On Polymarket, Predict and AlphaArcade an outcome token (`outcomes[].outcome_id`) works too, because those tokens identify one market, and on Polymarket so does a market's `conditionId`, the ID wallet positions carry. Elsewhere outcome IDs are side names such as `yes` that repeat in every market: Kalshi's, Pred's and Limitless's `yes`/`no` and SX Bet's `outcomeOne`/`outcomeTwo` are a `400` that points to `market_id`. For example `kalshi:KXNBAGAME-26OCT20OKCSAS` (an event ticker), `kalshi:KXNBAGAME-26OCT20OKCSAS-OKC` (a market ticker), `sxbet:L19766755` (a fixture), or Pred's `pred:<parent_market_id>:<child_market_id>` pair, or a Limitless market's slug. Only the text before the first colon is the provider, and it must be one of `kalshi`, `polymarket`, `predict`, `sxbet`, `alpha-arcade`, `prophetx`, `pred` or `limitless`; anything else is a `400` naming the value. Matching is case-insensitive. `lookups` reports every identifier under its spelling as sent (whitespace around the provider and ID trimmed), with the canonical events it found. Repeat the parameter for several identifiers, across providers (a comma-joined list or an empty value is a `400`); combined with `event_id`, up to 100 unique identifiers in all. At least one `event_id` or `source_id` is required. A lookup finds the event an identifier belongs to and, by default, returns it in full, so the submarket the identifier names is in it unless `include_submarkets=false`. A player prop finds its game under any `player_prop_match` policy when the game has another matched submarket, while the prop itself appears only when the policy admits it; a game matched only on props the policy excludes is not returned.
 	SourceID []*string `json:"-" url:"source_id,omitempty"`
 	// Selects which events the lookup searches. Defaults to `false`: only events whose scheduled start has not certainly passed — today's games, plus a one-day grace so a late start that runs past midnight Eastern is never dropped mid-play. Set it to `true` to also search the settled archive: events that left the live matching run, usually because the venues settled or delisted them. That adds games whose date is further in the past, including ones a venue still lists as open, and games a venue cancelled, which can be future-dated; the default leaves a cancelled game out.
 	//
@@ -439,6 +450,8 @@ type LookupSportsMatchingMarketsRequest struct {
 	PlayerPropMatch *LookupSportsMatchingMarketsRequestPlayerPropMatch `json:"-" url:"player_prop_match,omitempty"`
 	// When `true`, each event lists every matched submarket (spreads, totals, period lines and player props); when `false`, only its full-game moneyline, and an event appears only when that is matched. Defaults to `true` on a lookup, which returns the events it finds in full: a spread ticker shows its spread. Every submarket has the same shape, so code written against the moneyline reads the rest unchanged. This is an identity mapping only; fetch current status, quotes, and liquidity from the referenced market resources. Explicit `player_prop_match` requires this to be `true`.
 	IncludeSubmarkets *bool `json:"-" url:"include_submarkets,omitempty"`
+	// When `true`, every moneyline, spread and total also lists `rule_comparisons`: the three rows (`tie`, `overtime` and `push`), each with every source market's value, a description and an evidence link, that sit behind its `settlement_equivalence`. When `false`, the default, a game line carries `settlement_equivalence` alone: the verdict is always there and only the rows are left out. The rows are about 60% of an event's bytes on a busy football slate, and a lookup returns every submarket, so ask for them when you want the evidence. A player prop always carries its own matrix, whatever this is. The flag changes what each event lists and never which events are found.
+	IncludeRules *bool `json:"-" url:"include_rules,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
 	explicitFields *big.Int `json:"-" url:"-"`
@@ -484,6 +497,13 @@ func (l *LookupSportsMatchingMarketsRequest) SetPlayerPropMatch(playerPropMatch 
 func (l *LookupSportsMatchingMarketsRequest) SetIncludeSubmarkets(includeSubmarkets *bool) {
 	l.IncludeSubmarkets = includeSubmarkets
 	l.require(lookupSportsMatchingMarketsRequestFieldIncludeSubmarkets)
+}
+
+// SetIncludeRules sets the IncludeRules field and marks it as non-optional;
+// this prevents an empty or null value for this field from being omitted during serialization.
+func (l *LookupSportsMatchingMarketsRequest) SetIncludeRules(includeRules *bool) {
+	l.IncludeRules = includeRules
+	l.require(lookupSportsMatchingMarketsRequestFieldIncludeRules)
 }
 
 // Error body returned with HTTP 409. The identifier you sent is well-formed but not unique: it names a real resource on more than one provider, and nothing in the request says which one you meant. Polymarket and Predict share both the bare-numeric and kebab-case identifier shapes and their id spaces genuinely overlap, so this is a routine outcome rather than an edge case — measured 2026-08-25, 53 of 93 Predict market ids drawn from `GET /v1/matching-markets/sports` also resolved on Polymarket.
@@ -856,7 +876,7 @@ func (c *CanonicalSportsEvent) String() string {
 	return fmt.Sprintf("%#v", c)
 }
 
-// One outcome of a canonical submarket. A moneyline lists the away team first, a spread `cover` before `not_cover`, and a total or player prop `over` before `under`.
+// One outcome of a canonical submarket. A moneyline lists the away team first, a spread `cover` before `not_cover`, and a total, team total or player prop `over` before `under`.
 var (
 	canonicalSportsOutcomeFieldKey   = big.NewInt(1 << 0)
 	canonicalSportsOutcomeFieldLabel = big.NewInt(1 << 1)
@@ -865,7 +885,7 @@ var (
 )
 
 type CanonicalSportsOutcome struct {
-	// What the outcome pays on: `winner:<participant key>` on a moneyline, `cover:<subject>` and `not_cover:<subject>` on a spread (the subject is the side giving points), and `over` and `under` on a total or a player prop. Each source outcome's `canonical_outcome_key` is one of these.
+	// What the outcome pays on: `winner:<participant key>` on a moneyline, `cover:<subject>` and `not_cover:<subject>` on a spread (the subject is the side giving points), and `over` and `under` on a total, a team total (the subject's own points) or a player prop. Each source outcome's `canonical_outcome_key` is one of these.
 	Key   string `json:"key" url:"key"`
 	Label string `json:"label" url:"label"`
 	Type  string `json:"type" url:"type"`
@@ -1111,6 +1131,7 @@ var (
 )
 
 type CanonicalSportsRules struct {
+	// Overtime treatment the submarket's key carries: `incl_ot` (the default) or `reg` on a full-game total or team total, and `incl_ot` on a second-half or fourth-quarter spread, total or team total whose venues' own rules count overtime. A half or quarter means regulation play, so a regulation line publishes no `rules`. Kept for compatibility; the `overtime` row of the submarket's `rule_comparisons` (sent with `include_rules=true`) is each venue's own statement of the same rule and never contradicts it.
 	Settlement *string `json:"settlement,omitempty" url:"settlement,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
@@ -1190,7 +1211,7 @@ func (c *CanonicalSportsRules) String() string {
 	return fmt.Sprintf("%#v", c)
 }
 
-// One venue market matched to a canonical submarket. Every provider uses the same fields: `provider`; the provider's parent `event_id`, for `GET /v1/events/{event_id}`; the market's own `market_id`, for `GET /v1/markets/{market_id}`; and outcomes whose `outcome_id`s are the ones market detail returns, each mapped to a canonical outcome. Send either ID with this market's `provider`, as the composite `{provider}:{id}` or as the `provider` query parameter: a bare Predict ID can also name a Polymarket market, and AlphaArcade, ProphetX and Pred IDs are never inferred. Any of `event_id`, `market_id` or `market_slug`, prefixed with `provider`, finds this event again through `source_id`.
+// One venue market matched to a canonical submarket. Every provider uses the same fields: `provider`; the provider's parent `event_id`, for `GET /v1/events/{event_id}`; the market's own `market_id`, for `GET /v1/markets/{market_id}`; and outcomes whose `outcome_id`s are the ones market detail returns, each mapped to a canonical outcome. Send either ID with this market's `provider`, as the composite `{provider}:{id}` or as the `provider` query parameter: a bare Predict ID can also name a Polymarket market, and AlphaArcade, ProphetX, Pred and Limitless IDs are never inferred. Any of `event_id`, `market_id` or `market_slug`, prefixed with `provider`, finds this event again through `source_id`.
 var (
 	canonicalSportsSourceMarketFieldProvider   = big.NewInt(1 << 0)
 	canonicalSportsSourceMarketFieldEventID    = big.NewInt(1 << 1)
@@ -1202,7 +1223,7 @@ var (
 
 type CanonicalSportsSourceMarket struct {
 	Provider CanonicalSportsSourceMarketProvider `json:"provider" url:"provider"`
-	// The provider's own parent event for this market, for `GET /v1/events/{event_id}`: Kalshi's event ticker (a game's spread and total markets sit under events of their own), Polymarket's event slug, Predict's market ID, SX Bet's `L…` fixture ID, AlphaArcade's parent market ULID, ProphetX's integer event ID, or Pred's parent market ID. It names a parent, not this market, so it is not a `market_id`: a Kalshi event ticker answers `404` on market detail.
+	// The provider's own parent event for this market, for `GET /v1/events/{event_id}`: Kalshi's event ticker (a game's spread and total markets sit under events of their own), Polymarket's event slug, Predict's market ID, SX Bet's `L…` fixture ID, AlphaArcade's parent market ULID, ProphetX's integer event ID, Pred's parent market ID, or Limitless's market slug. It names a parent, not this market, so it is not a `market_id`: a Kalshi event ticker answers `404` on market detail.
 	EventID string `json:"event_id" url:"event_id"`
 	// Exact provider-native market identifier. It resolves on `GET /v1/markets/{market_id}`, either as-is or prefixed with this row's `provider` in the composite form `{provider}:{market_id}`. A ProphetX player prop's `market_id` names the line it was matched on, `<event_id>:<market_id>:<line>`: the pair alone resolves to whichever line ProphetX currently favours, and that moves before kickoff.
 	//
@@ -1371,6 +1392,7 @@ const (
 	CanonicalSportsSourceMarketProviderAlphaArcade CanonicalSportsSourceMarketProvider = "alpha-arcade"
 	CanonicalSportsSourceMarketProviderProphetx    CanonicalSportsSourceMarketProvider = "prophetx"
 	CanonicalSportsSourceMarketProviderPred        CanonicalSportsSourceMarketProvider = "pred"
+	CanonicalSportsSourceMarketProviderLimitless   CanonicalSportsSourceMarketProvider = "limitless"
 )
 
 func NewCanonicalSportsSourceMarketProviderFromString(s string) (CanonicalSportsSourceMarketProvider, error) {
@@ -1389,6 +1411,8 @@ func NewCanonicalSportsSourceMarketProviderFromString(s string) (CanonicalSports
 		return CanonicalSportsSourceMarketProviderProphetx, nil
 	case "pred":
 		return CanonicalSportsSourceMarketProviderPred, nil
+	case "limitless":
+		return CanonicalSportsSourceMarketProviderLimitless, nil
 	}
 	var t CanonicalSportsSourceMarketProvider
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
@@ -1408,13 +1432,13 @@ var (
 type CanonicalSportsSourceOutcome struct {
 	// Canonical outcome this source-native selection represents: read the team or side it pays on from here, not from `label`.
 	CanonicalOutcomeKey string `json:"canonical_outcome_key" url:"canonical_outcome_key"`
-	// The venue's own name for this selection, as market detail names it: Polymarket's and AlphaArcade's outcome names, SX Bet's and ProphetX's selection names (a spread label carries its sign), and `Yes` or `No` on Kalshi and Pred, whose markets are binary questions such as "Atlanta wins".
+	// The venue's own name for this selection, as market detail names it: Polymarket's and AlphaArcade's outcome names, SX Bet's and ProphetX's selection names (a spread label carries its sign), and `Yes` or `No` on Kalshi, Pred and Limitless, whose markets are binary questions such as "Atlanta wins".
 	Label string `json:"label" url:"label"`
 	// Exact provider-native outcome identifier. It is never a universal cross-provider outcome ID.
 	//
 	// On every provider this is the same value `GET /v1/markets/{market_id}` returns as `outcomes[].outcome_id` for the market named by this row's `market_id`, so the two surfaces join directly.
 	//
-	// `polymarket`, `predict` and `alpha-arcade` publish a per-outcome token (Polymarket CLOB token id, Predict on-chain id, AlphaArcade CLOB token id), so `source_id={provider}:{outcome_id}` finds this event from the token alone. A token is unique within its provider, not across them: AlphaArcade mirrors Polymarket markets and publishes their CLOB tokens, so the same token can appear under both. Key a token by `provider` as well. `sxbet` and `kalshi` publish no per-outcome token at all, so their references are market-scoped and must be read together with `market_id`: an SX Bet market has one hash and two named positions (`outcomeOne` / `outcomeTwo`), and a Kalshi market is binary (`yes` / `no`). Both are the spelling the venue itself uses to address a side — SX Bet keys its order-book snapshot by `outcomeOne`/`outcomeTwo`, and Kalshi keys its book by `yes`/`no` and reports a trade's `taker_side` the same way. `prophetx` publishes small market-scoped integer outcome ids (e.g. `4`, `5`) that join to the same market's detail row, like SX Bet's positions, and `pred` publishes `yes` / `no` like Kalshi. A market-scoped outcome id does not identify a market: `source_id` answers `400` for Kalshi's, Pred's and SX Bet's.
+	// `polymarket`, `predict` and `alpha-arcade` publish a per-outcome token (Polymarket CLOB token id, Predict on-chain id, AlphaArcade CLOB token id), so `source_id={provider}:{outcome_id}` finds this event from the token alone. A token is unique within its provider, not across them: AlphaArcade mirrors Polymarket markets and publishes their CLOB tokens, so the same token can appear under both. Key a token by `provider` as well. `sxbet` and `kalshi` publish no per-outcome token at all, so their references are market-scoped and must be read together with `market_id`: an SX Bet market has one hash and two named positions (`outcomeOne` / `outcomeTwo`), and a Kalshi market is binary (`yes` / `no`). Both are the spelling the venue itself uses to address a side — SX Bet keys its order-book snapshot by `outcomeOne`/`outcomeTwo`, and Kalshi keys its book by `yes`/`no` and reports a trade's `taker_side` the same way. `prophetx` publishes small market-scoped integer outcome ids (e.g. `4`, `5`) that join to the same market's detail row, like SX Bet's positions, and `pred` and `limitless` publish `yes` / `no` like Kalshi. A market-scoped outcome id does not identify a market: `source_id` answers `400` for Kalshi's, Pred's, Limitless's and SX Bet's.
 	OutcomeID string `json:"outcome_id" url:"outcome_id"`
 	// Optional source-native side such as `yes` or `no`.
 	Side *string `json:"side,omitempty" url:"side,omitempty"`
@@ -1690,19 +1714,23 @@ var (
 )
 
 type CanonicalSportsSubmarket struct {
-	// Player props only. `equivalent` requires a complete reviewed profile for every source contract; `different` means at least one known payout-rule difference, even if other rules are unknown; `unverified` means equivalence has not been established and no known difference was found. Absence on game lines makes no claim about their full settlement equivalence.
+	// Whether the venues in this submarket settle it the same way, across the rules in `rule_comparisons`. Always present on moneyline, spread, total, team total and player prop submarkets, whether or not `include_rules` asked for the rows behind it. `equivalent` means every rule is known for every venue and agrees; `different` means at least one known difference, even if other rules are unknown; `unverified` means no difference was found but a rule is unknown for at least one venue, so equivalence has not been established. A player prop is `equivalent` only with a complete reviewed profile for every source contract. A game line is compared on three rules, `tie`, `overtime` and `push`, and the comparison never changes which venues are paired: it is the evidence a consumer needs to decide whether a pairing is a hedge. In practice a game line differs on a tie only in a league that can end a game level, which today is the NFL (about 0.3% of games).
 	SettlementEquivalence *CanonicalSportsSubmarketSettlementEquivalence `json:"settlement_equivalence,omitempty" url:"settlement_equivalence,omitempty"`
-	// Player props only. A deterministic matrix covering all nine settlement dimensions. Filter rows with `comparison=different` for known differences and `comparison=unverified` for gaps. Row-level agreement is not a complete contract review. Source values reference individual native market IDs, not venue-wide defaults. Evidence describes captured source clauses; additional unreviewed terms can apply. No prices or payout estimates.
+	// The rule matrix behind `settlement_equivalence`: one row per rule, each listing every source market's value. A moneyline, spread, total or team total carries three rows, `tie`, `overtime` and `push`, only when the request sent `include_rules=true`; without it they are omitted and the verdict stands alone. A player prop always carries its nine. Filter rows with `comparison=different` for known differences and `comparison=unverified` for gaps. Row-level agreement is not a complete contract review. Source values reference individual native market IDs, not venue-wide defaults. Evidence describes captured source clauses; additional unreviewed terms can apply. No prices or payout estimates.
 	RuleComparisons []*PlayerPropRuleComparison `json:"rule_comparisons,omitempty" url:"rule_comparisons,omitempty"`
-	// Stable canonical submarket key within the event.
-	Key         string `json:"key" url:"key"`
-	MarketType  string `json:"market_type" url:"market_type"`
-	Segment     string `json:"segment" url:"segment"`
+	// Stable canonical submarket key within the event. A second-half or fourth-quarter spread, total or team total whose venues' own rules count overtime ends its detail with `:incl_ot` (`spread|half:2|spread:jax:incl_ot|2.5`); the same line on a venue whose rules exclude overtime has the key without the token, so the two are never one submarket. A team total's key names its team and states its overtime rule the way a game total's does (`team_total|full|team_total:phi:incl_ot|24.5`), so two teams' lines never share a key.
+	Key string `json:"key" url:"key"`
+	// What the submarket is: `moneyline`, `spread`, `total` (the game's total points), `team_total` (one team's own points, such as the Eagles over 24.5; its `subject` is the team), or `player_prop`. Not an enum: a value a client does not know yet is a new kind of market, never a different shape of an old one, and a client reads it as text. A team total is matched for the NFL, on Kalshi and Polymarket.
+	MarketType string `json:"market_type" url:"market_type"`
+	// `full`, `half:1`, `half:2`, or `quarter:1` to `quarter:4`. A half or quarter means regulation play, except a second half or fourth quarter whose venues count overtime, which says so in `rules.settlement` (`incl_ot`), in its `key` and in its `display_name`.
+	Segment string `json:"segment" url:"segment"`
+	// Human-readable label. A second-half or fourth-quarter line that counts overtime ends with ` (incl. OT)`, because a bare `2H` reads as regulation play. A team total names its team: `Philadelphia Eagles Total 24.5`, `1H Philadelphia Eagles Total 13.5`.
 	DisplayName string `json:"display_name" url:"display_name"`
-	Metric      string `json:"metric" url:"metric"`
-	// Unsigned threshold for totals and player props; signed handicap for spreads. Omitted for moneyline markets.
+	// What the submarket measures: `winner`, `spread`, `total`, a player prop's statistic, or, for a team total, the team's own score in its sport's unit (`points` for the NFL).
+	Metric string `json:"metric" url:"metric"`
+	// Unsigned threshold for totals, team totals and player props; signed handicap for spreads. Omitted for moneyline markets.
 	Line *float64 `json:"line,omitempty" url:"line,omitempty"`
-	// Participant or player whose line is represented. Present for subject-owned markets such as spreads and player props; omitted for event-owned moneylines and totals.
+	// Participant or player whose line is represented. Present for subject-owned markets such as spreads, team totals and player props; omitted for event-owned moneylines and totals.
 	Subject       *CanonicalSportsSubject        `json:"subject,omitempty" url:"subject,omitempty"`
 	Rules         *CanonicalSportsRules          `json:"rules,omitempty" url:"rules,omitempty"`
 	Outcomes      []*CanonicalSportsOutcome      `json:"outcomes" url:"outcomes"`
@@ -1939,7 +1967,7 @@ func (c *CanonicalSportsSubmarket) String() string {
 	return fmt.Sprintf("%#v", c)
 }
 
-// Player props only. `equivalent` requires a complete reviewed profile for every source contract; `different` means at least one known payout-rule difference, even if other rules are unknown; `unverified` means equivalence has not been established and no known difference was found. Absence on game lines makes no claim about their full settlement equivalence.
+// Whether the venues in this submarket settle it the same way, across the rules in `rule_comparisons`. Always present on moneyline, spread, total, team total and player prop submarkets, whether or not `include_rules` asked for the rows behind it. `equivalent` means every rule is known for every venue and agrees; `different` means at least one known difference, even if other rules are unknown; `unverified` means no difference was found but a rule is unknown for at least one venue, so equivalence has not been established. A player prop is `equivalent` only with a complete reviewed profile for every source contract. A game line is compared on three rules, `tie`, `overtime` and `push`, and the comparison never changes which venues are paired: it is the evidence a consumer needs to decide whether a pairing is a hedge. In practice a game line differs on a tie only in a league that can end a game level, which today is the NFL (about 0.3% of games).
 type CanonicalSportsSubmarketSettlementEquivalence string
 
 const (
@@ -5977,6 +6005,7 @@ func (p *PlansResponse) String() string {
 	return fmt.Sprintf("%#v", p)
 }
 
+// One rule of a submarket's rule matrix, compared across its venues. The name is historical: player props introduced it, and game lines reuse it with the rules `tie`, `overtime` and `push` instead of a second type, so one model reads both. A player prop carries the nine rules from `non_participation` to `resolution_source`; a moneyline, spread or total carries `tie`, `overtime` and `push`, when the request sent `include_rules=true`.
 var (
 	playerPropRuleComparisonFieldRule         = big.NewInt(1 << 0)
 	playerPropRuleComparisonFieldLabel        = big.NewInt(1 << 1)
@@ -5985,6 +6014,7 @@ var (
 )
 
 type PlayerPropRuleComparison struct {
+	// `overtime` is shared by props and game lines. `tie` and `push` appear on game lines only: `tie` is what the venue does when the game or period ends level, and `push` what it does when the result lands exactly on a whole-number line.
 	Rule PlayerPropRuleComparisonRule `json:"rule" url:"rule"`
 	// Human-readable name of the rule dimension.
 	Label string `json:"label" url:"label"`
@@ -6137,6 +6167,7 @@ func (p PlayerPropRuleComparisonComparison) Ptr() *PlayerPropRuleComparisonCompa
 	return &p
 }
 
+// `overtime` is shared by props and game lines. `tie` and `push` appear on game lines only: `tie` is what the venue does when the game or period ends level, and `push` what it does when the result lands exactly on a whole-number line.
 type PlayerPropRuleComparisonRule string
 
 const (
@@ -6149,6 +6180,8 @@ const (
 	PlayerPropRuleComparisonRuleCancellation     PlayerPropRuleComparisonRule = "cancellation"
 	PlayerPropRuleComparisonRuleInterruption     PlayerPropRuleComparisonRule = "interruption"
 	PlayerPropRuleComparisonRuleResolutionSource PlayerPropRuleComparisonRule = "resolution_source"
+	PlayerPropRuleComparisonRuleTie              PlayerPropRuleComparisonRule = "tie"
+	PlayerPropRuleComparisonRulePush             PlayerPropRuleComparisonRule = "push"
 )
 
 func NewPlayerPropRuleComparisonRuleFromString(s string) (PlayerPropRuleComparisonRule, error) {
@@ -6171,6 +6204,10 @@ func NewPlayerPropRuleComparisonRuleFromString(s string) (PlayerPropRuleComparis
 		return PlayerPropRuleComparisonRuleInterruption, nil
 	case "resolution_source":
 		return PlayerPropRuleComparisonRuleResolutionSource, nil
+	case "tie":
+		return PlayerPropRuleComparisonRuleTie, nil
+	case "push":
+		return PlayerPropRuleComparisonRulePush, nil
 	}
 	var t PlayerPropRuleComparisonRule
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
@@ -6180,6 +6217,7 @@ func (p PlayerPropRuleComparisonRule) Ptr() *PlayerPropRuleComparisonRule {
 	return &p
 }
 
+// One source market's value for one rule. Shared by player props and game lines, like `PlayerPropRuleComparison`.
 var (
 	playerPropRuleSourceValueFieldProvider    = big.NewInt(1 << 0)
 	playerPropRuleSourceValueFieldMarketID    = big.NewInt(1 << 1)
@@ -6193,11 +6231,11 @@ type PlayerPropRuleSourceValue struct {
 	Provider string `json:"provider" url:"provider"`
 	// Exact native market ID matching a source_markets entry.
 	MarketID string `json:"market_id" url:"market_id"`
-	// Machine-readable observed rule value, or `unknown`. Values are extensible; clients must tolerate unfamiliar values and read description. Never interpret unknown as no restriction.
+	// Machine-readable observed rule value, or `unknown`. Values are extensible; clients must tolerate unfamiliar values and read description. Never interpret unknown as no restriction. Game lines use `tie`: `half_payout` (each side is paid half), `void` (stakes returned), `loses` (the named result loses), `separate_outcome` (the venue lists a tie contract of its own), `not_possible` (the contract cannot end level: a league that plays on until one side wins, or a half-point line); `overtime`: `included` or `excluded`; and `push`: `void`, `loses` or `not_applicable` (a moneyline or a half-point line has nothing to land on). Each is `unknown` where the venue's rules do not say.
 	Value string `json:"value" url:"value"`
 	// Plain-language meaning, including relevant qualifications.
 	Description string `json:"description" url:"description"`
-	// Source contract containing the observed clause; omitted for unknown rules.
+	// Source contract containing the observed clause; omitted for unknown rules. For a game line it is the venue's published rules document (a Kalshi contract-terms PDF, SX Bet's help center, a ProphetX CFTC filing) or the record holding the market's own rules text.
 	EvidenceURL *string `json:"evidence_url,omitempty" url:"evidence_url,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted

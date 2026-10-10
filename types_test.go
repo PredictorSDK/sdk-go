@@ -690,6 +690,14 @@ func TestSettersGetSportsMatchingMarketsRequest(t *testing.T) {
 		assert.NotNil(t, obj.explicitFields)
 	})
 
+	t.Run("SetIncludeRules", func(t *testing.T) {
+		obj := &GetSportsMatchingMarketsRequest{}
+		var fernTestValueIncludeRules *bool
+		obj.SetIncludeRules(fernTestValueIncludeRules)
+		assert.Equal(t, fernTestValueIncludeRules, obj.IncludeRules)
+		assert.NotNil(t, obj.explicitFields)
+	})
+
 }
 
 func TestSettersMarkExplicitGetSportsMatchingMarketsRequest(t *testing.T) {
@@ -941,6 +949,37 @@ func TestSettersMarkExplicitGetSportsMatchingMarketsRequest(t *testing.T) {
 		// It verifies that setting a field via setter allows successful JSON round-trip
 	})
 
+	t.Run("SetIncludeRules_MarksExplicit", func(t *testing.T) {
+		t.Parallel()
+		// Arrange
+		obj := &GetSportsMatchingMarketsRequest{}
+		var fernTestValueIncludeRules *bool
+
+		// Act
+		obj.SetIncludeRules(fernTestValueIncludeRules)
+
+		// Assert - object with explicitly set field can be marshaled/unmarshaled
+		bytes, err := json.Marshal(obj)
+		require.NoError(t, err, "marshaling should succeed for test setup")
+
+		// This test ensures JSON marshaling and unmarshaling succeed when the field has a zero/nil value
+		// Detect if marshaled JSON is an object or primitive to use correct unmarshal target
+		if len(bytes) > 0 && bytes[0] == '{' {
+			// JSON object - unmarshal into map
+			var unmarshaled map[string]interface{}
+			err = json.Unmarshal(bytes, &unmarshaled)
+			require.NoError(t, err, "unmarshaling should succeed for test verification")
+		} else {
+			// JSON primitive (string, number, boolean, null) - unmarshal into interface{}
+			var unmarshaled interface{}
+			err = json.Unmarshal(bytes, &unmarshaled)
+			require.NoError(t, err, "unmarshaling should succeed for test verification")
+		}
+
+		// Note: This does not explicitly assert the presence of a specific JSON field
+		// It verifies that setting a field via setter allows successful JSON round-trip
+	})
+
 }
 
 func TestSettersListPolymarketWalletPositionsRequest(t *testing.T) {
@@ -1146,6 +1185,14 @@ func TestSettersLookupSportsMatchingMarketsRequest(t *testing.T) {
 		assert.NotNil(t, obj.explicitFields)
 	})
 
+	t.Run("SetIncludeRules", func(t *testing.T) {
+		obj := &LookupSportsMatchingMarketsRequest{}
+		var fernTestValueIncludeRules *bool
+		obj.SetIncludeRules(fernTestValueIncludeRules)
+		assert.Equal(t, fernTestValueIncludeRules, obj.IncludeRules)
+		assert.NotNil(t, obj.explicitFields)
+	})
+
 }
 
 func TestSettersMarkExplicitLookupSportsMatchingMarketsRequest(t *testing.T) {
@@ -1281,6 +1328,37 @@ func TestSettersMarkExplicitLookupSportsMatchingMarketsRequest(t *testing.T) {
 
 		// Act
 		obj.SetIncludeSubmarkets(fernTestValueIncludeSubmarkets)
+
+		// Assert - object with explicitly set field can be marshaled/unmarshaled
+		bytes, err := json.Marshal(obj)
+		require.NoError(t, err, "marshaling should succeed for test setup")
+
+		// This test ensures JSON marshaling and unmarshaling succeed when the field has a zero/nil value
+		// Detect if marshaled JSON is an object or primitive to use correct unmarshal target
+		if len(bytes) > 0 && bytes[0] == '{' {
+			// JSON object - unmarshal into map
+			var unmarshaled map[string]interface{}
+			err = json.Unmarshal(bytes, &unmarshaled)
+			require.NoError(t, err, "unmarshaling should succeed for test verification")
+		} else {
+			// JSON primitive (string, number, boolean, null) - unmarshal into interface{}
+			var unmarshaled interface{}
+			err = json.Unmarshal(bytes, &unmarshaled)
+			require.NoError(t, err, "unmarshaling should succeed for test verification")
+		}
+
+		// Note: This does not explicitly assert the presence of a specific JSON field
+		// It verifies that setting a field via setter allows successful JSON round-trip
+	})
+
+	t.Run("SetIncludeRules_MarksExplicit", func(t *testing.T) {
+		t.Parallel()
+		// Arrange
+		obj := &LookupSportsMatchingMarketsRequest{}
+		var fernTestValueIncludeRules *bool
+
+		// Act
+		obj.SetIncludeRules(fernTestValueIncludeRules)
 
 		// Assert - object with explicitly set field can be marshaled/unmarshaled
 		bytes, err := json.Marshal(obj)
@@ -15776,6 +15854,13 @@ func TestEnumCanonicalSportsSourceMarketProvider(t *testing.T) {
 		assert.Equal(t, CanonicalSportsSourceMarketProvider("pred"), val, "enum value should match expected wire value")
 	})
 
+	t.Run("NewFromString_limitless", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewCanonicalSportsSourceMarketProviderFromString("limitless")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, CanonicalSportsSourceMarketProvider("limitless"), val, "enum value should match expected wire value")
+	})
+
 	t.Run("NewFromString_Invalid", func(t *testing.T) {
 		_, err := NewCanonicalSportsSourceMarketProviderFromString("invalid_value_that_does_not_exist")
 		assert.Error(t, err)
@@ -16917,6 +17002,20 @@ func TestEnumPlayerPropRuleComparisonRule(t *testing.T) {
 		val, err := NewPlayerPropRuleComparisonRuleFromString("resolution_source")
 		assert.NoError(t, err, "valid enum value should not return error")
 		assert.Equal(t, PlayerPropRuleComparisonRule("resolution_source"), val, "enum value should match expected wire value")
+	})
+
+	t.Run("NewFromString_tie", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewPlayerPropRuleComparisonRuleFromString("tie")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, PlayerPropRuleComparisonRule("tie"), val, "enum value should match expected wire value")
+	})
+
+	t.Run("NewFromString_push", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewPlayerPropRuleComparisonRuleFromString("push")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, PlayerPropRuleComparisonRule("push"), val, "enum value should match expected wire value")
 	})
 
 	t.Run("NewFromString_Invalid", func(t *testing.T) {
