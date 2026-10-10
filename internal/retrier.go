@@ -1,15 +1,20 @@
 package internal
 
 import (
+	"context"
 	"crypto/rand"
+	"errors"
+	"io"
 	"math/big"
+	"net"
 	"net/http"
 	"strconv"
+	"syscall"
 	"time"
 )
 
 const (
-	defaultRetryAttempts = 2
+	defaultRetryAttempts = 3
 	minRetryDelay        = 1000 * time.Millisecond
 	maxRetryDelay        = 60000 * time.Millisecond
 )
@@ -132,7 +137,36 @@ func (r *Retrier) run(
 
 	response, err := fn(request)
 	if err != nil {
-		return nil, err
+		// No response arrived. A connection that failed before one
+		// (refused, reset, or closed by the server) is retried like a
+		// retryable status; a timeout, a cancelled context and every other
+		// error are returned at once.
+		if retryAttempt+1 >= maxRetryAttempts || !isRetryableTransportError(request, err) {
+			return nil, err
+		}
+
+		delay, delayErr := r.exponentialBackoff(retryAttempt)
+		if delayErr != nil {
+			return nil, delayErr
+		}
+
+		// Wait out the delay unless the caller's context ends first.
+		timer := time.NewTimer(delay)
+		select {
+		case <-request.Context().Done():
+			timer.Stop()
+			return nil, request.Context().Err()
+		case <-timer.C:
+		}
+
+		return r.run(
+			fn,
+			request,
+			errorDecoder,
+			maxRetryAttempts,
+			retryAttempt+1,
+			err,
+		)
 	}
 
 	if r.shouldRetry(response) {
@@ -283,4 +317,48 @@ func (r *Retrier) addSymmetricJitter(delay time.Duration) (time.Duration, error)
 type retryOptions struct {
 	attempts uint
 	disabled bool
+}
+
+// Windows reports a refused, aborted or reset connection as one of these
+// WSA codes rather than the syscall constants of the same names, which have
+// other values there. No other platform uses these numbers.
+const (
+	wsaeConnAborted syscall.Errno = 10053
+	wsaeConnReset   syscall.Errno = 10054
+	wsaeConnRefused syscall.Errno = 10061
+)
+
+// isRetryableTransportError reports whether err, returned for a request that
+// got no response, means the connection failed before one arrived: the server
+// refused it, reset it, or closed it. A timeout, a cancelled or expired
+// context and anything else (a certificate error, an unresolvable host, a
+// malformed request) are not retried: a caller who cancelled or timed out
+// asked to stop, and waiting does not change the answer to the rest.
+func isRetryableTransportError(request *http.Request, err error) bool {
+	if request.Context().Err() != nil {
+		return false
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return false
+	}
+	for _, target := range []error{
+		syscall.ECONNREFUSED,
+		syscall.ECONNRESET,
+		syscall.ECONNABORTED,
+		syscall.EPIPE,
+		wsaeConnRefused,
+		wsaeConnReset,
+		wsaeConnAborted,
+		io.EOF,
+		io.ErrUnexpectedEOF,
+	} {
+		if errors.Is(err, target) {
+			return true
+		}
+	}
+	return false
 }

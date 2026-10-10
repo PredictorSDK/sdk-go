@@ -56,7 +56,8 @@ func WithQueryParameters(queryParameters url.Values) *core.QueryParametersOption
 	}
 }
 
-// WithMaxAttempts configures the maximum number of retry attempts.
+// WithMaxAttempts configures the maximum number of attempts for one request,
+// the first included. The default is 3: the request and two retries.
 func WithMaxAttempts(attempts uint) *core.MaxAttemptsOption {
 	return &core.MaxAttemptsOption{
 		MaxAttempts: attempts,
@@ -72,24 +73,8 @@ func WithMaxStreamBufSize(size int) *core.MaxBufSizeOption {
 	}
 }
 
-// WithMaxStreamReconnectAttempts caps the number of transparent mid-stream
-// reconnect attempts on streaming endpoints that support resumption. The
-// reconnect loop honors Last-Event-ID and any server-sent `retry:` directives.
-// Has no effect on endpoints that don't support resumption.
-func WithMaxStreamReconnectAttempts(attempts uint) *core.MaxStreamReconnectAttemptsOption {
-	return &core.MaxStreamReconnectAttemptsOption{
-		MaxStreamReconnectAttempts: attempts,
-	}
-}
-
-// WithoutStreamReconnection disables transparent mid-stream reconnection on
-// resumable SSE endpoints. Has no effect on non-resumable endpoints.
-func WithoutStreamReconnection() *core.WithoutStreamReconnectionOption {
-	return &core.WithoutStreamReconnectionOption{}
-}
-
 // WithoutRetries disables HTTP-level retry attempts for the request. Use this
-// instead of WithMaxAttempts(0), which falls through to the default of 2
+// instead of WithMaxAttempts(0), which falls through to the default of 3
 // attempts.
 func WithoutRetries() *core.WithoutRetriesOption {
 	return &core.WithoutRetriesOption{}

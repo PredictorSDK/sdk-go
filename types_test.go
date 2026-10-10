@@ -16825,6 +16825,13 @@ func TestEnumMarketDetailTradingFeesChargeBasis(t *testing.T) {
 		assert.Equal(t, MarketDetailTradingFeesChargeBasis("settlement_profit"), val, "enum value should match expected wire value")
 	})
 
+	t.Run("NewFromString_close_or_settlement", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewMarketDetailTradingFeesChargeBasisFromString("close_or_settlement")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, MarketDetailTradingFeesChargeBasis("close_or_settlement"), val, "enum value should match expected wire value")
+	})
+
 	t.Run("NewFromString_Invalid", func(t *testing.T) {
 		_, err := NewMarketDetailTradingFeesChargeBasisFromString("invalid_value_that_does_not_exist")
 		assert.Error(t, err)

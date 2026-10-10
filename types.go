@@ -86,7 +86,7 @@ type GetEventRequest struct {
 	//
 	// **A bare numeric id or slug is not unique across providers.** Polymarket and Predict both use these shapes and their id spaces overlap, so sending one without a provider can fail with `409` (see that response). Pass `?provider=` — every source market in `GET /v1/matching-markets/sports` carries the `provider` that goes with its `event_id`.
 	//
-	// **Sports identifiers expire.** Game tickers and slugs are delisted once an event settles, and Hyperliquid ids roll over daily. Take current ones from `GET /v1/matching-markets/sports` (every source market carries its provider's `event_id`) rather than copying one out of this reference.
+	// **Sports identifiers expire.** Game tickers and slugs are delisted once an event settles, and a Hyperliquid id lives as long as its question: its daily-recurring price outcomes roll over every day, while a season-long question stays listed until it resolves. Take current ones from `GET /v1/matching-markets/sports` (every source market carries its provider's `event_id`) rather than copying one out of this reference.
 	EventID string `json:"-" url:"-"`
 	// Optional provider override, spelled like the `provider` field of this response and every other one (it was `platform` until 2026-10-09; `?platform=` now answers `400` naming this parameter). When omitted, inferred from the `event_id` format: `KX…` → Kalshi, `L\d+` → SX Bet. Numeric IDs and kebab-case slugs are shared shape between Polymarket and Predict; in that case the service probes both and returns `409` rather than guessing if the identifier resolves on both. Hyperliquid question/outcome integer ids collide with these numerics and are not inferred — pass `?provider=hyperliquid` (alias `hl`). Pred parent ids share the `0x…64hex` shape with SX Bet market hashes and are not inferred either — pass `?provider=pred`. Passing `provider` explicitly skips the probe entirely and is the recommended call whenever you know it. Supplying a value that contradicts a composite `{provider}:` prefix is a `400`.
 	Provider *GetEventRequestProvider `json:"-" url:"provider,omitempty"`
@@ -126,7 +126,7 @@ type GetMarketRequest struct {
 	//
 	// **A bare numeric id or slug is not unique across providers.** Polymarket and Predict both use these shapes and their id spaces overlap, so sending one without a provider can fail with `409` (see that response). Prefer the composite form — it is what `GET /v1/markets` returns in `data[].id` — or pass `?provider=`.
 	//
-	// **Sports identifiers expire.** Kalshi game tickers, Polymarket game slugs, and Hyperliquid outcome ids are recycled or delisted as events settle — Hyperliquid's live catalog is a handful of daily-recurring outcomes, so any specific integer id there is valid for roughly a day. Take current ids from `GET /v1/markets` or `GET /v1/matching-markets/sports` rather than copying one out of this reference. Long-dated markets (Kalshi season futures, multi-year AlphaArcade questions) and settled Polymarket/Predict/SX Bet ids stay resolvable.
+	// **Sports identifiers expire.** Kalshi game tickers and Polymarket game slugs are delisted as events settle, and a Hyperliquid outcome id lives as long as its question: its daily-recurring price outcomes roll over every day, while a season-long question (a league winner, say) stays listed until it resolves. Take current ids from `GET /v1/markets` or `GET /v1/matching-markets/sports` rather than copying one out of this reference. Long-dated markets (Kalshi season futures, multi-year AlphaArcade questions) and settled Polymarket, Predict and SX Bet ids stay resolvable.
 	MarketID string `json:"-" url:"-"`
 	// Optional provider override, spelled like the `provider` field on `GET /v1/markets` rows and every other response (it was `platform` until 2026-10-09; `?platform=` now answers `400` naming this parameter). When omitted, inferred from the composite prefix or from the native ID format (`KX…` → Kalshi, `0x…64hex` → SX Bet — Pred ids share that shape and are never inferred; use `pred:…` or `?provider=pred`). Numeric IDs and kebab-case slugs are shared shape between Polymarket and Predict; in that case the service probes both and returns `409` rather than guessing if the identifier resolves on both. Hyperliquid integer ids collide with these numerics and are not inferred — use the composite `hyperliquid:<id>` or `?provider=hyperliquid` (alias `hl`). AlphaArcade ULIDs and Limitless slugs are not inferred either — use the composite form (`alpha-arcade:<ulid>`, `limitless:<slug>`) or the matching `?provider=` value. Pred pairs (`pred:<parent>:<child>`) are likewise composite/`?provider=` only. Passing `provider` explicitly skips the probe entirely and is the recommended call whenever you know it. When the override contradicts a composite prefix (e.g. `kalshi:X` with `?provider=polymarket`), the request returns 400.
 	Provider *GetMarketRequestProvider `json:"-" url:"provider,omitempty"`
@@ -1223,7 +1223,7 @@ var (
 
 type CanonicalSportsSourceMarket struct {
 	Provider CanonicalSportsSourceMarketProvider `json:"provider" url:"provider"`
-	// The provider's own parent event for this market, for `GET /v1/events/{event_id}`: Kalshi's event ticker (a game's spread and total markets sit under events of their own), Polymarket's event slug, Predict's market ID, SX Bet's `L…` fixture ID, AlphaArcade's parent market ULID, ProphetX's integer event ID, Pred's parent market ID, or Limitless's market slug. It names a parent, not this market, so it is not a `market_id`: a Kalshi event ticker answers `404` on market detail.
+	// The provider's own parent event for this market, for `GET /v1/events/{event_id}`: Kalshi's event ticker (a game's spread and total markets sit under events of their own), Polymarket's event slug, Predict's market ID, SX Bet's `L…` fixture ID, AlphaArcade's parent market ULID, ProphetX's integer event ID, Pred's parent market ID, or Limitless's market slug. It names a parent, not this market, so it is not a `market_id`: a Kalshi event ticker answers `404` on market detail. SX Bet lists a fixture's markets only while it trades, so once the game has ended its `L…` id answers `404` on `GET /v1/events/{event_id}` while this market's `market_id` still resolves on market detail.
 	EventID string `json:"event_id" url:"event_id"`
 	// Exact provider-native market identifier. It resolves on `GET /v1/markets/{market_id}`, either as-is or prefixed with this row's `provider` in the composite form `{provider}:{market_id}`. A ProphetX player prop's `market_id` names the line it was matched on, `<event_id>:<market_id>:<line>`: the pair alone resolves to whichever line ProphetX currently favours, and that moves before kickoff.
 	//
@@ -3360,7 +3360,7 @@ func (m MarketCategory) Ptr() *MarketCategory {
 	return &m
 }
 
-// One side's fee model. Both `taker` and `maker` are always returned and you pick: PredictorSDK does not infer which side you will be, since that needs an order it has not seen. Null when the model is not determinable for that side.
+// One side's fee model. Both `taker` and `maker` are always returned and you pick: PredictorSDK does not infer which side you will be, since that needs an order it has not seen. The leg itself is `null` on `trading_fees` when the model cannot be stated for that side (see `taker` and `maker` there for when), and never null on a `scheduled_change`.
 //
 // Note that "maker" and "taker" mean the venue's own definition — the resting order is the maker, the incoming order that fills it is the taker.
 var (
@@ -4267,7 +4267,7 @@ type MarketDetailResponse struct {
 	ProviderID string `json:"provider_id" url:"provider_id"`
 	// Human-readable market title. Each platform exposes a slightly different field — Kalshi `title`, Polymarket `question`, Predict `title`, SX Bet composed from outcome labels (team-pair fallback) so a game's moneyline, spread, and total markets stay distinguishable, and Hyperliquid composed from outcome/question metadata.
 	Title string `json:"title" url:"title"`
-	// Normalized lifecycle status: `open` takes orders, `closed` has stopped trading without a final result, and `settled` has the venue's published result. Only an `open` market can report `pricing.availability: live`. Mapping per platform: Kalshi `active` → open · `settled`/`finalized` → settled · anything else (`closed`, `determined`) → closed. Polymarket `closed` with UMA resolution status `resolved` → settled · any other `closed` market (a resolution proposal pending, or a pre-2023 market with no UMA status) → closed · otherwise open. Predict `status=RESOLVED` → settled · `tradingStatus=OPEN` → open · otherwise closed. SX Bet: a reported result (`reportedDate`, a void included) → settled · otherwise `ACTIVE` → open · otherwise closed; SX Bet leaves some settled markets `ACTIVE`, so its `status` alone never decides settlement. Hyperliquid: an outcome listed in its question's `settledNamedOutcomes` → settled · otherwise open. AlphaArcade `isResolved` → settled · otherwise open. ProphetX `active` → open · otherwise closed; ProphetX serves only upcoming and live events, so a ProphetX market never reads `settled` — once its game is over the market id answers `404`. Limitless `FUNDED` / `FUNDED_FLAGGED` → open · `RESOLVED` → settled · `LOCKED`, `DRAFT` and anything else → closed. Pred `active` → open · `resolved` / `redeemed` → settled · anything else → closed. Unknown upstream values map to closed.
+	// Normalized lifecycle status: `open` takes orders, `closed` has stopped trading without a final result, and `settled` has the venue's published result. Only an `open` market can report `pricing.availability: live`. Mapping per platform: Kalshi `active` → open · `determined` or `amended` with the result on the record (yes, no or scalar), and `finalized` → settled · `initialized`, `inactive`, `closed` and `disputed` → closed (a challenged result is not settled). Polymarket `closed` with UMA resolution status `resolved` → settled · any other `closed` market (a resolution proposal pending, or a pre-2023 market with no UMA status) → closed · otherwise open. Predict `status=RESOLVED` → settled · `tradingStatus=OPEN` → open · otherwise closed. SX Bet: a reported result (`reportedDate`, a void included) → settled · otherwise `ACTIVE` → open · otherwise closed; SX Bet leaves some settled markets `ACTIVE`, so its `status` alone never decides settlement. Hyperliquid: an outcome listed in its question's `settledNamedOutcomes` → settled · otherwise open. AlphaArcade `isResolved` → settled · otherwise open. ProphetX `active` → open · otherwise closed; ProphetX serves only upcoming and live events, so a ProphetX market never reads `settled` — once its game is over the market id answers `404`. Limitless `FUNDED` / `FUNDED_FLAGGED` → open · `RESOLVED` → settled · `LOCKED`, `DRAFT` and anything else → closed. Pred `active` → open · `resolved` / `redeemed` → settled · anything else → closed. Unknown upstream values map to closed.
 	Status MarketDetailResponseStatus `json:"status" url:"status"`
 	// Outcomes with per-outcome quotes, in the venue's order.
 	//
@@ -4593,7 +4593,7 @@ func (m MarketDetailResponseProvider) Ptr() *MarketDetailResponseProvider {
 	return &m
 }
 
-// Normalized lifecycle status: `open` takes orders, `closed` has stopped trading without a final result, and `settled` has the venue's published result. Only an `open` market can report `pricing.availability: live`. Mapping per platform: Kalshi `active` → open · `settled`/`finalized` → settled · anything else (`closed`, `determined`) → closed. Polymarket `closed` with UMA resolution status `resolved` → settled · any other `closed` market (a resolution proposal pending, or a pre-2023 market with no UMA status) → closed · otherwise open. Predict `status=RESOLVED` → settled · `tradingStatus=OPEN` → open · otherwise closed. SX Bet: a reported result (`reportedDate`, a void included) → settled · otherwise `ACTIVE` → open · otherwise closed; SX Bet leaves some settled markets `ACTIVE`, so its `status` alone never decides settlement. Hyperliquid: an outcome listed in its question's `settledNamedOutcomes` → settled · otherwise open. AlphaArcade `isResolved` → settled · otherwise open. ProphetX `active` → open · otherwise closed; ProphetX serves only upcoming and live events, so a ProphetX market never reads `settled` — once its game is over the market id answers `404`. Limitless `FUNDED` / `FUNDED_FLAGGED` → open · `RESOLVED` → settled · `LOCKED`, `DRAFT` and anything else → closed. Pred `active` → open · `resolved` / `redeemed` → settled · anything else → closed. Unknown upstream values map to closed.
+// Normalized lifecycle status: `open` takes orders, `closed` has stopped trading without a final result, and `settled` has the venue's published result. Only an `open` market can report `pricing.availability: live`. Mapping per platform: Kalshi `active` → open · `determined` or `amended` with the result on the record (yes, no or scalar), and `finalized` → settled · `initialized`, `inactive`, `closed` and `disputed` → closed (a challenged result is not settled). Polymarket `closed` with UMA resolution status `resolved` → settled · any other `closed` market (a resolution proposal pending, or a pre-2023 market with no UMA status) → closed · otherwise open. Predict `status=RESOLVED` → settled · `tradingStatus=OPEN` → open · otherwise closed. SX Bet: a reported result (`reportedDate`, a void included) → settled · otherwise `ACTIVE` → open · otherwise closed; SX Bet leaves some settled markets `ACTIVE`, so its `status` alone never decides settlement. Hyperliquid: an outcome listed in its question's `settledNamedOutcomes` → settled · otherwise open. AlphaArcade `isResolved` → settled · otherwise open. ProphetX `active` → open · otherwise closed; ProphetX serves only upcoming and live events, so a ProphetX market never reads `settled` — once its game is over the market id answers `404`. Limitless `FUNDED` / `FUNDED_FLAGGED` → open · `RESOLVED` → settled · `LOCKED`, `DRAFT` and anything else → closed. Pred `active` → open · `resolved` / `redeemed` → settled · anything else → closed. Unknown upstream values map to closed.
 type MarketDetailResponseStatus string
 
 const (
@@ -4619,7 +4619,7 @@ func (m MarketDetailResponseStatus) Ptr() *MarketDetailResponseStatus {
 	return &m
 }
 
-// The next PUBLISHED change to this market's fee parameters and when it takes effect. OMITTED (not null) when there is no pending change, matching `pricing.neg_risk`.
+// The next PUBLISHED change to this market's fee parameters and when it takes effect. OMITTED (not null) when there is no pending change, matching `pricing.neg_risk`. A change is reported only when both of its legs can be stated, so `taker` and `maker` here are never null.
 //
 // Kalshi is the only platform that publishes this today, and it matters: every MLB series currently runs at a `fee_multiplier` of 0.5 with a per-event override restoring 1.0 at first pitch, so the fee DOUBLES mid-market on a game that is already trading. On a $100 taker order at a price of 0.42 that is 203 bps before the first pitch and 406 bps after — enough to change which venue is cheaper for the same canonical outcome at the same price. Without this field a consumer mis-costs every order placed near a game start with no way to see it coming.
 var (
@@ -4631,8 +4631,8 @@ var (
 type MarketDetailScheduledFeeChange struct {
 	// When the new parameters take effect, RFC3339.
 	EffectiveAt time.Time           `json:"effective_at" url:"effective_at"`
-	Taker       *MarketDetailFeeLeg `json:"taker,omitempty" url:"taker,omitempty"`
-	Maker       *MarketDetailFeeLeg `json:"maker,omitempty" url:"maker,omitempty"`
+	Taker       *MarketDetailFeeLeg `json:"taker" url:"taker"`
+	Maker       *MarketDetailFeeLeg `json:"maker" url:"maker"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
 	explicitFields *big.Int `json:"-" url:"-"`
@@ -4762,7 +4762,7 @@ func (m *MarketDetailScheduledFeeChange) String() string {
 //
 // `availability` and the legs are on separate axes on purpose: availability says what is KNOWN, the legs say what is CHARGED. A fee-free market is `availability: published` with `model: "none"` and `rate: 0` — an asserted zero, distinguishable from `unpublished` (the venue publishes nothing) and from `account_specific` (rates exist but are per-account).
 //
-// OUT OF SCOPE and therefore not modeled as fields, though each is real and moves the number: rebates (Polymarket's maker-rebate and taker-rebate programs), per-account discounts (Predict's 10% invite discount), volume/staking tiers (Hyperliquid), and third-party pass-through (Kalshi FCM customers, Polymarket builder fees). The parameters here are the venue's PUBLISHED base for this market; a specific account may pay less.
+// OUT OF SCOPE and therefore not modeled as fields, though each is real and moves the number: rebates (Polymarket's maker-rebate and taker-rebate programs), per-account discounts (Predict's 10% invite discount), volume/staking tiers and the market deployer's own fee, its `deployerFeeScale` (Hyperliquid), and third-party pass-through (Kalshi FCM customers, Polymarket builder fees). The parameters here are the venue's PUBLISHED base for this market; a specific account may pay less.
 var (
 	marketDetailTradingFeesFieldAvailability    = big.NewInt(1 << 0)
 	marketDetailTradingFeesFieldObservedAt      = big.NewInt(1 << 1)
@@ -4782,13 +4782,17 @@ type MarketDetailTradingFees struct {
 	ObservedAt *time.Time `json:"observed_at,omitempty" url:"observed_at,omitempty"`
 	// Where the parameters came from, so a latency-sensitive consumer knows which platforms cost extra hops. `market_record` — embedded in the same market record the identity fetch already returned (Polymarket `feeSchedule`, Predict `feeRateBps`, AlphaArcade `feeBasePercent`); zero extra fetches. `series_record` — the parameters live on parent records and cost up to three small, TTL-cached hops (Kalshi: the event record for its series ticker and any fee override in force, the series for the base `fee_type`/`fee_multiplier` that override supersedes, then the event's pending fee changes for `scheduled_change`). `venue_schedule` — the venue exposes no per-market parameter and the answer comes from its published schedule (SX Bet, Hyperliquid).
 	Source MarketDetailTradingFeesSource `json:"source" url:"source"`
-	// What the fee is assessed on. `fill` — assessed when the order fills, from the traded share count and the fill price. `settlement_profit` — assessed at settlement, on profit (total return − stake), and only on a position that WON; a loss or a void is never charged.
+	// What the fee is assessed on. `fill` — assessed when the order fills, from the traded share count and the fill price. `settlement_profit` — assessed at settlement, on profit (total return − stake), and only on a position that WON; a loss or a void is never charged. `close_or_settlement` — assessed when a position is closed or settles, and never when one is opened.
 	//
 	// Read this before comparing rates across venues. SX Bet charges on winning profit at settlement, so its fee is an expected-value haircut rather than an entry cost — a consumer that models it as a percentage of notional is wrong about the shape before it is wrong about the rate. The reported basis is the one that applies to trading: SX Bet's four payout fees. Its separate `refundFee` is charged at fill time on the capital-efficiency refund rather than on profit, and is out of scope here along with its rates.
-	ChargeBasis     *MarketDetailTradingFeesChargeBasis `json:"charge_basis,omitempty" url:"charge_basis,omitempty"`
-	Taker           *MarketDetailFeeLeg                 `json:"taker,omitempty" url:"taker,omitempty"`
-	Maker           *MarketDetailFeeLeg                 `json:"maker,omitempty" url:"maker,omitempty"`
-	ScheduledChange *MarketDetailScheduledFeeChange     `json:"scheduled_change,omitempty" url:"scheduled_change,omitempty"`
+	//
+	// Hyperliquid's outcome markets are `close_or_settlement`: its fee page says outcome trading "only charges fees when closing or settling, not when opening outcome positions", so a buy that opens a position costs nothing and outcome trading has no maker rebates. The rate is still the account's own (`account_specific`, `rate: null`), and a market's deployer can add a fee on top through the `deployerFeeScale` in Hyperliquid's `outcomeMeta` (`1.0` on outcomes from the `out` and `skew` deployers; trade.xyz documents `0`, which adds none, for its own).
+	ChargeBasis *MarketDetailTradingFeesChargeBasis `json:"charge_basis,omitempty" url:"charge_basis,omitempty"`
+	// The taker leg: the fee on the incoming order that fills a resting one. Always present, and **`null` (never omitted) when no model can be stated for this side**. `availability` says when. `published`: never null. `partial`: null where the venue does not let us state the leg, which today is Limitless's taker (a curve with no closed form) and both legs of a market whose record omits its fee parameters (or, on Kalshi, names a fee type we do not model). `account_specific`: null for SX Bet, whose rates are set per account (Hyperliquid returns the leg with a null `rate` instead). `unavailable`: always null, because the parameters could not be read or the venue (ProphetX) publishes none. `unpublished`: always null. So `taker.rate` can be read without a null check once `availability` is `published`.
+	Taker *MarketDetailFeeLeg `json:"taker,omitempty" url:"taker,omitempty"`
+	// The maker leg: the fee on the resting order a taker fills. Always present, and **`null` (never omitted) when no model can be stated for this side**. `availability` says when. `published`: never null. `partial`: null for a Polymarket market whose record does not say that only takers pay, and for both legs of a market whose record omits its fee parameters (or, on Kalshi, names a fee type we do not model). `account_specific`: null for SX Bet, whose rates are set per account (Hyperliquid returns the leg with a null `rate` instead). `unavailable`: always null, because the parameters could not be read or the venue (ProphetX) publishes none. `unpublished`: always null. So `maker.rate` can be read without a null check once `availability` is `published`.
+	Maker           *MarketDetailFeeLeg             `json:"maker,omitempty" url:"maker,omitempty"`
+	ScheduledChange *MarketDetailScheduledFeeChange `json:"scheduled_change,omitempty" url:"scheduled_change,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
 	explicitFields *big.Int `json:"-" url:"-"`
@@ -4991,14 +4995,17 @@ func (m MarketDetailTradingFeesAvailability) Ptr() *MarketDetailTradingFeesAvail
 	return &m
 }
 
-// What the fee is assessed on. `fill` — assessed when the order fills, from the traded share count and the fill price. `settlement_profit` — assessed at settlement, on profit (total return − stake), and only on a position that WON; a loss or a void is never charged.
+// What the fee is assessed on. `fill` — assessed when the order fills, from the traded share count and the fill price. `settlement_profit` — assessed at settlement, on profit (total return − stake), and only on a position that WON; a loss or a void is never charged. `close_or_settlement` — assessed when a position is closed or settles, and never when one is opened.
 //
 // Read this before comparing rates across venues. SX Bet charges on winning profit at settlement, so its fee is an expected-value haircut rather than an entry cost — a consumer that models it as a percentage of notional is wrong about the shape before it is wrong about the rate. The reported basis is the one that applies to trading: SX Bet's four payout fees. Its separate `refundFee` is charged at fill time on the capital-efficiency refund rather than on profit, and is out of scope here along with its rates.
+//
+// Hyperliquid's outcome markets are `close_or_settlement`: its fee page says outcome trading "only charges fees when closing or settling, not when opening outcome positions", so a buy that opens a position costs nothing and outcome trading has no maker rebates. The rate is still the account's own (`account_specific`, `rate: null`), and a market's deployer can add a fee on top through the `deployerFeeScale` in Hyperliquid's `outcomeMeta` (`1.0` on outcomes from the `out` and `skew` deployers; trade.xyz documents `0`, which adds none, for its own).
 type MarketDetailTradingFeesChargeBasis string
 
 const (
-	MarketDetailTradingFeesChargeBasisFill             MarketDetailTradingFeesChargeBasis = "fill"
-	MarketDetailTradingFeesChargeBasisSettlementProfit MarketDetailTradingFeesChargeBasis = "settlement_profit"
+	MarketDetailTradingFeesChargeBasisFill              MarketDetailTradingFeesChargeBasis = "fill"
+	MarketDetailTradingFeesChargeBasisSettlementProfit  MarketDetailTradingFeesChargeBasis = "settlement_profit"
+	MarketDetailTradingFeesChargeBasisCloseOrSettlement MarketDetailTradingFeesChargeBasis = "close_or_settlement"
 )
 
 func NewMarketDetailTradingFeesChargeBasisFromString(s string) (MarketDetailTradingFeesChargeBasis, error) {
@@ -5007,6 +5014,8 @@ func NewMarketDetailTradingFeesChargeBasisFromString(s string) (MarketDetailTrad
 		return MarketDetailTradingFeesChargeBasisFill, nil
 	case "settlement_profit":
 		return MarketDetailTradingFeesChargeBasisSettlementProfit, nil
+	case "close_or_settlement":
+		return MarketDetailTradingFeesChargeBasisCloseOrSettlement, nil
 	}
 	var t MarketDetailTradingFeesChargeBasis
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
