@@ -15861,6 +15861,13 @@ func TestEnumCanonicalSportsSourceMarketProvider(t *testing.T) {
 		assert.Equal(t, CanonicalSportsSourceMarketProvider("limitless"), val, "enum value should match expected wire value")
 	})
 
+	t.Run("NewFromString_hyperliquid", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewCanonicalSportsSourceMarketProviderFromString("hyperliquid")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, CanonicalSportsSourceMarketProvider("hyperliquid"), val, "enum value should match expected wire value")
+	})
+
 	t.Run("NewFromString_Invalid", func(t *testing.T) {
 		_, err := NewCanonicalSportsSourceMarketProviderFromString("invalid_value_that_does_not_exist")
 		assert.Error(t, err)
