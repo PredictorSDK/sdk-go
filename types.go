@@ -128,7 +128,7 @@ type GetMarketRequest struct {
 	//
 	// **Sports identifiers expire.** Kalshi game tickers and Polymarket game slugs are delisted as events settle, and a Hyperliquid outcome id lives as long as its question: its daily-recurring price outcomes roll over every day, while a season-long question (a league winner, say) stays listed until it resolves. Take current ids from `GET /v1/markets` or `GET /v1/matching-markets/sports` rather than copying one out of this reference. Long-dated markets (Kalshi season futures, multi-year AlphaArcade questions) and settled Polymarket, Predict and SX Bet ids stay resolvable.
 	MarketID string `json:"-" url:"-"`
-	// Optional provider override, spelled like the `provider` field on `GET /v1/markets` rows and every other response (it was `platform` until 2026-10-09; `?platform=` now answers `400` naming this parameter). When omitted, inferred from the composite prefix or from the native ID format (`KX…` → Kalshi, `0x…64hex` → SX Bet — Pred ids share that shape and are never inferred; use `pred:…` or `?provider=pred`). Numeric IDs and kebab-case slugs are shared shape between Polymarket and Predict; in that case the service probes both and returns `409` rather than guessing if the identifier resolves on both. Hyperliquid integer ids collide with these numerics and are not inferred — use the composite `hyperliquid:<id>` or `?provider=hyperliquid` (alias `hl`). AlphaArcade ULIDs and Limitless slugs are not inferred either — use the composite form (`alpha-arcade:<ulid>`, `limitless:<slug>`) or the matching `?provider=` value. Pred pairs (`pred:<parent>:<child>`) are likewise composite/`?provider=` only. Passing `provider` explicitly skips the probe entirely and is the recommended call whenever you know it. When the override contradicts a composite prefix (e.g. `kalshi:X` with `?provider=polymarket`), the request returns 400.
+	// Optional provider override, spelled like the `provider` field on `GET /v1/markets` rows and every other response (it was `platform` until 2026-10-09; `?platform=` now answers `400` naming this parameter). When omitted, inferred from the composite prefix or from the native ID format (`KX…` → Kalshi, `0x…64hex` → SX Bet — Pred ids share that shape and are never inferred; use `pred:…` or `?provider=pred`). Numeric IDs and kebab-case slugs are shared shape between Polymarket and Predict; in that case the service probes both and returns `409` rather than guessing if the identifier resolves on both. Hyperliquid integer ids collide with these numerics and are not inferred — use the composite `hyperliquid:<id>` or `?provider=hyperliquid` (alias `hl`). AlphaArcade ULIDs, Limitless slugs and Polymarket US slugs are not inferred either — use the composite form (`alpha-arcade:<ulid>`, `limitless:<slug>`, `polymarket-us:<slug>`) or the matching `?provider=` value. Pred pairs (`pred:<parent>:<child>`) are likewise composite/`?provider=` only. Passing `provider` explicitly skips the probe entirely and is the recommended call whenever you know it. When the override contradicts a composite prefix (e.g. `kalshi:X` with `?provider=polymarket`), the request returns 400.
 	Provider *GetMarketRequestProvider `json:"-" url:"provider,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
@@ -440,7 +440,7 @@ var (
 type LookupSportsMatchingMarketsRequest struct {
 	// Canonical event key(s) to look up (for example, `nba-okc-sas-2026-10-20`), matched case-insensitively. Repeat the parameter for several events (do not comma-join them), and combine it freely with `source_id`, up to 100 unique identifiers in all. At least one `event_id` or `source_id` is required. A venue's own ID here (a Kalshi ticker, a numeric ID, an SX Bet `L…` fixture, an `0x` hash, a ULID or a `{provider}:{id}` composite) is a `400` telling you to send it as `source_id`, and so is an empty value. So is a value that matches no canonical event but is a venue's identifier, most often a Polymarket slug: a night game's slug carries the UTC date (`nfl-sea-den-2026-10-16` for the canonical `nfl-sea-den-2026-10-15`), and Polymarket spells some teams differently (`cal` for Calgary, `la` for the Rams).
 	EventID []*string `json:"-" url:"event_id,omitempty"`
-	// Venue identifier(s) to look up, as `{provider}:{id}`: any `market_id`, `market_slug` or `event_id` that a `data[].submarkets[].source_markets[]` entry publishes, prefixed with that entry's `provider`. On Polymarket, Predict, AlphaArcade and Hyperliquid an outcome token (`outcomes[].outcome_id`) works too, because those tokens identify one market (a Hyperliquid token starts with `#`, which a URL must send as `%23`), and on Polymarket so does a market's `conditionId`, the ID wallet positions carry. Elsewhere outcome IDs are side names such as `yes` that repeat in every market: Kalshi's, Pred's and Limitless's `yes`/`no` and SX Bet's `outcomeOne`/`outcomeTwo` are a `400` that points to `market_id`. For example `kalshi:KXNBAGAME-26OCT20OKCSAS` (an event ticker), `kalshi:KXNBAGAME-26OCT20OKCSAS-OKC` (a market ticker), `sxbet:L19766755` (a fixture), or Pred's `pred:<parent_market_id>:<child_market_id>` pair, or a Limitless market's slug. Only the text before the first colon is the provider, and it must be one of `kalshi`, `polymarket`, `predict`, `sxbet`, `alpha-arcade`, `prophetx`, `pred`, `limitless` or `hyperliquid`; anything else is a `400` naming the value. Matching is case-insensitive. `lookups` reports every identifier under its spelling as sent (whitespace around the provider and ID trimmed), with the canonical events it found. Repeat the parameter for several identifiers, across providers (a comma-joined list or an empty value is a `400`); combined with `event_id`, up to 100 unique identifiers in all. At least one `event_id` or `source_id` is required. A lookup finds the event an identifier belongs to and, by default, returns it in full, so the submarket the identifier names is in it unless `include_submarkets=false`. A player prop finds its game under any `player_prop_match` policy when the game has another matched submarket, while the prop itself appears only when the policy admits it; a game matched only on props the policy excludes is not returned.
+	// Venue identifier(s) to look up, as `{provider}:{id}`: any `market_id`, `market_slug` or `event_id` that a `data[].submarkets[].source_markets[]` entry publishes, prefixed with that entry's `provider`. On Polymarket, Predict, AlphaArcade and Hyperliquid an outcome token (`outcomes[].outcome_id`) works too, because those tokens identify one market (a Hyperliquid token starts with `#`, which a URL must send as `%23`), and on Polymarket so does a market's `conditionId`, the ID wallet positions carry. Elsewhere outcome IDs are side names such as `yes` that repeat in every market: Kalshi's, Pred's, Limitless's and Polymarket US's `yes`/`no` and SX Bet's `outcomeOne`/`outcomeTwo` are a `400` that points to `market_id`. For example `kalshi:KXNBAGAME-26OCT20OKCSAS` (an event ticker), `kalshi:KXNBAGAME-26OCT20OKCSAS-OKC` (a market ticker), `sxbet:L19766755` (a fixture), or Pred's `pred:<parent_market_id>:<child_market_id>` pair, a Limitless market's slug, or a Polymarket US market or event slug (`polymarket-us:aec-nfl-ind-jax-2026-11-01`, `polymarket-us:nfl-ind-jax-2026-11-01`). Only the text before the first colon is the provider, and it must be one of `kalshi`, `polymarket`, `predict`, `sxbet`, `alpha-arcade`, `prophetx`, `pred`, `limitless`, `hyperliquid` or `polymarket-us`; anything else is a `400` naming the value. Matching is case-insensitive. `lookups` reports every identifier under its spelling as sent (whitespace around the provider and ID trimmed), with the canonical events it found. Repeat the parameter for several identifiers, across providers (a comma-joined list or an empty value is a `400`); combined with `event_id`, up to 100 unique identifiers in all. At least one `event_id` or `source_id` is required. A lookup finds the event an identifier belongs to and, by default, returns it in full, so the submarket the identifier names is in it unless `include_submarkets=false`. A player prop finds its game under any `player_prop_match` policy when the game has another matched submarket, while the prop itself appears only when the policy admits it; a game matched only on props the policy excludes is not returned.
 	SourceID []*string `json:"-" url:"source_id,omitempty"`
 	// Selects which events the lookup searches. Defaults to `false`: only events whose scheduled start has not certainly passed — today's games, plus a one-day grace so a late start that runs past midnight Eastern is never dropped mid-play. Set it to `true` to also search the settled archive: events that left the live matching run, usually because the venues settled or delisted them. That adds games whose date is further in the past, including ones a venue still lists as open, and games a venue cancelled, which can be future-dated; the default leaves a cancelled game out.
 	//
@@ -1211,7 +1211,7 @@ func (c *CanonicalSportsRules) String() string {
 	return fmt.Sprintf("%#v", c)
 }
 
-// One venue market matched to a canonical submarket. Every provider uses the same fields: `provider`; the provider's parent `event_id`, for `GET /v1/events/{event_id}`; the market's own `market_id`, for `GET /v1/markets/{market_id}`; and outcomes whose `outcome_id`s are the ones market detail returns, each mapped to a canonical outcome. Send either ID with this market's `provider`, as the composite `{provider}:{id}` or as the `provider` query parameter: a bare Predict ID can also name a Polymarket market, and AlphaArcade, ProphetX, Pred, Limitless and Hyperliquid IDs are never inferred. Any of `event_id`, `market_id` or `market_slug`, prefixed with `provider`, finds this event again through `source_id`.
+// One venue market matched to a canonical submarket. Every provider uses the same fields: `provider`; the provider's parent `event_id`, for `GET /v1/events/{event_id}`; the market's own `market_id`, for `GET /v1/markets/{market_id}`; and outcomes whose `outcome_id`s are the ones market detail returns, each mapped to a canonical outcome. Send either ID with this market's `provider`, as the composite `{provider}:{id}` or as the `provider` query parameter: a bare Predict ID can also name a Polymarket market, and AlphaArcade, ProphetX, Pred, Limitless, Hyperliquid and Polymarket US IDs are never inferred. Any of `event_id`, `market_id` or `market_slug`, prefixed with `provider`, finds this event again through `source_id`.
 var (
 	canonicalSportsSourceMarketFieldProvider   = big.NewInt(1 << 0)
 	canonicalSportsSourceMarketFieldEventID    = big.NewInt(1 << 1)
@@ -1223,9 +1223,9 @@ var (
 
 type CanonicalSportsSourceMarket struct {
 	Provider CanonicalSportsSourceMarketProvider `json:"provider" url:"provider"`
-	// The provider's own parent event for this market, for `GET /v1/events/{event_id}`: Kalshi's event ticker (a game's spread and total markets sit under events of their own), Polymarket's event slug, Predict's market ID, SX Bet's `L…` fixture ID, AlphaArcade's parent market ULID, ProphetX's integer event ID, Pred's parent market ID, Limitless's market slug, or Hyperliquid's outcome ID (each Hyperliquid market, a game winner, spread or total, is its own event). It names a parent, not this market, so it is not a `market_id`: a Kalshi event ticker answers `404` on market detail. SX Bet lists a fixture's markets only while it trades, so once the game has ended its `L…` id answers `404` on `GET /v1/events/{event_id}` while this market's `market_id` still resolves on market detail.
+	// The provider's own parent event for this market, for `GET /v1/events/{event_id}`: Kalshi's event ticker (a game's spread and total markets sit under events of their own), Polymarket's event slug, Predict's market ID, SX Bet's `L…` fixture ID, AlphaArcade's parent market ULID, ProphetX's integer event ID, Pred's parent market ID, Limitless's market slug, Hyperliquid's outcome ID (each Hyperliquid market, a game winner, spread or total, is its own event), or Polymarket US's event slug (the game, `nfl-ind-jax-2026-11-01`). It names a parent, not this market, so it is not a `market_id`: a Kalshi event ticker answers `404` on market detail. SX Bet lists a fixture's markets only while it trades, so once the game has ended its `L…` id answers `404` on `GET /v1/events/{event_id}` while this market's `market_id` still resolves on market detail.
 	EventID string `json:"event_id" url:"event_id"`
-	// Exact provider-native market identifier. It resolves on `GET /v1/markets/{market_id}`, either as-is or prefixed with this row's `provider` in the composite form `{provider}:{market_id}`. A ProphetX player prop, spread or total's `market_id` names the line it was matched on, `<event_id>:<market_id>:<line>`: the pair alone resolves to whichever line ProphetX currently favours, and that moves before kickoff. A spread uses the native home handicap here, which can be positive even though the canonical subject gives points.
+	// Exact provider-native market identifier. It resolves on `GET /v1/markets/{market_id}`, either as-is or prefixed with this row's `provider` in the composite form `{provider}:{market_id}`. A ProphetX player prop, spread or total's `market_id` names the line it was matched on, `<event_id>:<market_id>:<line>`: the pair alone resolves to whichever line ProphetX currently favours, and that moves before kickoff. A spread uses the native home handicap here, which can be positive even though the canonical subject gives points. A Polymarket US `market_id` is the market's slug (`asc-nfl-ind-jax-2026-11-01-neg-10pt5`), its trading symbol.
 	//
 	// One provider can contribute MORE THAN ONE entry to the same submarket, because a provider is free to model one canonical market as several native ones. Kalshi does exactly that for a game moneyline: it lists one binary market per team ("Arizona wins", "San Francisco wins"), so a Kalshi moneyline row appears twice, once per team ticker, each with its own `yes`/`no` outcomes. Group by `provider` if you need one row per venue; do not assume the list has at most one entry per provider.
 	MarketID string `json:"market_id" url:"market_id"`
@@ -1385,15 +1385,16 @@ func (c *CanonicalSportsSourceMarket) String() string {
 type CanonicalSportsSourceMarketProvider string
 
 const (
-	CanonicalSportsSourceMarketProviderKalshi      CanonicalSportsSourceMarketProvider = "kalshi"
-	CanonicalSportsSourceMarketProviderPolymarket  CanonicalSportsSourceMarketProvider = "polymarket"
-	CanonicalSportsSourceMarketProviderPredict     CanonicalSportsSourceMarketProvider = "predict"
-	CanonicalSportsSourceMarketProviderSxbet       CanonicalSportsSourceMarketProvider = "sxbet"
-	CanonicalSportsSourceMarketProviderAlphaArcade CanonicalSportsSourceMarketProvider = "alpha-arcade"
-	CanonicalSportsSourceMarketProviderProphetx    CanonicalSportsSourceMarketProvider = "prophetx"
-	CanonicalSportsSourceMarketProviderPred        CanonicalSportsSourceMarketProvider = "pred"
-	CanonicalSportsSourceMarketProviderLimitless   CanonicalSportsSourceMarketProvider = "limitless"
-	CanonicalSportsSourceMarketProviderHyperliquid CanonicalSportsSourceMarketProvider = "hyperliquid"
+	CanonicalSportsSourceMarketProviderKalshi       CanonicalSportsSourceMarketProvider = "kalshi"
+	CanonicalSportsSourceMarketProviderPolymarket   CanonicalSportsSourceMarketProvider = "polymarket"
+	CanonicalSportsSourceMarketProviderPredict      CanonicalSportsSourceMarketProvider = "predict"
+	CanonicalSportsSourceMarketProviderSxbet        CanonicalSportsSourceMarketProvider = "sxbet"
+	CanonicalSportsSourceMarketProviderAlphaArcade  CanonicalSportsSourceMarketProvider = "alpha-arcade"
+	CanonicalSportsSourceMarketProviderProphetx     CanonicalSportsSourceMarketProvider = "prophetx"
+	CanonicalSportsSourceMarketProviderPred         CanonicalSportsSourceMarketProvider = "pred"
+	CanonicalSportsSourceMarketProviderLimitless    CanonicalSportsSourceMarketProvider = "limitless"
+	CanonicalSportsSourceMarketProviderHyperliquid  CanonicalSportsSourceMarketProvider = "hyperliquid"
+	CanonicalSportsSourceMarketProviderPolymarketUs CanonicalSportsSourceMarketProvider = "polymarket-us"
 )
 
 func NewCanonicalSportsSourceMarketProviderFromString(s string) (CanonicalSportsSourceMarketProvider, error) {
@@ -1416,6 +1417,8 @@ func NewCanonicalSportsSourceMarketProviderFromString(s string) (CanonicalSports
 		return CanonicalSportsSourceMarketProviderLimitless, nil
 	case "hyperliquid":
 		return CanonicalSportsSourceMarketProviderHyperliquid, nil
+	case "polymarket-us":
+		return CanonicalSportsSourceMarketProviderPolymarketUs, nil
 	}
 	var t CanonicalSportsSourceMarketProvider
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
@@ -1435,13 +1438,13 @@ var (
 type CanonicalSportsSourceOutcome struct {
 	// Canonical outcome this source-native selection represents: read the team or side it pays on from here, not from `label`.
 	CanonicalOutcomeKey string `json:"canonical_outcome_key" url:"canonical_outcome_key"`
-	// The venue's own name for this selection, as market detail names it: Polymarket's and AlphaArcade's outcome names, SX Bet's and ProphetX's selection names (a spread label carries its sign), Hyperliquid's side names (`LAR`, `Rams`: each deployer names its sides its own way), and `Yes` or `No` on Kalshi, Pred and Limitless, whose markets are binary questions such as "Atlanta wins".
+	// The venue's own name for this selection, as market detail names it: Polymarket's and AlphaArcade's outcome names, SX Bet's and ProphetX's selection names (a spread label carries its sign), Hyperliquid's side names (`LAR`, `Rams`: each deployer names its sides its own way), Polymarket US's side names (a team on a moneyline, a signed handicap such as `-10.50` on a spread, `Over`/`Under` on a total, `Yes`/`No` on a period winner or a player prop), and `Yes` or `No` on Kalshi, Pred and Limitless, whose markets are binary questions such as "Atlanta wins".
 	Label string `json:"label" url:"label"`
 	// Exact provider-native outcome identifier. It is never a universal cross-provider outcome ID.
 	//
 	// On every provider this is the same value `GET /v1/markets/{market_id}` returns as `outcomes[].outcome_id` for the market named by this row's `market_id`, so the two surfaces join directly.
 	//
-	// `polymarket`, `predict` and `alpha-arcade` publish a per-outcome token (Polymarket CLOB token id, or position id on a Polymarket Protocol V2 market; Predict on-chain id; AlphaArcade CLOB token id), so `source_id={provider}:{outcome_id}` finds this event from the token alone. A token is unique within its provider, not across them: AlphaArcade mirrors Polymarket markets and publishes their CLOB tokens, so the same token can appear under both. Key a token by `provider` as well. `sxbet` and `kalshi` publish no per-outcome token at all, so their references are market-scoped and must be read together with `market_id`: an SX Bet market has one hash and two named positions (`outcomeOne` / `outcomeTwo`), and a Kalshi market is binary (`yes` / `no`). Both are the spelling the venue itself uses to address a side — SX Bet keys its order-book snapshot by `outcomeOne`/`outcomeTwo`, and Kalshi keys its book by `yes`/`no` and reports a trade's `taker_side` the same way. `prophetx` publishes small market-scoped integer outcome ids (e.g. `4`, `5`) that join to the same market's detail row, like SX Bet's positions, and `pred` and `limitless` publish `yes` / `no` like Kalshi. `hyperliquid` publishes each side's spot coin, `#` followed by ten times the outcome ID plus the side (`#114580` and `#114581` for outcome `11458`), the name its order book trades the side under; like a Polymarket token it identifies one market. A market-scoped outcome id does not identify a market: `source_id` answers `400` for Kalshi's, Pred's, Limitless's and SX Bet's.
+	// `polymarket`, `predict` and `alpha-arcade` publish a per-outcome token (Polymarket CLOB token id, or position id on a Polymarket Protocol V2 market; Predict on-chain id; AlphaArcade CLOB token id), so `source_id={provider}:{outcome_id}` finds this event from the token alone. A token is unique within its provider, not across them: AlphaArcade mirrors Polymarket markets and publishes their CLOB tokens, so the same token can appear under both. Key a token by `provider` as well. `sxbet` and `kalshi` publish no per-outcome token at all, so their references are market-scoped and must be read together with `market_id`: an SX Bet market has one hash and two named positions (`outcomeOne` / `outcomeTwo`), and a Kalshi market is binary (`yes` / `no`). Both are the spelling the venue itself uses to address a side — SX Bet keys its order-book snapshot by `outcomeOne`/`outcomeTwo`, and Kalshi keys its book by `yes`/`no` and reports a trade's `taker_side` the same way. `prophetx` publishes small market-scoped integer outcome ids (e.g. `4`, `5`) that join to the same market's detail row, like SX Bet's positions, and `pred`, `limitless` and `polymarket-us` publish `yes` / `no` like Kalshi (on Polymarket US the one instrument's long and short side: its order API calls them `OUTCOME_SIDE_YES` and `OUTCOME_SIDE_NO`). `hyperliquid` publishes each side's spot coin, `#` followed by ten times the outcome ID plus the side (`#114580` and `#114581` for outcome `11458`), the name its order book trades the side under; like a Polymarket token it identifies one market. A market-scoped outcome id does not identify a market: `source_id` answers `400` for Kalshi's, Pred's, Limitless's, Polymarket US's and SX Bet's.
 	OutcomeID string `json:"outcome_id" url:"outcome_id"`
 	// Optional source-native side such as `yes` or `no`.
 	Side *string `json:"side,omitempty" url:"side,omitempty"`
@@ -3069,15 +3072,16 @@ func (e *EventResponse) String() string {
 type EventResponseProvider string
 
 const (
-	EventResponseProviderKalshi      EventResponseProvider = "kalshi"
-	EventResponseProviderPolymarket  EventResponseProvider = "polymarket"
-	EventResponseProviderPredict     EventResponseProvider = "predict"
-	EventResponseProviderSxbet       EventResponseProvider = "sxbet"
-	EventResponseProviderHyperliquid EventResponseProvider = "hyperliquid"
-	EventResponseProviderAlphaArcade EventResponseProvider = "alpha-arcade"
-	EventResponseProviderProphetx    EventResponseProvider = "prophetx"
-	EventResponseProviderLimitless   EventResponseProvider = "limitless"
-	EventResponseProviderPred        EventResponseProvider = "pred"
+	EventResponseProviderKalshi       EventResponseProvider = "kalshi"
+	EventResponseProviderPolymarket   EventResponseProvider = "polymarket"
+	EventResponseProviderPredict      EventResponseProvider = "predict"
+	EventResponseProviderSxbet        EventResponseProvider = "sxbet"
+	EventResponseProviderHyperliquid  EventResponseProvider = "hyperliquid"
+	EventResponseProviderAlphaArcade  EventResponseProvider = "alpha-arcade"
+	EventResponseProviderProphetx     EventResponseProvider = "prophetx"
+	EventResponseProviderLimitless    EventResponseProvider = "limitless"
+	EventResponseProviderPred         EventResponseProvider = "pred"
+	EventResponseProviderPolymarketUs EventResponseProvider = "polymarket-us"
 )
 
 func NewEventResponseProviderFromString(s string) (EventResponseProvider, error) {
@@ -3100,6 +3104,8 @@ func NewEventResponseProviderFromString(s string) (EventResponseProvider, error)
 		return EventResponseProviderLimitless, nil
 	case "pred":
 		return EventResponseProviderPred, nil
+	case "polymarket-us":
+		return EventResponseProviderPolymarketUs, nil
 	}
 	var t EventResponseProvider
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
@@ -3112,15 +3118,16 @@ func (e EventResponseProvider) Ptr() *EventResponseProvider {
 type GetEventRequestProvider string
 
 const (
-	GetEventRequestProviderKalshi      GetEventRequestProvider = "kalshi"
-	GetEventRequestProviderPolymarket  GetEventRequestProvider = "polymarket"
-	GetEventRequestProviderPredict     GetEventRequestProvider = "predict"
-	GetEventRequestProviderSxbet       GetEventRequestProvider = "sxbet"
-	GetEventRequestProviderHyperliquid GetEventRequestProvider = "hyperliquid"
-	GetEventRequestProviderAlphaArcade GetEventRequestProvider = "alpha-arcade"
-	GetEventRequestProviderProphetx    GetEventRequestProvider = "prophetx"
-	GetEventRequestProviderLimitless   GetEventRequestProvider = "limitless"
-	GetEventRequestProviderPred        GetEventRequestProvider = "pred"
+	GetEventRequestProviderKalshi       GetEventRequestProvider = "kalshi"
+	GetEventRequestProviderPolymarket   GetEventRequestProvider = "polymarket"
+	GetEventRequestProviderPredict      GetEventRequestProvider = "predict"
+	GetEventRequestProviderSxbet        GetEventRequestProvider = "sxbet"
+	GetEventRequestProviderHyperliquid  GetEventRequestProvider = "hyperliquid"
+	GetEventRequestProviderAlphaArcade  GetEventRequestProvider = "alpha-arcade"
+	GetEventRequestProviderProphetx     GetEventRequestProvider = "prophetx"
+	GetEventRequestProviderLimitless    GetEventRequestProvider = "limitless"
+	GetEventRequestProviderPred         GetEventRequestProvider = "pred"
+	GetEventRequestProviderPolymarketUs GetEventRequestProvider = "polymarket-us"
 )
 
 func NewGetEventRequestProviderFromString(s string) (GetEventRequestProvider, error) {
@@ -3143,6 +3150,8 @@ func NewGetEventRequestProviderFromString(s string) (GetEventRequestProvider, er
 		return GetEventRequestProviderLimitless, nil
 	case "pred":
 		return GetEventRequestProviderPred, nil
+	case "polymarket-us":
+		return GetEventRequestProviderPolymarketUs, nil
 	}
 	var t GetEventRequestProvider
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
@@ -3155,15 +3164,16 @@ func (g GetEventRequestProvider) Ptr() *GetEventRequestProvider {
 type GetMarketRequestProvider string
 
 const (
-	GetMarketRequestProviderKalshi      GetMarketRequestProvider = "kalshi"
-	GetMarketRequestProviderPolymarket  GetMarketRequestProvider = "polymarket"
-	GetMarketRequestProviderPredict     GetMarketRequestProvider = "predict"
-	GetMarketRequestProviderSxbet       GetMarketRequestProvider = "sxbet"
-	GetMarketRequestProviderHyperliquid GetMarketRequestProvider = "hyperliquid"
-	GetMarketRequestProviderAlphaArcade GetMarketRequestProvider = "alpha-arcade"
-	GetMarketRequestProviderProphetx    GetMarketRequestProvider = "prophetx"
-	GetMarketRequestProviderLimitless   GetMarketRequestProvider = "limitless"
-	GetMarketRequestProviderPred        GetMarketRequestProvider = "pred"
+	GetMarketRequestProviderKalshi       GetMarketRequestProvider = "kalshi"
+	GetMarketRequestProviderPolymarket   GetMarketRequestProvider = "polymarket"
+	GetMarketRequestProviderPredict      GetMarketRequestProvider = "predict"
+	GetMarketRequestProviderSxbet        GetMarketRequestProvider = "sxbet"
+	GetMarketRequestProviderHyperliquid  GetMarketRequestProvider = "hyperliquid"
+	GetMarketRequestProviderAlphaArcade  GetMarketRequestProvider = "alpha-arcade"
+	GetMarketRequestProviderProphetx     GetMarketRequestProvider = "prophetx"
+	GetMarketRequestProviderLimitless    GetMarketRequestProvider = "limitless"
+	GetMarketRequestProviderPred         GetMarketRequestProvider = "pred"
+	GetMarketRequestProviderPolymarketUs GetMarketRequestProvider = "polymarket-us"
 )
 
 func NewGetMarketRequestProviderFromString(s string) (GetMarketRequestProvider, error) {
@@ -3186,6 +3196,8 @@ func NewGetMarketRequestProviderFromString(s string) (GetMarketRequestProvider, 
 		return GetMarketRequestProviderLimitless, nil
 	case "pred":
 		return GetMarketRequestProviderPred, nil
+	case "polymarket-us":
+		return GetMarketRequestProviderPolymarketUs, nil
 	}
 	var t GetMarketRequestProvider
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
@@ -3198,15 +3210,16 @@ func (g GetMarketRequestProvider) Ptr() *GetMarketRequestProvider {
 type GetMarketsRequestProvider string
 
 const (
-	GetMarketsRequestProviderKalshi      GetMarketsRequestProvider = "kalshi"
-	GetMarketsRequestProviderPolymarket  GetMarketsRequestProvider = "polymarket"
-	GetMarketsRequestProviderPredict     GetMarketsRequestProvider = "predict"
-	GetMarketsRequestProviderSxbet       GetMarketsRequestProvider = "sxbet"
-	GetMarketsRequestProviderHyperliquid GetMarketsRequestProvider = "hyperliquid"
-	GetMarketsRequestProviderAlphaArcade GetMarketsRequestProvider = "alpha-arcade"
-	GetMarketsRequestProviderProphetx    GetMarketsRequestProvider = "prophetx"
-	GetMarketsRequestProviderLimitless   GetMarketsRequestProvider = "limitless"
-	GetMarketsRequestProviderPred        GetMarketsRequestProvider = "pred"
+	GetMarketsRequestProviderKalshi       GetMarketsRequestProvider = "kalshi"
+	GetMarketsRequestProviderPolymarket   GetMarketsRequestProvider = "polymarket"
+	GetMarketsRequestProviderPredict      GetMarketsRequestProvider = "predict"
+	GetMarketsRequestProviderSxbet        GetMarketsRequestProvider = "sxbet"
+	GetMarketsRequestProviderHyperliquid  GetMarketsRequestProvider = "hyperliquid"
+	GetMarketsRequestProviderAlphaArcade  GetMarketsRequestProvider = "alpha-arcade"
+	GetMarketsRequestProviderProphetx     GetMarketsRequestProvider = "prophetx"
+	GetMarketsRequestProviderLimitless    GetMarketsRequestProvider = "limitless"
+	GetMarketsRequestProviderPred         GetMarketsRequestProvider = "pred"
+	GetMarketsRequestProviderPolymarketUs GetMarketsRequestProvider = "polymarket-us"
 )
 
 func NewGetMarketsRequestProviderFromString(s string) (GetMarketsRequestProvider, error) {
@@ -3229,6 +3242,8 @@ func NewGetMarketsRequestProviderFromString(s string) (GetMarketsRequestProvider
 		return GetMarketsRequestProviderLimitless, nil
 	case "pred":
 		return GetMarketsRequestProviderPred, nil
+	case "polymarket-us":
+		return GetMarketsRequestProviderPolymarketUs, nil
 	}
 	var t GetMarketsRequestProvider
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
@@ -3689,9 +3704,9 @@ var (
 )
 
 type MarketDetailOutcome struct {
-	// Outcome label as the platform reports it. Kalshi binary markets normalize to `Yes`/`No`; Polymarket parses the stringified outcomes array (also typically `Yes`/`No`); Predict reports per-outcome names; SX Bet uses outcome-one/outcome-two names (e.g. team labels with spreads applied); Hyperliquid uses the outcome `sideSpecs` names.
+	// Outcome label as the platform reports it. Kalshi binary markets normalize to `Yes`/`No`; Polymarket parses the stringified outcomes array (also typically `Yes`/`No`); Predict reports per-outcome names; SX Bet uses outcome-one/outcome-two names (e.g. team labels with spreads applied); Hyperliquid uses the outcome `sideSpecs` names; Polymarket US uses each side's own name (`marketSides[].description`: a team on a moneyline, a signed handicap such as `-10.50` on a spread, `Over`/`Under`, or `Yes`/`No`).
 	Name string `json:"name" url:"name"`
-	// Stable per-platform key for this outcome: Kalshi, Limitless and Pred `yes`/`no`; Polymarket CLOB token id (the position id on a Polymarket Protocol V2 market); Predict on-chain id; SX Bet `outcomeOne`/`outcomeTwo`; Hyperliquid coin encoding (`#<10*outcome+side>`); ProphetX's market-scoped selection id (`4`, `5`); AlphaArcade the CLOB token id of the Polymarket market it mirrors. On a market that groups several options (see `outcomes`) it is the option's composite market id, such as `alpha-arcade:01K0HQE3CEM2T2RDRWSCJ3V647`. It is the id `/v1/matching-markets/sports` publishes for the same side, and the join key for future per-outcome sub-resources (order-book depth). Omitted only where the venue publishes no key for a side: the two sides of an AlphaArcade market that mirrors no Polymarket market (21 of 993 two-sided AlphaArcade markets on 2026-10-04, none of them sports).
+	// Stable per-platform key for this outcome: Kalshi, Limitless, Pred and Polymarket US `yes`/`no` (on Polymarket US, the instrument's long and short side); Polymarket CLOB token id (the position id on a Polymarket Protocol V2 market); Predict on-chain id; SX Bet `outcomeOne`/`outcomeTwo`; Hyperliquid coin encoding (`#<10*outcome+side>`); ProphetX's market-scoped selection id (`4`, `5`); AlphaArcade the CLOB token id of the Polymarket market it mirrors. On a market that groups several options (see `outcomes`) it is the option's composite market id, such as `alpha-arcade:01K0HQE3CEM2T2RDRWSCJ3V647`. It is the id `/v1/matching-markets/sports` publishes for the same side, and the join key for future per-outcome sub-resources (order-book depth). Omitted only where the venue publishes no key for a side: the two sides of an AlphaArcade market that mirrors no Polymarket market (21 of 993 two-sided AlphaArcade markets on 2026-10-04, none of them sports).
 	OutcomeID *string `json:"outcome_id,omitempty" url:"outcome_id,omitempty"`
 	// Current implied probability of this outcome in 0–1 — the headline field, equal to the implied probability on every supported platform. Derivation cascade: mid of bid/ask when two-sided → the single available side → last trade → platform mark (Polymarket `outcomePrices`, which preserves 0/1 resolution marks on settled markets; AlphaArcade's catalog midpoint). Because the cascade differs by what each platform exposes, `price` is a DISPLAY number — when comparing across platforms or sizing trades, prefer `bid`/`ask` directly where present. Null when no quote of any kind exists.
 	//
@@ -3913,7 +3928,7 @@ type MarketDetailPricing struct {
 	Availability MarketDetailPricingAvailability `json:"availability" url:"availability"`
 	// Self-describing unit declaration for all price fields. Single canonical scale today; new values would be added alongside (never replacing) this one.
 	Scale MarketDetailPricingScale `json:"scale" url:"scale"`
-	// Where the quotes came from. `market_record` — embedded in the same record as the identity fetch: Kalshi, Polymarket and Predict, and the group views of Limitless and Pred, which read no order book. `orderbook` — the platform's order book, in a bounded second fetch where it is a separate route: SX Bet (`/orderbook-v3/snapshot`), Hyperliquid (`l2Book`), AlphaArcade, Limitless, Pred and ProphetX. A failed book read keeps `orderbook` and reports `availability: unavailable` or the record's marks.
+	// Where the quotes came from. `market_record` — embedded in the same record as the identity fetch: Kalshi, Polymarket and Predict, and the group views of Limitless and Pred, which read no order book. `orderbook` — the platform's order book, in a bounded second fetch where it is a separate route: SX Bet (`/orderbook-v3/snapshot`), Hyperliquid (`l2Book`), AlphaArcade, Limitless, Pred, Polymarket US and ProphetX. A failed book read keeps `orderbook` and reports `availability: unavailable` or the record's marks, except on Polymarket US, which reports the record's own best bid and ask as `market_record`.
 	Source MarketDetailPricingSource `json:"source" url:"source"`
 	// The upstream timestamp on this platform's own clock, as RFC3339. When the two sides carry independent stamps this is the OLDER of them — a conservative floor that never over-claims freshness. Null when the record carries no timestamp at all (Predict, AlphaArcade, and SX Bet).
 	//
@@ -3925,17 +3940,18 @@ type MarketDetailPricing struct {
 	// * `prophetx` — the best offer's own `updated_at` on each side, the older of the two. It describes that resting offer, not the whole book: it changes when the best offer changes, which makes it a quote stamp, but on a thin book an offer can stay best for days. Measured from under a minute to 2.6 days old (median about 2 hours) across 51 quoted markets sampled from the whole catalog on 2026-10-03, including 2.6 days on a market reporting `availability: live`. Size the bound to the venue's liquidity, not in seconds.
 	// * `limitless` — the market record's `updatedAt`: a record write stamp in the same family as Polymarket's, advancing on the venue's own rewrite cadence rather than with the quote. Bounds record age in minutes, not quote age in seconds. The order book itself carries no wall-clock stamp.
 	// * `pred` — the child order book's `last_updated_at`: the book snapshot time, advancing when the book moves, so an age bound on it is meaningful. On a thin book it is legitimately old — size the threshold to the venue's liquidity, as with ProphetX. Measured seconds-old on a live NFL book 2026-09-23. Null (with `as_of_kind: unknown`) on the parent group view, which performs no book read, and whenever the book is gone (a settled child's book 503s upstream).
+	// * `polymarket-us` — the order book's `transactTime`, the time of its last change (rendered at millisecond precision, truncated): a quote stamp. Measured over 33 open markets read twice 4.5 minutes apart on 2026-10-30, it advanced on 16, including all 4 whose best bid or ask moved; on a quiet book it stays old (3 seconds to 31 hours at read time, median about 11 minutes), so size the bound to the market. When the book cannot be read the quotes come from the market record and this is the record's `updatedAt`, which did not advance on any of those 33 markets though the record's quotes changed on 4 (`as_of_kind: record_static`). Null on a settled market, which reads no book.
 	// * `predict`, `alpha-arcade`, `sxbet` — always null. SX Bet's order book publishes a monotonic book `version` and no wall-clock stamp anywhere.
 	//
 	// These ranges are observed behaviour, not a contract: they are published so a consumer can pick a threshold from measured data rather than guessing, and they can change whenever a venue changes how it writes its records. Server ingest time is never substituted into this field — that would masquerade as an upstream stamp. Use `observed_at` for the read time.
 	AsOf *time.Time `json:"as_of,omitempty" url:"as_of,omitempty"`
 	// What `as_of` MEASURES on this provider, so one consumer code path can bound freshness tightly where the value is a quote time and refuse to pretend where it is not. Always present; `unknown` whenever `as_of` is null, never an empty string.
 	//
-	// `quote` — the stamp advances when the quote advances, so an age bound on it is meaningful. Hyperliquid (`l2Book` server time), ProphetX (the best offer's `updated_at`) and Pred (the book's `last_updated_at`). How TIGHT that bound can be still depends on the venue: Hyperliquid's tracks wall clock to the second, while ProphetX's describes the resting best offer and is legitimately hours or days old on a thin book. Size the threshold to the venue's liquidity; a blanket seconds-scale bound rejects most of ProphetX.
+	// `quote` — the stamp advances when the quote advances, so an age bound on it is meaningful. Hyperliquid (`l2Book` server time), ProphetX (the best offer's `updated_at`), Pred (the book's `last_updated_at`) and Polymarket US (the book's `transactTime`). How TIGHT that bound can be still depends on the venue: Hyperliquid's tracks wall clock to the second, while ProphetX's describes the resting best offer and is legitimately hours or days old on a thin book. Size the threshold to the venue's liquidity; a blanket seconds-scale bound rejects most of ProphetX.
 	//
 	// `record_refresh` — the stamp advances on a periodic rewrite of the provider's record, independent of whether the quote moved. Bounds RECORD age (minutes), not quote age. Polymarket.
 	//
-	// `record_static` — the stamp does not advance while the market is actively quoted, so it bounds nothing at any threshold. Kalshi. Treat quote freshness as unknown here and do not gate on `as_of`; bound `observed_at` instead and take executable price from the venue's own book.
+	// `record_static` — the stamp does not advance while the market is actively quoted, so it bounds nothing at any threshold. Kalshi, and Polymarket US when its book could not be read and the quotes came from its record. Treat quote freshness as unknown here and do not gate on `as_of`; bound `observed_at` instead and take executable price from the venue's own book.
 	//
 	// `unknown` — `as_of` is null: the record carries no timestamp of any kind (Predict, AlphaArcade, SX Bet). Kept distinct from `record_static` because the underlying fact differs even though the consumer's action does not.
 	AsOfKind MarketDetailPricingAsOfKind `json:"as_of_kind" url:"as_of_kind"`
@@ -4123,11 +4139,11 @@ func (m *MarketDetailPricing) String() string {
 
 // What `as_of` MEASURES on this provider, so one consumer code path can bound freshness tightly where the value is a quote time and refuse to pretend where it is not. Always present; `unknown` whenever `as_of` is null, never an empty string.
 //
-// `quote` — the stamp advances when the quote advances, so an age bound on it is meaningful. Hyperliquid (`l2Book` server time), ProphetX (the best offer's `updated_at`) and Pred (the book's `last_updated_at`). How TIGHT that bound can be still depends on the venue: Hyperliquid's tracks wall clock to the second, while ProphetX's describes the resting best offer and is legitimately hours or days old on a thin book. Size the threshold to the venue's liquidity; a blanket seconds-scale bound rejects most of ProphetX.
+// `quote` — the stamp advances when the quote advances, so an age bound on it is meaningful. Hyperliquid (`l2Book` server time), ProphetX (the best offer's `updated_at`), Pred (the book's `last_updated_at`) and Polymarket US (the book's `transactTime`). How TIGHT that bound can be still depends on the venue: Hyperliquid's tracks wall clock to the second, while ProphetX's describes the resting best offer and is legitimately hours or days old on a thin book. Size the threshold to the venue's liquidity; a blanket seconds-scale bound rejects most of ProphetX.
 //
 // `record_refresh` — the stamp advances on a periodic rewrite of the provider's record, independent of whether the quote moved. Bounds RECORD age (minutes), not quote age. Polymarket.
 //
-// `record_static` — the stamp does not advance while the market is actively quoted, so it bounds nothing at any threshold. Kalshi. Treat quote freshness as unknown here and do not gate on `as_of`; bound `observed_at` instead and take executable price from the venue's own book.
+// `record_static` — the stamp does not advance while the market is actively quoted, so it bounds nothing at any threshold. Kalshi, and Polymarket US when its book could not be read and the quotes came from its record. Treat quote freshness as unknown here and do not gate on `as_of`; bound `observed_at` instead and take executable price from the venue's own book.
 //
 // `unknown` — `as_of` is null: the record carries no timestamp of any kind (Predict, AlphaArcade, SX Bet). Kept distinct from `record_static` because the underlying fact differs even though the consumer's action does not.
 type MarketDetailPricingAsOfKind string
@@ -4220,7 +4236,7 @@ func (m MarketDetailPricingScale) Ptr() *MarketDetailPricingScale {
 	return &m
 }
 
-// Where the quotes came from. `market_record` — embedded in the same record as the identity fetch: Kalshi, Polymarket and Predict, and the group views of Limitless and Pred, which read no order book. `orderbook` — the platform's order book, in a bounded second fetch where it is a separate route: SX Bet (`/orderbook-v3/snapshot`), Hyperliquid (`l2Book`), AlphaArcade, Limitless, Pred and ProphetX. A failed book read keeps `orderbook` and reports `availability: unavailable` or the record's marks.
+// Where the quotes came from. `market_record` — embedded in the same record as the identity fetch: Kalshi, Polymarket and Predict, and the group views of Limitless and Pred, which read no order book. `orderbook` — the platform's order book, in a bounded second fetch where it is a separate route: SX Bet (`/orderbook-v3/snapshot`), Hyperliquid (`l2Book`), AlphaArcade, Limitless, Pred, Polymarket US and ProphetX. A failed book read keeps `orderbook` and reports `availability: unavailable` or the record's marks, except on Polymarket US, which reports the record's own best bid and ask as `market_record`.
 type MarketDetailPricingSource string
 
 const (
@@ -4243,7 +4259,7 @@ func (m MarketDetailPricingSource) Ptr() *MarketDetailPricingSource {
 	return &m
 }
 
-// Single-market detail across all nine supported platforms. Identity fields are strict-universal (no second fetch on any platform); the pricing tier carries per-outcome quotes plus market-level aggregates with explicit nulls where a platform doesn't natively expose a figure — values are never fabricated. The trading_fees tier applies the same rule to the venue's own published fee parameters. closes_at/event_id remain deliberately omitted, see the endpoint description for the rationale.
+// Single-market detail across all ten supported platforms. Identity fields are strict-universal (no second fetch on any platform); the pricing tier carries per-outcome quotes plus market-level aggregates with explicit nulls where a platform doesn't natively expose a figure — values are never fabricated. The trading_fees tier applies the same rule to the venue's own published fee parameters. closes_at/event_id remain deliberately omitted, see the endpoint description for the rationale.
 var (
 	marketDetailResponseFieldID                   = big.NewInt(1 << 0)
 	marketDetailResponseFieldProvider             = big.NewInt(1 << 1)
@@ -4266,31 +4282,31 @@ type MarketDetailResponse struct {
 	ID string `json:"id" url:"id"`
 	// Prediction market provider the market_id resolved against.
 	Provider MarketDetailResponseProvider `json:"provider" url:"provider"`
-	// Provider-native market identifier. Kalshi ticker, Polymarket numeric id, Predict numeric id, SX Bet `marketHash`, Hyperliquid outcome id, AlphaArcade market ULID, ProphetX `<event_id>:<market_id>` (resolving the favourite primary-line strike) or `<event_id>:<market_id>:<line>` (that line), or Limitless slug. For Polymarket markets resolved by slug, this is normalized to the numeric id. Hyperliquid integer ids collide with Polymarket/Predict numeric ids, so look them up via the composite id (`hyperliquid:<id>`, as returned by `/v1/markets`) or `?provider=hyperliquid`. Limitless slugs collide with Polymarket/Predict slugs, so look them up via the composite id (`limitless:<slug>`) or `?provider=limitless`. Pred `<parent>:<child>` pairs share the `0x…64hex` shape with SX Bet hashes, so look them up via the composite id (`pred:<parent>:<child>`) or `?provider=pred`; a bare `pred:<parent>` addresses the parent as a group.
+	// Provider-native market identifier. Kalshi ticker, Polymarket numeric id, Predict numeric id, SX Bet `marketHash`, Hyperliquid outcome id, AlphaArcade market ULID, ProphetX `<event_id>:<market_id>` (resolving the favourite primary-line strike) or `<event_id>:<market_id>:<line>` (that line), Limitless slug, or Polymarket US market slug (a Polymarket US market looked up by its numeric id is published under its slug). For Polymarket markets resolved by slug, this is normalized to the numeric id. Hyperliquid integer ids collide with Polymarket/Predict numeric ids, so look them up via the composite id (`hyperliquid:<id>`, as returned by `/v1/markets`) or `?provider=hyperliquid`. Limitless slugs collide with Polymarket/Predict slugs, so look them up via the composite id (`limitless:<slug>`) or `?provider=limitless`. Pred `<parent>:<child>` pairs share the `0x…64hex` shape with SX Bet hashes, so look them up via the composite id (`pred:<parent>:<child>`) or `?provider=pred`; a bare `pred:<parent>` addresses the parent as a group. Polymarket US slugs collide with Polymarket/Predict slugs too, so look them up via the composite id (`polymarket-us:<slug>`) or `?provider=polymarket-us`.
 	ProviderID string `json:"provider_id" url:"provider_id"`
-	// Human-readable market title. Each platform exposes a slightly different field — Kalshi `title`, Polymarket `question`, Predict `title`, SX Bet composed from outcome labels (team-pair fallback) so a game's moneyline, spread, and total markets stay distinguishable, and Hyperliquid composed from outcome/question metadata.
+	// Human-readable market title. Each platform exposes a slightly different field — Kalshi `title`, Polymarket `question`, Predict `title`, SX Bet composed from outcome labels (team-pair fallback) so a game's moneyline, spread, and total markets stay distinguishable, Hyperliquid composed from outcome/question metadata, and Polymarket US its `question`, with the period a game market's question leaves out (from its `sportsMarketType`: "… (1st half)"), a count other than points, goals or runs ("… (sets)"), and, outside a game, an option's `title` where the question is its group's ("Major League Soccer Champion — Vancouver Whitecaps FC"). Every Polymarket US surface uses this title.
 	Title string `json:"title" url:"title"`
-	// Normalized lifecycle status: `open` takes orders, `closed` has stopped trading without a final result, and `settled` has the venue's published result. Only an `open` market can report `pricing.availability: live`. Mapping per platform: Kalshi `active` → open · `determined` or `amended` with the result on the record (yes, no or scalar), and `finalized` → settled · `initialized`, `inactive`, `closed` and `disputed` → closed (a challenged result is not settled). Polymarket `closed` with resolution status `resolved` (UMA's on a CTF market, `resolutionStatus` on a Polymarket Protocol V2 market) → settled · any other `closed` market (a resolution proposal pending, or a pre-2023 market with no UMA status) → closed · otherwise open. Predict `status=RESOLVED` → settled · `tradingStatus=OPEN` → open · otherwise closed. SX Bet: a reported result (`reportedDate`, a void included) → settled · otherwise `ACTIVE` → open · otherwise closed; SX Bet leaves some settled markets `ACTIVE`, so its `status` alone never decides settlement. Hyperliquid: an outcome listed in its question's `settledNamedOutcomes` → settled · otherwise open. AlphaArcade `isResolved` → settled · otherwise open. ProphetX `active` → open · otherwise closed; ProphetX serves only upcoming and live events, so a ProphetX market never reads `settled` — once its game is over the market id answers `404`. Limitless `FUNDED` / `FUNDED_FLAGGED` → open · `RESOLVED` → settled · `LOCKED`, `DRAFT` and anything else → closed. Pred `active` → open · `resolved` / `redeemed` → settled · anything else → closed. Unknown upstream values map to closed.
+	// Normalized lifecycle status: `open` takes orders, `closed` has stopped trading without a final result, and `settled` has the venue's published result. Only an `open` market can report `pricing.availability: live`. Mapping per platform: Kalshi `active` → open · `determined` or `amended` with the result on the record (yes, no or scalar), and `finalized` → settled · `initialized`, `inactive`, `closed` and `disputed` → closed (a challenged result is not settled). Polymarket `closed` with resolution status `resolved` (UMA's on a CTF market, `resolutionStatus` on a Polymarket Protocol V2 market) → settled · any other `closed` market (a resolution proposal pending, or a pre-2023 market with no UMA status) → closed · otherwise open. Predict `status=RESOLVED` → settled · `tradingStatus=OPEN` → open · otherwise closed. SX Bet: a reported result (`reportedDate`, a void included) → settled · otherwise `ACTIVE` → open · otherwise closed; SX Bet leaves some settled markets `ACTIVE`, so its `status` alone never decides settlement. Hyperliquid: an outcome listed in its question's `settledNamedOutcomes` → settled · otherwise open. AlphaArcade `isResolved` → settled · otherwise open. ProphetX `active` → open · otherwise closed; ProphetX serves only upcoming and live events, so a ProphetX market never reads `settled` — once its game is over the market id answers `404`. Limitless `FUNDED` / `FUNDED_FLAGGED` → open · `RESOLVED` → settled · `LOCKED`, `DRAFT` and anything else → closed. Pred `active` → open · `resolved` / `redeemed` → settled · anything else → closed. Polymarket US `MARKET_STATUS_RESOLVED` → settled (its result is published, even on the few markets still flagged open) · `MARKET_STATUS_OPEN` while `active` and not `closed` → open · anything else, `MARKET_STATUS_CLOSED` included, → closed. Unknown upstream values map to closed.
 	Status MarketDetailResponseStatus `json:"status" url:"status"`
 	// Outcomes with per-outcome quotes, in the venue's order.
 	//
-	// A two-sided market lists both sides, and `outcomes[0]` is the platform's primary/headline outcome: Kalshi `Yes`, Polymarket's first outcome token (its `bestBid`/`bestAsk` side), Predict `indexSet=1`, SX Bet `outcomeOne`, Hyperliquid's first `sideSpec`, ProphetX's first selection, and `Yes` on AlphaArcade, Limitless and Pred. Render `outcomes[0].price` as the headline probability; do NOT search for an outcome named "Yes" (names are free-text on Predict, SX Bet, Hyperliquid and ProphetX).
+	// A two-sided market lists both sides, and `outcomes[0]` is the platform's primary/headline outcome: Kalshi `Yes`, Polymarket's first outcome token (its `bestBid`/`bestAsk` side), Predict `indexSet=1`, SX Bet `outcomeOne`, Hyperliquid's first `sideSpec`, ProphetX's first selection, Polymarket US's long (YES) side, and `Yes` on AlphaArcade, Limitless and Pred. Render `outcomes[0].price` as the headline probability; do NOT search for an outcome named "Yes" (names are free-text on Predict, SX Bet, Hyperliquid, ProphetX and Polymarket US).
 	//
 	// A market that groups several options lists one outcome per option: an AlphaArcade multi-choice market, a Limitless group, and a Pred parent. Each outcome is that option's YES, and its `outcome_id` is the option's own composite market id, which this endpoint resolves. A group has no headline outcome, and it can list dozens of outcomes (21 on AlphaArcade's 2028 presidential market), so never assume two.
 	Outcomes    []*MarketDetailOutcome   `json:"outcomes" url:"outcomes"`
 	Pricing     *MarketDetailPricing     `json:"pricing" url:"pricing"`
 	TradingFees *MarketDetailTradingFees `json:"trading_fees" url:"trading_fees"`
-	// Resting order-book depth valued in USD — strictly CLOB book depth, never an AMM pool size or a synthetic score. Polymarket exposes it natively (`liquidityNum`); null for Kalshi (its upstream `liquidity_dollars` is deprecated and always zero), Predict (stats is null on the record), and SX Bet/Hyperliquid (no scalar without summing the raw order book).
+	// Resting order-book depth valued in USD — strictly CLOB book depth, never an AMM pool size or a synthetic score. Polymarket exposes it natively (`liquidityNum`); null for Kalshi (its upstream `liquidity_dollars` is deprecated and always zero), Predict (stats is null on the record), and SX Bet/Hyperliquid/Polymarket US (no scalar without summing the raw order book).
 	LiquidityUsd *float64 `json:"liquidity_usd,omitempty" url:"liquidity_usd,omitempty"`
-	// Trailing-24h traded volume in USD notional. Null where the platform doesn't denominate volume in USD — notably Kalshi (contracts; see `volume_24h_contracts`) — or doesn't expose a volume aggregate at all (SX Bet, Hyperliquid, Predict's record).
+	// Trailing-24h traded volume in USD notional. Null where the platform doesn't denominate volume in USD — notably Kalshi (contracts; see `volume_24h_contracts`) — or doesn't expose a volume aggregate at all (SX Bet, Hyperliquid, Predict's record, Polymarket US).
 	Volume24HUsd *float64 `json:"volume_24h_usd,omitempty" url:"volume_24h_usd,omitempty"`
-	// Lifetime traded volume in USD notional. Same per-platform availability as `volume_24h_usd`. Never fabricated by converting contract counts through a price.
+	// Lifetime traded volume in USD notional. Same per-platform availability as `volume_24h_usd`, except Polymarket US, whose order book publishes its lifetime `notionalTraded` (null on a settled market, whose book is not read). Never fabricated by converting contract counts through a price.
 	VolumeTotalUsd *float64 `json:"volume_total_usd,omitempty" url:"volume_total_usd,omitempty"`
 	// Trailing-24h traded volume in contracts (Kalshi `volume_24h_fp`; fractional contracts supported). Omitted for platforms that denominate volume in USD.
 	Volume24HContracts *float64 `json:"volume_24h_contracts,omitempty" url:"volume_24h_contracts,omitempty"`
-	// Lifetime traded volume in contracts (Kalshi `volume_fp`). Omitted for platforms that denominate volume in USD.
+	// Lifetime traded volume in contracts (Kalshi `volume_fp`, Polymarket US's book `sharesTraded`). Omitted where the platform publishes no contract count.
 	VolumeTotalContracts *float64 `json:"volume_total_contracts,omitempty" url:"volume_total_contracts,omitempty"`
-	// Total outstanding contracts (Kalshi `open_interest_fp`). Contracts, not USD — a positioning gauge kept separate from `liquidity_usd` (depth). Omitted where the platform doesn't expose market-level open interest.
+	// Total outstanding contracts (Kalshi `open_interest_fp`, Polymarket US's book `openInterest`). Contracts, not USD — a positioning gauge kept separate from `liquidity_usd` (depth). Omitted where the platform doesn't expose market-level open interest.
 	OpenInterest *float64 `json:"open_interest,omitempty" url:"open_interest,omitempty"`
 
 	// Private bitmask of fields set to an explicit value and therefore not to be omitted
@@ -4556,15 +4572,16 @@ func (m *MarketDetailResponse) String() string {
 type MarketDetailResponseProvider string
 
 const (
-	MarketDetailResponseProviderKalshi      MarketDetailResponseProvider = "kalshi"
-	MarketDetailResponseProviderPolymarket  MarketDetailResponseProvider = "polymarket"
-	MarketDetailResponseProviderPredict     MarketDetailResponseProvider = "predict"
-	MarketDetailResponseProviderSxbet       MarketDetailResponseProvider = "sxbet"
-	MarketDetailResponseProviderHyperliquid MarketDetailResponseProvider = "hyperliquid"
-	MarketDetailResponseProviderAlphaArcade MarketDetailResponseProvider = "alpha-arcade"
-	MarketDetailResponseProviderProphetx    MarketDetailResponseProvider = "prophetx"
-	MarketDetailResponseProviderLimitless   MarketDetailResponseProvider = "limitless"
-	MarketDetailResponseProviderPred        MarketDetailResponseProvider = "pred"
+	MarketDetailResponseProviderKalshi       MarketDetailResponseProvider = "kalshi"
+	MarketDetailResponseProviderPolymarket   MarketDetailResponseProvider = "polymarket"
+	MarketDetailResponseProviderPredict      MarketDetailResponseProvider = "predict"
+	MarketDetailResponseProviderSxbet        MarketDetailResponseProvider = "sxbet"
+	MarketDetailResponseProviderHyperliquid  MarketDetailResponseProvider = "hyperliquid"
+	MarketDetailResponseProviderAlphaArcade  MarketDetailResponseProvider = "alpha-arcade"
+	MarketDetailResponseProviderProphetx     MarketDetailResponseProvider = "prophetx"
+	MarketDetailResponseProviderLimitless    MarketDetailResponseProvider = "limitless"
+	MarketDetailResponseProviderPred         MarketDetailResponseProvider = "pred"
+	MarketDetailResponseProviderPolymarketUs MarketDetailResponseProvider = "polymarket-us"
 )
 
 func NewMarketDetailResponseProviderFromString(s string) (MarketDetailResponseProvider, error) {
@@ -4587,6 +4604,8 @@ func NewMarketDetailResponseProviderFromString(s string) (MarketDetailResponsePr
 		return MarketDetailResponseProviderLimitless, nil
 	case "pred":
 		return MarketDetailResponseProviderPred, nil
+	case "polymarket-us":
+		return MarketDetailResponseProviderPolymarketUs, nil
 	}
 	var t MarketDetailResponseProvider
 	return "", fmt.Errorf("%s is not a valid %T", s, t)
@@ -4596,7 +4615,7 @@ func (m MarketDetailResponseProvider) Ptr() *MarketDetailResponseProvider {
 	return &m
 }
 
-// Normalized lifecycle status: `open` takes orders, `closed` has stopped trading without a final result, and `settled` has the venue's published result. Only an `open` market can report `pricing.availability: live`. Mapping per platform: Kalshi `active` → open · `determined` or `amended` with the result on the record (yes, no or scalar), and `finalized` → settled · `initialized`, `inactive`, `closed` and `disputed` → closed (a challenged result is not settled). Polymarket `closed` with resolution status `resolved` (UMA's on a CTF market, `resolutionStatus` on a Polymarket Protocol V2 market) → settled · any other `closed` market (a resolution proposal pending, or a pre-2023 market with no UMA status) → closed · otherwise open. Predict `status=RESOLVED` → settled · `tradingStatus=OPEN` → open · otherwise closed. SX Bet: a reported result (`reportedDate`, a void included) → settled · otherwise `ACTIVE` → open · otherwise closed; SX Bet leaves some settled markets `ACTIVE`, so its `status` alone never decides settlement. Hyperliquid: an outcome listed in its question's `settledNamedOutcomes` → settled · otherwise open. AlphaArcade `isResolved` → settled · otherwise open. ProphetX `active` → open · otherwise closed; ProphetX serves only upcoming and live events, so a ProphetX market never reads `settled` — once its game is over the market id answers `404`. Limitless `FUNDED` / `FUNDED_FLAGGED` → open · `RESOLVED` → settled · `LOCKED`, `DRAFT` and anything else → closed. Pred `active` → open · `resolved` / `redeemed` → settled · anything else → closed. Unknown upstream values map to closed.
+// Normalized lifecycle status: `open` takes orders, `closed` has stopped trading without a final result, and `settled` has the venue's published result. Only an `open` market can report `pricing.availability: live`. Mapping per platform: Kalshi `active` → open · `determined` or `amended` with the result on the record (yes, no or scalar), and `finalized` → settled · `initialized`, `inactive`, `closed` and `disputed` → closed (a challenged result is not settled). Polymarket `closed` with resolution status `resolved` (UMA's on a CTF market, `resolutionStatus` on a Polymarket Protocol V2 market) → settled · any other `closed` market (a resolution proposal pending, or a pre-2023 market with no UMA status) → closed · otherwise open. Predict `status=RESOLVED` → settled · `tradingStatus=OPEN` → open · otherwise closed. SX Bet: a reported result (`reportedDate`, a void included) → settled · otherwise `ACTIVE` → open · otherwise closed; SX Bet leaves some settled markets `ACTIVE`, so its `status` alone never decides settlement. Hyperliquid: an outcome listed in its question's `settledNamedOutcomes` → settled · otherwise open. AlphaArcade `isResolved` → settled · otherwise open. ProphetX `active` → open · otherwise closed; ProphetX serves only upcoming and live events, so a ProphetX market never reads `settled` — once its game is over the market id answers `404`. Limitless `FUNDED` / `FUNDED_FLAGGED` → open · `RESOLVED` → settled · `LOCKED`, `DRAFT` and anything else → closed. Pred `active` → open · `resolved` / `redeemed` → settled · anything else → closed. Polymarket US `MARKET_STATUS_RESOLVED` → settled (its result is published, even on the few markets still flagged open) · `MARKET_STATUS_OPEN` while `active` and not `closed` → open · anything else, `MARKET_STATUS_CLOSED` included, → closed. Unknown upstream values map to closed.
 type MarketDetailResponseStatus string
 
 const (
@@ -4752,7 +4771,7 @@ func (m *MarketDetailScheduledFeeChange) String() string {
 
 // The trading fee the PREDICTION MARKET charges on a trade in this market — the venue's own published parameters, normalized. This has nothing to do with PredictorSDK's subscription pricing.
 //
-// Always present on the response. Every published model across the nine platforms is a per-share fee times the traded share count, and only the price term differs, so `taker.model` plus its parameters expresses each venue exactly rather than approximating any of them — except Limitless, whose taker curve is published as table rows with no closed form: its descriptor reports `partial` with a null taker leg instead of inventing a number. (A Limitless market with fees disabled reports `published` with both legs zero — an asserted free, never an unknown. A Pred market whose record omits `fee_rate_bps` reports `partial` for the same reason: the venue's own integration note says absent fee configuration must be confirmed, not assumed fee-free.) Compute the fee yourself:
+// Always present on the response. Every published model across the ten platforms is a per-share fee times the traded share count, and only the price term differs, so `taker.model` plus its parameters expresses each venue exactly rather than approximating any of them — except Limitless, whose taker curve is published as table rows with no closed form: its descriptor reports `partial` with a null taker leg instead of inventing a number. (A Limitless market with fees disabled reports `published` with both legs zero — an asserted free, never an unknown. A Pred market whose record omits `fee_rate_bps` reports `partial` for the same reason: the venue's own integration note says absent fee configuration must be confirmed, not assumed fee-free.) Compute the fee yourself:
 //
 // `fee = shares × f(price)`, then apply `rounding`, where `f` is
 //
@@ -4765,7 +4784,7 @@ func (m *MarketDetailScheduledFeeChange) String() string {
 //
 // `availability` and the legs are on separate axes on purpose: availability says what is KNOWN, the legs say what is CHARGED. A fee-free market is `availability: published` with `model: "none"` and `rate: 0` — an asserted zero, distinguishable from `unpublished` (the venue publishes nothing) and from `account_specific` (rates exist but are per-account).
 //
-// OUT OF SCOPE and therefore not modeled as fields, though each is real and moves the number: rebates (Polymarket's maker-rebate and taker-rebate programs), per-account discounts (Predict's 10% invite discount), volume/staking tiers and the market deployer's own fee, its `deployerFeeScale` (Hyperliquid), and third-party pass-through (Kalshi FCM customers, Polymarket builder fees). The parameters here are the venue's PUBLISHED base for this market; a specific account may pay less.
+// OUT OF SCOPE and therefore not modeled as fields, though each is real and moves the number: rebates (Polymarket's maker-rebate and taker-rebate programs, Polymarket US's maker- and taker-rebate tiers), per-account discounts (Predict's 10% invite discount), volume/staking tiers and the market deployer's own fee, its `deployerFeeScale` (Hyperliquid), and third-party pass-through (Kalshi FCM customers, Polymarket builder fees). The parameters here are the venue's PUBLISHED base for this market; a specific account may pay less.
 var (
 	marketDetailTradingFeesFieldAvailability    = big.NewInt(1 << 0)
 	marketDetailTradingFeesFieldObservedAt      = big.NewInt(1 << 1)
@@ -4783,7 +4802,7 @@ type MarketDetailTradingFees struct {
 	//
 	// Named `observed_at` rather than `as_of` deliberately: `pricing.as_of` is the provider record's own last-update time, which is a different thing, and reusing the name for a differently-defined timestamp would bake that confusion into a second field. Null when nothing is read at request time (`source: venue_schedule`) or when nothing could be read (`availability: unavailable`).
 	ObservedAt *time.Time `json:"observed_at,omitempty" url:"observed_at,omitempty"`
-	// Where the parameters came from, so a latency-sensitive consumer knows which platforms cost extra hops. `market_record` — embedded in the same market record the identity fetch already returned (Polymarket `feeSchedule`, Predict `feeRateBps`, AlphaArcade `feeBasePercent`); zero extra fetches. `series_record` — the parameters live on parent records and cost up to three small, TTL-cached hops (Kalshi: the event record for its series ticker and any fee override in force, the series for the base `fee_type`/`fee_multiplier` that override supersedes, then the event's pending fee changes for `scheduled_change`). `venue_schedule` — the venue exposes no per-market parameter and the answer comes from its published schedule (SX Bet, Hyperliquid).
+	// Where the parameters came from, so a latency-sensitive consumer knows which platforms cost extra hops. `market_record` — embedded in the same market record the identity fetch already returned (Polymarket `feeSchedule`, Predict `feeRateBps`, AlphaArcade `feeBasePercent`, Polymarket US `feeCoefficient`); zero extra fetches. `series_record` — the parameters live on parent records and cost up to three small, TTL-cached hops (Kalshi: the event record for its series ticker and any fee override in force, the series for the base `fee_type`/`fee_multiplier` that override supersedes, then the event's pending fee changes for `scheduled_change`). `venue_schedule` — the venue exposes no per-market parameter and the answer comes from its published schedule (SX Bet, Hyperliquid).
 	Source MarketDetailTradingFeesSource `json:"source" url:"source"`
 	// What the fee is assessed on. `fill` — assessed when the order fills, from the traded share count and the fill price. `settlement_profit` — assessed at settlement, on profit (total return − stake), and only on a position that WON; a loss or a void is never charged. `close_or_settlement` — assessed when a position is closed or settles, and never when one is opened.
 	//
@@ -5028,7 +5047,7 @@ func (m MarketDetailTradingFeesChargeBasis) Ptr() *MarketDetailTradingFeesCharge
 	return &m
 }
 
-// Where the parameters came from, so a latency-sensitive consumer knows which platforms cost extra hops. `market_record` — embedded in the same market record the identity fetch already returned (Polymarket `feeSchedule`, Predict `feeRateBps`, AlphaArcade `feeBasePercent`); zero extra fetches. `series_record` — the parameters live on parent records and cost up to three small, TTL-cached hops (Kalshi: the event record for its series ticker and any fee override in force, the series for the base `fee_type`/`fee_multiplier` that override supersedes, then the event's pending fee changes for `scheduled_change`). `venue_schedule` — the venue exposes no per-market parameter and the answer comes from its published schedule (SX Bet, Hyperliquid).
+// Where the parameters came from, so a latency-sensitive consumer knows which platforms cost extra hops. `market_record` — embedded in the same market record the identity fetch already returned (Polymarket `feeSchedule`, Predict `feeRateBps`, AlphaArcade `feeBasePercent`, Polymarket US `feeCoefficient`); zero extra fetches. `series_record` — the parameters live on parent records and cost up to three small, TTL-cached hops (Kalshi: the event record for its series ticker and any fee override in force, the series for the base `fee_type`/`fee_multiplier` that override supersedes, then the event's pending fee changes for `scheduled_change`). `venue_schedule` — the venue exposes no per-market parameter and the answer comes from its published schedule (SX Bet, Hyperliquid).
 type MarketDetailTradingFeesSource string
 
 const (
@@ -7322,15 +7341,16 @@ func (u *UnifiedMarket) String() string {
 type UnifiedMarketProvider string
 
 const (
-	UnifiedMarketProviderKalshi      UnifiedMarketProvider = "kalshi"
-	UnifiedMarketProviderPolymarket  UnifiedMarketProvider = "polymarket"
-	UnifiedMarketProviderPredict     UnifiedMarketProvider = "predict"
-	UnifiedMarketProviderSxbet       UnifiedMarketProvider = "sxbet"
-	UnifiedMarketProviderHyperliquid UnifiedMarketProvider = "hyperliquid"
-	UnifiedMarketProviderAlphaArcade UnifiedMarketProvider = "alpha-arcade"
-	UnifiedMarketProviderProphetx    UnifiedMarketProvider = "prophetx"
-	UnifiedMarketProviderLimitless   UnifiedMarketProvider = "limitless"
-	UnifiedMarketProviderPred        UnifiedMarketProvider = "pred"
+	UnifiedMarketProviderKalshi       UnifiedMarketProvider = "kalshi"
+	UnifiedMarketProviderPolymarket   UnifiedMarketProvider = "polymarket"
+	UnifiedMarketProviderPredict      UnifiedMarketProvider = "predict"
+	UnifiedMarketProviderSxbet        UnifiedMarketProvider = "sxbet"
+	UnifiedMarketProviderHyperliquid  UnifiedMarketProvider = "hyperliquid"
+	UnifiedMarketProviderAlphaArcade  UnifiedMarketProvider = "alpha-arcade"
+	UnifiedMarketProviderProphetx     UnifiedMarketProvider = "prophetx"
+	UnifiedMarketProviderLimitless    UnifiedMarketProvider = "limitless"
+	UnifiedMarketProviderPred         UnifiedMarketProvider = "pred"
+	UnifiedMarketProviderPolymarketUs UnifiedMarketProvider = "polymarket-us"
 )
 
 func NewUnifiedMarketProviderFromString(s string) (UnifiedMarketProvider, error) {
@@ -7353,6 +7373,8 @@ func NewUnifiedMarketProviderFromString(s string) (UnifiedMarketProvider, error)
 		return UnifiedMarketProviderLimitless, nil
 	case "pred":
 		return UnifiedMarketProviderPred, nil
+	case "polymarket-us":
+		return UnifiedMarketProviderPolymarketUs, nil
 	}
 	var t UnifiedMarketProvider
 	return "", fmt.Errorf("%s is not a valid %T", s, t)

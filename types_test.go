@@ -15868,6 +15868,13 @@ func TestEnumCanonicalSportsSourceMarketProvider(t *testing.T) {
 		assert.Equal(t, CanonicalSportsSourceMarketProvider("hyperliquid"), val, "enum value should match expected wire value")
 	})
 
+	t.Run("NewFromString_polymarket_us", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewCanonicalSportsSourceMarketProviderFromString("polymarket-us")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, CanonicalSportsSourceMarketProvider("polymarket-us"), val, "enum value should match expected wire value")
+	})
+
 	t.Run("NewFromString_Invalid", func(t *testing.T) {
 		_, err := NewCanonicalSportsSourceMarketProviderFromString("invalid_value_that_does_not_exist")
 		assert.Error(t, err)
@@ -15982,6 +15989,13 @@ func TestEnumEventResponseProvider(t *testing.T) {
 		assert.Equal(t, EventResponseProvider("pred"), val, "enum value should match expected wire value")
 	})
 
+	t.Run("NewFromString_polymarket_us", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewEventResponseProviderFromString("polymarket-us")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, EventResponseProvider("polymarket-us"), val, "enum value should match expected wire value")
+	})
+
 	t.Run("NewFromString_Invalid", func(t *testing.T) {
 		_, err := NewEventResponseProviderFromString("invalid_value_that_does_not_exist")
 		assert.Error(t, err)
@@ -16058,6 +16072,13 @@ func TestEnumGetEventRequestProvider(t *testing.T) {
 		val, err := NewGetEventRequestProviderFromString("pred")
 		assert.NoError(t, err, "valid enum value should not return error")
 		assert.Equal(t, GetEventRequestProvider("pred"), val, "enum value should match expected wire value")
+	})
+
+	t.Run("NewFromString_polymarket_us", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewGetEventRequestProviderFromString("polymarket-us")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, GetEventRequestProvider("polymarket-us"), val, "enum value should match expected wire value")
 	})
 
 	t.Run("NewFromString_Invalid", func(t *testing.T) {
@@ -16138,6 +16159,13 @@ func TestEnumGetMarketRequestProvider(t *testing.T) {
 		assert.Equal(t, GetMarketRequestProvider("pred"), val, "enum value should match expected wire value")
 	})
 
+	t.Run("NewFromString_polymarket_us", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewGetMarketRequestProviderFromString("polymarket-us")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, GetMarketRequestProvider("polymarket-us"), val, "enum value should match expected wire value")
+	})
+
 	t.Run("NewFromString_Invalid", func(t *testing.T) {
 		_, err := NewGetMarketRequestProviderFromString("invalid_value_that_does_not_exist")
 		assert.Error(t, err)
@@ -16214,6 +16242,13 @@ func TestEnumGetMarketsRequestProvider(t *testing.T) {
 		val, err := NewGetMarketsRequestProviderFromString("pred")
 		assert.NoError(t, err, "valid enum value should not return error")
 		assert.Equal(t, GetMarketsRequestProvider("pred"), val, "enum value should match expected wire value")
+	})
+
+	t.Run("NewFromString_polymarket_us", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewGetMarketsRequestProviderFromString("polymarket-us")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, GetMarketsRequestProvider("polymarket-us"), val, "enum value should match expected wire value")
 	})
 
 	t.Run("NewFromString_Invalid", func(t *testing.T) {
@@ -16717,6 +16752,13 @@ func TestEnumMarketDetailResponseProvider(t *testing.T) {
 		assert.Equal(t, MarketDetailResponseProvider("pred"), val, "enum value should match expected wire value")
 	})
 
+	t.Run("NewFromString_polymarket_us", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewMarketDetailResponseProviderFromString("polymarket-us")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, MarketDetailResponseProvider("polymarket-us"), val, "enum value should match expected wire value")
+	})
+
 	t.Run("NewFromString_Invalid", func(t *testing.T) {
 		_, err := NewMarketDetailResponseProviderFromString("invalid_value_that_does_not_exist")
 		assert.Error(t, err)
@@ -17108,6 +17150,13 @@ func TestEnumUnifiedMarketProvider(t *testing.T) {
 		val, err := NewUnifiedMarketProviderFromString("pred")
 		assert.NoError(t, err, "valid enum value should not return error")
 		assert.Equal(t, UnifiedMarketProvider("pred"), val, "enum value should match expected wire value")
+	})
+
+	t.Run("NewFromString_polymarket_us", func(t *testing.T) {
+		t.Parallel()
+		val, err := NewUnifiedMarketProviderFromString("polymarket-us")
+		assert.NoError(t, err, "valid enum value should not return error")
+		assert.Equal(t, UnifiedMarketProvider("polymarket-us"), val, "enum value should match expected wire value")
 	})
 
 	t.Run("NewFromString_Invalid", func(t *testing.T) {
